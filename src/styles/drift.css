@@ -1,0 +1,434 @@
+/* ============================================================
+   BLANE — Health Drift Detection Stylesheet
+   Standalone: no :root variables, all values literal.
+   All units in px (no rem).
+   ============================================================ */
+
+/* ============================================================
+   DRIFT SECTION WRAPPER
+   ============================================================ */
+.drift-section {
+  background: #0d1a12;
+  border: 1px solid rgba(45, 220, 122, 0.12);
+  border-radius: 20px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.25s;
+}
+
+.drift-section:hover {
+  border-color: rgba(45, 220, 122, 0.22);
+}
+
+.drift-section::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(45, 220, 122, 0.4), transparent);
+}
+
+/* ---- Header ---- */
+.drift-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.drift-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.drift-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(45, 220, 122, 0.12);
+  border: 1px solid rgba(45, 220, 122, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.drift-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: #e8f5ee;
+}
+
+.drift-sub {
+  font-size: 12px;
+  color: #4d6e5a;
+  margin-top: 1px;
+}
+
+.drift-range-badge {
+  font-size: 11px;
+  background: #111f16;
+  border: 1px solid rgba(45, 220, 122, 0.15);
+  border-radius: 100px;
+  padding: 3px 12px;
+  color: #4d6e5a;
+}
+
+/* ============================================================
+   OVERALL HEALTH SCORE
+   ============================================================ */
+.drift-score-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: #111f16;
+  border: 1px solid rgba(45, 220, 122, 0.1);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.drift-score-circle-wrap {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+}
+
+.drift-score-circle-wrap svg {
+  transform: rotate(-90deg);
+}
+
+.drift-score-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.drift-score-num {
+  font-family: 'Syne', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.drift-score-label-sm {
+  font-size: 9px;
+  color: #4d6e5a;
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.drift-score-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.drift-score-status {
+  font-family: 'Syne', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.drift-score-desc {
+  font-size: 13px;
+  color: #8aab96;
+  line-height: 1.5;
+}
+
+/* Score bar */
+.drift-score-bar-wrap {
+  flex: 1;
+  min-width: 120px;
+}
+
+.drift-score-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #4d6e5a;
+  margin-bottom: 5px;
+}
+
+.drift-score-bar-bg {
+  height: 8px;
+  background: #0d1a12;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.drift-score-bar-fill {
+  height: 8px;
+  border-radius: 8px;
+  transition: width 1s ease;
+}
+
+/* ============================================================
+   METRIC DRIFT CARDS GRID
+   ============================================================ */
+.drift-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+/* ---- Individual metric card ---- */
+.drift-card {
+  background: #060d0a;
+  border: 1px solid rgba(45, 220, 122, 0.1);
+  border-radius: 14px;
+  padding: 16px;
+  transition: border-color 0.22s, transform 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.drift-card:hover {
+  border-color: rgba(45, 220, 122, 0.25);
+  transform: translateY(-2px);
+}
+
+/* Left accent bar */
+.drift-card::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  transition: background 0.3s;
+}
+
+.drift-card.status-good::after    { background: #2ddc7a; }
+.drift-card.status-warning::after { background: #fbbf24; }
+.drift-card.status-danger::after  { background: #f87171; }
+.drift-card.status-neutral::after { background: #4d6e5a; }
+
+/* Card header */
+.drift-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.drift-card-icon-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drift-card-emoji {
+  font-size: 16px;
+}
+
+.drift-card-name {
+  font-size: 12px;
+  color: #8aab96;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* Trend arrow badge */
+.drift-trend-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 100px;
+}
+
+.drift-trend-badge.up-bad {
+  background: rgba(248, 113, 113, 0.1);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.2);
+}
+
+.drift-trend-badge.up-good {
+  background: rgba(45, 220, 122, 0.1);
+  color: #2ddc7a;
+  border: 1px solid rgba(45, 220, 122, 0.2);
+}
+
+.drift-trend-badge.down-bad {
+  background: rgba(248, 113, 113, 0.1);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.2);
+}
+
+.drift-trend-badge.down-good {
+  background: rgba(45, 220, 122, 0.1);
+  color: #2ddc7a;
+  border: 1px solid rgba(45, 220, 122, 0.2);
+}
+
+.drift-trend-badge.stable {
+  background: rgba(96, 165, 250, 0.1);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+.drift-trend-badge.irregular {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+/* Current value */
+.drift-card-value {
+  font-family: 'Syne', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  color: #e8f5ee;
+  line-height: 1;
+  margin-bottom: 3px;
+}
+
+.drift-card-value-unit {
+  font-size: 13px;
+  color: #4d6e5a;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+}
+
+.drift-card-context {
+  font-size: 12px;
+  color: #4d6e5a;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+/* Mini chart */
+.drift-chart-wrap {
+  height: 40px;
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.drift-mini-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+/* Risk label */
+.drift-risk-label {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 100px;
+  display: inline-block;
+}
+
+.drift-risk-label.good {
+  background: rgba(45, 220, 122, 0.1);
+  color: #2ddc7a;
+  border: 1px solid rgba(45, 220, 122, 0.2);
+}
+
+.drift-risk-label.warning {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.drift-risk-label.danger {
+  background: rgba(248, 113, 113, 0.1);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.2);
+}
+
+.drift-risk-label.neutral {
+  background: rgba(77, 110, 90, 0.15);
+  color: #4d6e5a;
+  border: 1px solid rgba(77, 110, 90, 0.25);
+}
+
+/* ============================================================
+   NO DATA STATE
+   ============================================================ */
+.drift-no-data {
+  text-align: center;
+  padding: 32px 20px;
+  color: #4d6e5a;
+}
+
+.drift-no-data-icon {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 10px;
+  opacity: 0.5;
+}
+
+.drift-no-data p {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.drift-no-data a {
+  color: #2ddc7a;
+  text-decoration: none;
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes drift-fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.drift-card {
+  animation: drift-fade-in 0.4s ease both;
+}
+
+.drift-card:nth-child(1) { animation-delay: 0.05s; }
+.drift-card:nth-child(2) { animation-delay: 0.10s; }
+.drift-card:nth-child(3) { animation-delay: 0.15s; }
+.drift-card:nth-child(4) { animation-delay: 0.20s; }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1024px) {
+  .drift-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .drift-cards-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .drift-card {
+    padding: 12px;
+  }
+
+  .drift-card-value {
+    font-size: 20px;
+  }
+
+  .drift-score-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}

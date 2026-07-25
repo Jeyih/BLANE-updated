@@ -1,0 +1,363 @@
+/* ============================================================
+   BLANE — Recipe Recommendation Stylesheet
+   Standalone: no :root variables, all values literal.
+   All units in px (no rem).
+   ============================================================ */
+
+/* ============================================================
+   RECOMMENDATION WIDGET WRAPPER
+   ============================================================ */
+.rec-widget {
+  background: #0d1a12;
+  border: 1px solid rgba(45, 220, 122, 0.12);
+  border-radius: 20px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.25s;
+}
+
+.rec-widget:hover {
+  border-color: rgba(45, 220, 122, 0.22);
+}
+
+.rec-widget::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(45, 220, 122, 0.4), transparent);
+}
+
+/* ---- Header ---- */
+.rec-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rec-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rec-header-icon {
+  width: 36px;
+  height: 36px;
+  background: rgba(45, 220, 122, 0.12);
+  border: 1px solid rgba(45, 220, 122, 0.2);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.rec-header-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: #e8f5ee;
+}
+
+.rec-header-sub {
+  font-size: 12px;
+  color: #4d6e5a;
+  margin-top: 1px;
+}
+
+.rec-view-all-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 1px solid rgba(45, 220, 122, 0.2);
+  border-radius: 9px;
+  padding: 6px 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  color: #4d6e5a;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.rec-view-all-btn:hover {
+  border-color: rgba(45, 220, 122, 0.4);
+  color: #2ddc7a;
+  background: rgba(45, 220, 122, 0.04);
+}
+
+/* ============================================================
+   TOP 3 CARDS GRID
+   ============================================================ */
+.rec-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+/* ---- Individual recommendation card ---- */
+.rec-card {
+  background: #111f16;
+  border: 1px solid rgba(45, 220, 122, 0.1);
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color 0.22s, transform 0.2s, box-shadow 0.22s;
+  display: flex;
+  flex-direction: column;
+  animation: rec-fadein 0.4s ease both;
+}
+
+.rec-card:nth-child(1) { animation-delay: 0.05s; }
+.rec-card:nth-child(2) { animation-delay: 0.12s; }
+.rec-card:nth-child(3) { animation-delay: 0.19s; }
+
+@keyframes rec-fadein {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.rec-card:hover {
+  border-color: rgba(45, 220, 122, 0.3);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+/* Rank ribbon */
+.rec-card-rank {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 16px;
+  z-index: 2;
+}
+
+/* Emoji banner */
+.rec-card-banner {
+  height: 90px;
+  background: #0d1a12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.rec-card-type-tag {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 10px;
+  background: rgba(6, 13, 10, 0.82);
+  border: 1px solid rgba(45, 220, 122, 0.18);
+  border-radius: 100px;
+  padding: 2px 8px;
+  color: #2ddc7a;
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
+  backdrop-filter: blur(4px);
+}
+
+/* Card body */
+.rec-card-body {
+  padding: 12px 14px 14px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rec-card-name {
+  font-family: 'Syne', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #e8f5ee;
+  line-height: 1.3;
+}
+
+/* Match score row */
+.rec-score-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rec-score-ring {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.rec-score-ring svg {
+  transform: rotate(-90deg);
+}
+
+.rec-score-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Syne', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.rec-score-info {
+  flex: 1;
+}
+
+.rec-score-label {
+  font-size: 10px;
+  color: #4d6e5a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.rec-score-bar-bg {
+  height: 4px;
+  background: #0d1a12;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.rec-score-bar-fill {
+  height: 4px;
+  border-radius: 4px;
+  transition: width 0.8s ease;
+}
+
+/* Reason text */
+.rec-reason {
+  font-size: 11px;
+  color: #8aab96;
+  line-height: 1.5;
+  border-top: 1px solid rgba(45, 220, 122, 0.07);
+  padding-top: 8px;
+  margin-top: auto;
+}
+
+.rec-reason strong {
+  color: #2ddc7a;
+  font-weight: 600;
+}
+
+/* Quick stats row */
+.rec-stats {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rec-stat-chip {
+  font-size: 10px;
+  background: #0d1a12;
+  border: 1px solid rgba(45, 220, 122, 0.1);
+  border-radius: 6px;
+  padding: 2px 7px;
+  color: #4d6e5a;
+}
+
+.rec-stat-chip b {
+  color: #8aab96;
+  font-weight: 600;
+}
+
+/* ============================================================
+   LOADING STATE
+   ============================================================ */
+.rec-loading {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.rec-skeleton-card {
+  background: #111f16;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.rec-skeleton-banner {
+  height: 90px;
+  background: linear-gradient(90deg, #111f16 25%, #1a2e1f 50%, #111f16 75%);
+  background-size: 200% 100%;
+  animation: rec-shimmer 1.4s infinite;
+}
+
+.rec-skeleton-body {
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rec-skeleton-line {
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #111f16 25%, #1a2e1f 50%, #111f16 75%);
+  background-size: 200% 100%;
+  animation: rec-shimmer 1.4s infinite;
+}
+
+@keyframes rec-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ============================================================
+   NO PROFILE STATE
+   ============================================================ */
+.rec-no-profile {
+  text-align: center;
+  padding: 28px 20px;
+  color: #4d6e5a;
+}
+
+.rec-no-profile-icon {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 10px;
+  opacity: 0.5;
+}
+
+.rec-no-profile p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.rec-no-profile a {
+  color: #2ddc7a;
+  text-decoration: none;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1024px) {
+  .rec-cards-grid,
+  .rec-loading {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .rec-cards-grid,
+  .rec-loading {
+    grid-template-columns: 1fr;
+  }
+
+  .rec-card-banner { height: 70px; font-size: 36px; }
+}

@@ -1,0 +1,170 @@
+/* ============================================================
+   BLANE — Seasonal Availability Engine Stylesheet
+   Standalone: no :root variables, all values literal.
+   All units in px (no rem).
+   ============================================================ */
+
+/* ============================================================
+   SEASON BADGE (on recipe/meal cards)
+   ============================================================ */
+.season-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 100px;
+  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif;
+  letter-spacing: 0.3px;
+}
+
+.season-badge.in-season {
+  background: rgba(45, 220, 122, 0.12);
+  color: #2ddc7a;
+  border: 1px solid rgba(45, 220, 122, 0.25);
+}
+
+.season-badge.partial {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+}
+
+.season-badge.out-of-season {
+  background: rgba(248, 113, 113, 0.08);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.18);
+}
+
+.season-badge.year-round {
+  background: rgba(96, 165, 250, 0.1);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+/* ============================================================
+   INGREDIENT SEASON TAG (inside recipe detail modal)
+   ============================================================ */
+.ing-season-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 100px;
+  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.ing-season-tag.in-season {
+  background: rgba(45, 220, 122, 0.1);
+  color: #2ddc7a;
+  border: 1px solid rgba(45, 220, 122, 0.2);
+}
+
+.ing-season-tag.out-of-season {
+  background: rgba(248, 113, 113, 0.07);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.15);
+}
+
+.ing-season-tag.year-round {
+  background: rgba(96, 165, 250, 0.08);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.15);
+}
+
+/* ============================================================
+   SEASONAL ALTERNATIVE BANNER
+   (shown below out-of-season ingredient rows in modal)
+   ============================================================ */
+.seasonal-alt-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: rgba(251, 191, 36, 0.06);
+  border: 1px solid rgba(251, 191, 36, 0.18);
+  border-radius: 9px;
+  padding: 8px 11px;
+  margin-top: 5px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #8aab96;
+  line-height: 1.5;
+  animation: sea-fadein 0.3s ease both;
+}
+
+@keyframes sea-fadein {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.seasonal-alt-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+
+.seasonal-alt-text strong { color: #fbbf24; font-weight: 600; }
+
+/* ============================================================
+   CURRENT SEASON PILL (top of recipes page)
+   ============================================================ */
+.current-season-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  border: 1px solid;
+}
+
+.current-season-pill.wet {
+  background: rgba(96, 165, 250, 0.1);
+  color: #60a5fa;
+  border-color: rgba(96, 165, 250, 0.25);
+}
+
+.current-season-pill.dry {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.25);
+}
+
+/* ============================================================
+   SEASONAL FILTER BUTTON (in recipes filter bar)
+   ============================================================ */
+.rp-filter-btn.seasonal-active {
+  background: rgba(45, 220, 122, 0.12);
+  border-color: #2ddc7a;
+  color: #2ddc7a;
+}
+
+/* ============================================================
+   IN-SEASON HIGHLIGHT on recipe card banner
+   ============================================================ */
+.recipe-card-banner.in-season-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(45,220,122,0.08) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* ============================================================
+   MEAL CARD seasonal row (inside mealplan slot)
+   ============================================================ */
+.meal-season-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 18px 10px;
+  flex-wrap: wrap;
+}
+
+.meal-season-row-label {
+  font-size: 11px;
+  color: #4d6e5a;
+}

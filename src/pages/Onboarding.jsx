@@ -1,0 +1,335 @@
+/* ============================================================
+   BLANE — Onboarding Page
+   Replaces: onboarding.html + js/onboarding.js entirely.
+
+   Old vanilla flow: DOM manipulation to show/hide .onboard-step
+   divs, manual form field reads, upsert to Supabase on finish.
+
+   New React flow: a single `formData` state object holds every
+   field across all 4 steps; `currentStep` controls which step
+   div gets the .active class (same CSS toggle as before).
+   ============================================================ */
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { supabase, REDIRECT_AFTER_ONBOARD } from '../lib/supabase';
+import '../styles/onboarding.css';
+
+const TOTAL_STEPS = 4;
+const STEP_LABELS = ['Basic Info', 'Health Goals', 'Dietary Restrictions', 'Medical Conditions'];
+
+const GOALS = [
+  { key: 'lose_weight',      icon: '🔥', label: 'Lose Weight',      desc: 'Reduce body fat with a sustainable calorie deficit' },
+  { key: 'gain_muscle',      icon: '💪', label: 'Gain Muscle',      desc: 'Build lean mass with a protein-rich surplus plan' },
+  { key: 'maintain',         icon: '⚖️', label: 'Maintain',         desc: 'Stay at current weight with balanced nutrition' },
+  { key: 'improve_health',   icon: '❤️', label: 'Improve Health',   desc: 'Optimize nutrients for overall wellness and energy' },
+  { key: 'boost_energy',     icon: '⚡', label: 'Boost Energy',     desc: 'Fuel your day with steady energy and fewer crashes' },
+  { key: 'manage_condition', icon: '🩺', label: 'Manage Condition', desc: 'Eat around a specific health condition or diagnosis' },
+];
+
+const DIETARY_OPTIONS = [
+  { key: 'vegetarian',        icon: '🥦', label: 'Vegetarian' },
+  { key: 'vegan',             icon: '🌱', label: 'Vegan' },
+  { key: 'halal',             icon: '☪️', label: 'Halal' },
+  { key: 'kosher',            icon: '✡️', label: 'Kosher' },
+  { key: 'gluten_free',       icon: '🌾', label: 'Gluten-Free' },
+  { key: 'dairy_free',        icon: '🥛', label: 'Dairy-Free' },
+  { key: 'nut_allergy',       icon: '🥜', label: 'Nut Allergy' },
+  { key: 'shellfish_allergy', icon: '🦐', label: 'Shellfish Allergy' },
+  { key: 'egg_free',          icon: '🥚', label: 'Egg-Free' },
+  { key: 'soy_free',          icon: '🫘', label: 'Soy-Free' },
+  { key: 'low_sodium',        icon: '🧂', label: 'Low Sodium' },
+  { key: 'low_sugar',         icon: '🍬', label: 'Low Sugar' },
+];
+
+const MEDICAL_OPTIONS = [
+  { key: 'diabetes_t1',       icon: '💉', label: 'Diabetes Type 1' },
+  { key: 'diabetes_t2',       icon: '🩸', label: 'Diabetes Type 2' },
+  { key: 'hypertension',      icon: '❤️', label: 'Hypertension' },
+  { key: 'high_cholesterol',  icon: '🫀', label: 'High Cholesterol' },
+  { key: 'gerd',              icon: '🔥', label: 'GERD / Acid Reflux' },
+  { key: 'ibs',               icon: '🫃', label: 'IBS / Gut Issues' },
+  { key: 'kidney_disease',    icon: '🫘', label: 'Kidney Disease' },
+  { key: 'thyroid',           icon: '🦋', label: 'Thyroid Disorder' },
+  { key: 'anemia',            icon: '🩺', label: 'Anemia' },
+  { key: 'pcos',              icon: '🔵', label: 'PCOS' },
+  { key: 'gout',              icon: '🦵', label: 'Gout' },
+  { key: 'celiac',            icon: '🌾', label: 'Celiac Disease' },
+];
+
+const emptyForm = {
+  fullName: '', age: '', sex: '', height: '', weight: '', activity: '',
+  goal: '', dietary: [], dietaryOther: '', medical: [], medicalOther: '',
+};
+
+export default function Onboarding() {
+  const { session, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const [currentStep, setCurrentStep] = useState(1);
+  const [form, setForm]               = useState(emptyForm);
+  const [error, setError]             = useState('');
+  const [saving, setSaving]           = useState(false);
+
+  /* Pre-fill full name from auth metadata (replaces the old
+     "meta.full_name" prefill in onboarding.js) */
+  useEffect(() => {
+    const metaName = session?.user?.user_metadata?.full_name;
+    if (metaName) setForm((f) => ({ ...f, fullName: f.fullName || metaName }));
+  }, [session]);
+
+  function updateField(key, value) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function toggleGoal(key) {
+    setForm((f) => ({ ...f, goal: key }));
+  }
+
+  function toggleTag(field, key) {
+    setForm((f) => {
+      const list = f[field];
+      const next = list.includes(key) ? list.filter((k) => k !== key) : [...list, key];
+      return { ...f, [field]: next };
+    });
+  }
+
+  function validateStep(step) {
+    setError('');
+    if (step === 1) {
+      if (!form.fullName.trim()) return fail('Please enter your full name.');
+      if (!form.age)             return fail('Please enter your age.');
+      if (!form.sex)             return fail('Please select your biological sex.');
+      if (!form.height)          return fail('Please enter your height.');
+      if (!form.weight)          return fail('Please enter your weight.');
+    }
+    if (step === 2) {
+      if (!form.goal) return fail('Please select a health goal.');
+    }
+    return true;
+  }
+
+  function fail(msg) {
+    setError(msg);
+    return false;
+  }
+
+  function goBack() {
+    if (currentStep > 1) { setCurrentStep((s) => s - 1); setError(''); }
+  }
+
+  function goNext() {
+    if (!validateStep(currentStep)) return;
+    if (currentStep < TOTAL_STEPS) {
+      setCurrentStep((s) => s + 1);
+      setError('');
+    } else {
+      submitProfile();
+    }
+  }
+
+  /* ---- SUBMIT — mirrors old submitProfile() ---- */
+  async function submitProfile() {
+    setSaving(true);
+
+    const dietary = [...form.dietary];
+    if (form.dietaryOther.trim()) dietary.push(form.dietaryOther.trim());
+
+    const medical = [...form.medical];
+    if (form.medicalOther.trim()) medical.push(form.medicalOther.trim());
+
+    const { error: dbError } = await supabase.from('profiles').upsert({
+      id:                   session.user.id,
+      full_name:            form.fullName.trim(),
+      age:                  parseInt(form.age),
+      sex:                  form.sex,
+      height_cm:            parseFloat(form.height),
+      weight_kg:            parseFloat(form.weight),
+      activity_level:       form.activity,
+      goal:                 form.goal,
+      dietary_restrictions: dietary,
+      medical_conditions:   medical,
+      updated_at:           new Date().toISOString(),
+    });
+
+    setSaving(false);
+
+    if (dbError) {
+      setError('Could not save: ' + dbError.message);
+      return;
+    }
+
+    navigate(REDIRECT_AFTER_ONBOARD);
+  }
+
+  const progressPct = Math.round(((currentStep - 1) / TOTAL_STEPS) * 100);
+
+  return (
+    <>
+      {/* TOP BAR */}
+      <div className="onboard-topbar">
+        <a href="/" className="logo">
+          <div className="logo-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2C7.4 2 4 5.4 4 9c0 2.4 1.2 4.5 3 5.7V18c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2v-3.3c1.8-1.2 3-3.3 3-5.7 0-3.6-3.4-7-8-7zm0 2c3.3 0 6 2.7 6 5 0 2-1.2 3.7-3 4.6V18H9v-4.4C7.2 12.7 6 11 6 9c0-2.3 2.7-5 6-5z"/>
+            </svg>
+          </div>
+          <span className="logo-text"><span>BL</span>ANE</span>
+        </a>
+        <span className="onboard-step-label">
+          Step <span>{currentStep}</span> — <span>{STEP_LABELS[currentStep - 1]}</span>
+        </span>
+        <button className="btn btn-outline" style={{ fontSize: '13px', padding: '7px 16px' }} onClick={logout}>
+          Sign out
+        </button>
+      </div>
+
+      {/* MAIN */}
+      <main className="onboard-page">
+        <div className="onboard-progress-wrap">
+          <div className="onboard-progress-bar">
+            <div className="onboard-progress-fill" style={{ width: progressPct + '%' }}></div>
+          </div>
+          <div className="onboard-progress-text">Step {currentStep} of {TOTAL_STEPS}</div>
+        </div>
+
+        <div className="onboard-card">
+          {error && <p className="form-error" style={{ display: 'block' }}>{error}</p>}
+
+          {/* STEP 1: Basic Info */}
+          <div className={'onboard-step' + (currentStep === 1 ? ' active' : '')}>
+            <div className="onboard-step-icon">👤</div>
+            <h2>Tell us about yourself</h2>
+            <p className="sub">We use this to calculate your personal nutrition targets accurately.</p>
+
+            <div className="form-group">
+              <label className="form-label">Full name</label>
+              <input className="form-input" type="text" placeholder="e.g. Juan dela Cruz"
+                value={form.fullName} onChange={(e) => updateField('fullName', e.target.value)} />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Age</label>
+                <input className="form-input" type="number" placeholder="e.g. 24" min="1" max="120"
+                  value={form.age} onChange={(e) => updateField('age', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Biological sex</label>
+                <select className="form-select" value={form.sex} onChange={(e) => updateField('sex', e.target.value)}>
+                  <option value="">Select...</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Height (cm)</label>
+                <input className="form-input" type="number" placeholder="e.g. 168" min="50" max="250"
+                  value={form.height} onChange={(e) => updateField('height', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Weight (kg)</label>
+                <input className="form-input" type="number" placeholder="e.g. 65" min="10" max="500" step="0.1"
+                  value={form.weight} onChange={(e) => updateField('weight', e.target.value)} />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Activity level</label>
+              <select className="form-select" value={form.activity} onChange={(e) => updateField('activity', e.target.value)}>
+                <option value="">Select...</option>
+                <option value="sedentary">Sedentary (little or no exercise)</option>
+                <option value="light">Lightly active (1-3 days/week)</option>
+                <option value="moderate">Moderately active (3-5 days/week)</option>
+                <option value="very_active">Very active (6-7 days/week)</option>
+                <option value="extra_active">Extra active (physical job or 2x training)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* STEP 2: Health Goals */}
+          <div className={'onboard-step' + (currentStep === 2 ? ' active' : '')}>
+            <div className="onboard-step-icon">🎯</div>
+            <h2>What is your main goal?</h2>
+            <p className="sub">BLANE tailors your calorie targets and macro ratios around this.</p>
+            <div className="goal-grid">
+              {GOALS.map((g) => (
+                <div
+                  key={g.key}
+                  className={'goal-card' + (form.goal === g.key ? ' selected' : '')}
+                  onClick={() => toggleGoal(g.key)}
+                >
+                  <span className="goal-card-icon">{g.icon}</span>
+                  <span className="goal-card-label">{g.label}</span>
+                  <span className="goal-card-desc">{g.desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* STEP 3: Dietary Restrictions */}
+          <div className={'onboard-step' + (currentStep === 3 ? ' active' : '')}>
+            <div className="onboard-step-icon">🥗</div>
+            <h2>Any dietary restrictions?</h2>
+            <p className="sub">Select all that apply. BLANE will never suggest meals that violate these. Skip if none apply.</p>
+            <div className="tag-grid">
+              {DIETARY_OPTIONS.map((opt) => (
+                <div
+                  key={opt.key}
+                  className={'tag-pill' + (form.dietary.includes(opt.key) ? ' selected' : '')}
+                  onClick={() => toggleTag('dietary', opt.key)}
+                >
+                  <span className="tag-pill-icon">{opt.icon}</span> {opt.label}
+                </div>
+              ))}
+            </div>
+            <div className="form-group" style={{ marginTop: '18px' }}>
+              <label className="form-label">Other restrictions (optional)</label>
+              <input className="form-input" type="text" placeholder="e.g. No pork, No MSG..."
+                value={form.dietaryOther} onChange={(e) => updateField('dietaryOther', e.target.value)} />
+            </div>
+          </div>
+
+          {/* STEP 4: Medical Conditions */}
+          <div className={'onboard-step' + (currentStep === 4 ? ' active' : '')}>
+            <div className="onboard-step-icon">🩺</div>
+            <h2>Any medical conditions?</h2>
+            <p className="sub">This helps BLANE avoid nutrients that may affect your condition. All data is private and stored securely. Skip if none apply.</p>
+            <div className="tag-grid">
+              {MEDICAL_OPTIONS.map((opt) => (
+                <div
+                  key={opt.key}
+                  className={'tag-pill' + (form.medical.includes(opt.key) ? ' selected' : '')}
+                  onClick={() => toggleTag('medical', opt.key)}
+                >
+                  <span className="tag-pill-icon">{opt.icon}</span> {opt.label}
+                </div>
+              ))}
+            </div>
+            <div className="form-group" style={{ marginTop: '18px' }}>
+              <label className="form-label">Other condition (optional)</label>
+              <input className="form-input" type="text" placeholder="e.g. Lupus, Crohn's disease..."
+                value={form.medicalOther} onChange={(e) => updateField('medicalOther', e.target.value)} />
+            </div>
+          </div>
+
+          {/* NAV BUTTONS */}
+          <div className="onboard-nav">
+            <button className="btn btn-outline" style={{ visibility: currentStep === 1 ? 'hidden' : 'visible' }} onClick={goBack}>
+              ← Back
+            </button>
+            <button className="btn btn-primary" onClick={goNext} disabled={saving}>
+              {saving ? 'Saving...' : currentStep === TOTAL_STEPS ? 'Finish & Save' : 'Continue'}
+            </button>
+          </div>
+        </div>
+      </main>
+
+      {/* SAVING OVERLAY */}
+      <div className={'saving-overlay' + (saving ? ' active' : '')}>
+        <div className="saving-spinner"></div>
+        <p className="saving-text">Saving your profile...</p>
+      </div>
+    </>
+  );
+}

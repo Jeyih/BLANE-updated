@@ -1,0 +1,846 @@
+/* ============================================================
+   BLANE — Dashboard Stylesheet
+   Standalone: no :root variables, all values literal.
+   All units in px (no rem).
+   ============================================================ */
+
+/* ---- Base reset for dashboard page ---- */
+.dash-body {
+  background-color: #060d0a;
+  color: #e8f5ee;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* ============================================================
+   MAIN CONTENT
+   ============================================================ */
+.dash-main {
+  padding-top: 64px;
+}
+
+.dash-content {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 36px 32px 60px;
+}
+
+/* Page header */
+.dash-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 32px;
+  gap: 16px;
+}
+
+.dash-page-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: #e8f5ee;
+  letter-spacing: -0.5px;
+}
+
+.dash-page-date {
+  font-size: 14px;
+  color: #4d6e5a;
+  margin-top: 4px;
+}
+
+/* ============================================================
+   WIDGET GRID
+   ============================================================ */
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 20px;
+}
+
+/* Span helpers */
+.col-8  { grid-column: span 8; }
+.col-4  { grid-column: span 4; }
+.col-6  { grid-column: span 6; }
+.col-3  { grid-column: span 3; }
+.col-12 { grid-column: span 12; }
+
+/* ============================================================
+   BASE WIDGET CARD
+   ============================================================ */
+.widget {
+  background: #0d1a12;
+  border: 1px solid rgba(45, 220, 122, 0.12);
+  border-radius: 20px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.25s;
+}
+
+.widget:hover {
+  border-color: rgba(45, 220, 122, 0.25);
+}
+
+.widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.widget-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.widget-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(45, 220, 122, 0.12);
+  border: 1px solid rgba(45, 220, 122, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.widget-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: #e8f5ee;
+}
+
+.widget-subtitle {
+  font-size: 12px;
+  color: #4d6e5a;
+  margin-top: 2px;
+}
+
+.widget-badge {
+  font-size: 11px;
+  background: rgba(45, 220, 122, 0.12);
+  color: #2ddc7a;
+  border: 1px solid rgba(45, 220, 122, 0.25);
+  border-radius: 100px;
+  padding: 3px 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.widget-badge.warning {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.25);
+}
+
+/* Top accent line */
+.widget::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(45, 220, 122, 0.4), transparent);
+}
+
+/* ============================================================
+   WIDGET 1 — TODAY'S MEAL PLAN
+   ============================================================ */
+.meal-tabs {
+  display: flex;
+  gap: 4px;
+  background: #111f16;
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 18px;
+}
+
+.meal-tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4d6e5a;
+  padding: 7px 8px;
+  border-radius: 7px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.meal-tab-btn.active {
+  background: #2ddc7a;
+  color: #060d0a;
+}
+
+.meal-tab-btn:hover:not(.active) {
+  color: #8aab96;
+}
+
+/* Meal panel */
+.meal-panel {
+  display: none;
+}
+
+.meal-panel.active {
+  display: block;
+}
+
+.meal-main-card {
+  background: #111f16;
+  border: 1px solid rgba(45, 220, 122, 0.1);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.meal-emoji-big {
+  font-size: 36px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(45, 220, 122, 0.06);
+  border-radius: 12px;
+}
+
+.meal-main-info {
+  flex: 1;
+}
+
+.meal-main-name {
+  font-family: 'Syne', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #e8f5ee;
+  margin-bottom: 4px;
+}
+
+.meal-main-meta {
+  font-size: 12px;
+  color: #4d6e5a;
+  margin-bottom: 10px;
+}
+
+.meal-macros-row {
+  display: flex;
+  gap: 12px;
+}
+
+.meal-macro-chip {
+  background: #0d1a12;
+  border: 1px solid rgba(45, 220, 122, 0.1);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.meal-macro-chip span {
+  color: #2ddc7a;
+  font-weight: 600;
+}
+
+.meal-macro-chip small {
+  color: #4d6e5a;
+}
+
+.meal-kcal-tag {
+  font-family: 'Syne', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #2ddc7a;
+  white-space: nowrap;
+}
+
+.meal-kcal-tag small {
+  font-size: 11px;
+  color: #4d6e5a;
+  font-weight: 400;
+  display: block;
+  text-align: right;
+}
+
+/* Ingredients list */
+.meal-ingredients {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meal-ingredient-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.ingredient-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2ddc7a;
+  flex-shrink: 0;
+}
+
+.ingredient-name {
+  flex: 1;
+  color: #8aab96;
+}
+
+.ingredient-amount {
+  color: #4d6e5a;
+  font-size: 12px;
+}
+
+.ingredient-avail {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 100px;
+}
+
+.ingredient-avail.yes {
+  background: rgba(45, 220, 122, 0.1);
+  color: #2ddc7a;
+}
+
+.ingredient-avail.no {
+  background: rgba(251, 191, 36, 0.08);
+  color: #fbbf24;
+}
+
+/* Daily calorie summary bar */
+.daily-cal-summary {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(45, 220, 122, 0.08);
+}
+
+.daily-cal-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.daily-cal-label {
+  font-size: 12px;
+  color: #4d6e5a;
+}
+
+.daily-cal-numbers {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  color: #e8f5ee;
+}
+
+.daily-cal-numbers span {
+  color: #2ddc7a;
+}
+
+.daily-cal-bar-bg {
+  height: 6px;
+  background: #111f16;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.daily-cal-bar-fill {
+  height: 6px;
+  background: linear-gradient(90deg, #1a8c4e, #2ddc7a);
+  border-radius: 6px;
+  transition: width 1s ease;
+}
+
+/* ============================================================
+   WIDGET 2 — BMI & BODY STATS
+   ============================================================ */
+.bmi-display {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.bmi-ring-wrap {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  flex-shrink: 0;
+}
+
+.bmi-ring-wrap svg {
+  transform: rotate(-90deg);
+}
+
+.bmi-ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.bmi-value {
+  font-family: 'Syne', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #e8f5ee;
+  line-height: 1;
+}
+
+.bmi-label-sm {
+  font-size: 10px;
+  color: #4d6e5a;
+  margin-top: 2px;
+}
+
+.bmi-category-wrap {
+  flex: 1;
+}
+
+.bmi-category-name {
+  font-family: 'Syne', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #2ddc7a;
+  margin-bottom: 4px;
+}
+
+.bmi-category-desc {
+  font-size: 12px;
+  color: #8aab96;
+  line-height: 1.5;
+}
+
+/* BMI scale bar */
+.bmi-scale {
+  margin-bottom: 20px;
+}
+
+.bmi-scale-bar {
+  height: 8px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #60a5fa 0%, #34d399 30%, #2ddc7a 50%, #fbbf24 70%, #f87171 100%);
+  position: relative;
+  margin-bottom: 6px;
+}
+
+.bmi-scale-marker {
+  position: absolute;
+  top: -3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #e8f5ee;
+  border: 2px solid #060d0a;
+  transform: translateX(-50%);
+  transition: left 0.8s ease;
+}
+
+.bmi-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #4d6e5a;
+}
+
+/* Body stats grid */
+.body-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.body-stat-item {
+  background: #111f16;
+  border: 1px solid rgba(45, 220, 122, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.body-stat-label {
+  font-size: 11px;
+  color: #4d6e5a;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+
+.body-stat-value {
+  font-family: 'Syne', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #e8f5ee;
+}
+
+.body-stat-value span {
+  font-size: 12px;
+  color: #4d6e5a;
+  font-weight: 400;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.body-stat-change {
+  font-size: 11px;
+  margin-top: 3px;
+}
+
+.body-stat-change.up   { color: #f87171; }
+.body-stat-change.down { color: #2ddc7a; }
+.body-stat-change.same { color: #4d6e5a; }
+
+/* ============================================================
+   WIDGET 3 — WATER INTAKE TRACKER
+   ============================================================ */
+.water-goal-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.water-consumed {
+  font-family: 'Syne', sans-serif;
+  font-size: 36px;
+  font-weight: 800;
+  color: #2ddc7a;
+  line-height: 1;
+}
+
+.water-unit {
+  font-size: 16px;
+  color: #4d6e5a;
+}
+
+.water-of-goal {
+  font-size: 13px;
+  color: #4d6e5a;
+  margin-left: 4px;
+}
+
+/* Cup grid */
+.water-cups-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.water-cup {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 1px solid rgba(45, 220, 122, 0.18);
+  background: #111f16;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+  user-select: none;
+}
+
+.water-cup:hover {
+  border-color: rgba(45, 220, 122, 0.4);
+  transform: scale(1.06);
+}
+
+.water-cup.filled {
+  background: rgba(45, 220, 122, 0.15);
+  border-color: #2ddc7a;
+}
+
+.water-cup.filled:hover {
+  background: rgba(45, 220, 122, 0.25);
+}
+
+/* Progress */
+.water-progress-bar-bg {
+  height: 6px;
+  background: #111f16;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.water-progress-bar-fill {
+  height: 6px;
+  background: linear-gradient(90deg, #60a5fa, #2ddc7a);
+  border-radius: 6px;
+  transition: width 0.5s ease;
+}
+
+.water-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #4d6e5a;
+}
+
+/* Quick add buttons */
+.water-quick-add {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.water-add-btn {
+  flex: 1;
+  background: #111f16;
+  border: 1px solid rgba(45, 220, 122, 0.15);
+  border-radius: 10px;
+  padding: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  color: #8aab96;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+  text-align: center;
+}
+
+.water-add-btn:hover {
+  background: rgba(45, 220, 122, 0.08);
+  border-color: rgba(45, 220, 122, 0.3);
+  color: #2ddc7a;
+}
+
+.water-add-btn strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e8f5ee;
+  margin-bottom: 1px;
+}
+
+/* ============================================================
+   WIDGET 4 — NEARBY MARKET STATUS
+   ============================================================ */
+.market-search-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.market-search-input {
+  flex: 1;
+  background: #111f16;
+  border: 1px solid rgba(45, 220, 122, 0.15);
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: #e8f5ee;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.market-search-input::placeholder {
+  color: #4d6e5a;
+}
+
+.market-search-input:focus {
+  border-color: #1a8c4e;
+  box-shadow: 0 0 0 3px rgba(45, 220, 122, 0.1);
+}
+
+.market-search-btn {
+  background: rgba(45, 220, 122, 0.12);
+  border: 1px solid rgba(45, 220, 122, 0.25);
+  border-radius: 10px;
+  padding: 9px 14px;
+  color: #2ddc7a;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+}
+
+.market-search-btn:hover {
+  background: rgba(45, 220, 122, 0.2);
+}
+
+/* Market list */
+.market-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.market-item {
+  background: #111f16;
+  border: 1px solid rgba(45, 220, 122, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: border-color 0.2s;
+}
+
+.market-item:hover {
+  border-color: rgba(45, 220, 122, 0.2);
+}
+
+.market-icon-wrap {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(45, 220, 122, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.market-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.market-name {
+  font-family: 'Syne', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8f5ee;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.market-meta {
+  font-size: 12px;
+  color: #4d6e5a;
+  margin-top: 2px;
+}
+
+.market-status-badge {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.market-status-badge.open {
+  background: rgba(45, 220, 122, 0.1);
+  color: #2ddc7a;
+  border: 1px solid rgba(45, 220, 122, 0.2);
+}
+
+.market-status-badge.closed {
+  background: rgba(248, 113, 113, 0.1);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.2);
+}
+
+/* Ingredient availability tags */
+.market-ingredients {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ingredient-tag {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  border: 1px solid rgba(45, 220, 122, 0.15);
+  color: #8aab96;
+  background: #0d1a12;
+}
+
+.ingredient-tag.found {
+  color: #2ddc7a;
+  background: rgba(45, 220, 122, 0.08);
+  border-color: rgba(45, 220, 122, 0.2);
+}
+
+/* Map placeholder */
+.market-map-placeholder {
+  height: 100px;
+  background: #111f16;
+  border: 1px solid rgba(45, 220, 122, 0.1);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #4d6e5a;
+  font-size: 13px;
+}
+
+.market-map-placeholder span {
+  font-size: 24px;
+}
+
+/* ============================================================
+   LOADING SKELETON
+   ============================================================ */
+.skeleton {
+  background: linear-gradient(90deg, #111f16 25%, #1a2e1f 50%, #111f16 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 8px;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1024px) {
+  .col-8  { grid-column: span 12; }
+  .col-4  { grid-column: span 12; }
+  .col-6  { grid-column: span 12; }
+  .col-3  { grid-column: span 6; }
+
+}
+
+@media (max-width: 640px) {
+  .dash-content {
+    padding: 24px 16px 48px;
+  }
+
+  .dash-grid {
+    gap: 14px;
+  }
+
+  .col-3 {
+    grid-column: span 12;
+  }
+
+  .water-cups-grid {
+    grid-template-columns: repeat(8, 1fr);
+    gap: 6px;
+  }
+
+  .body-stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dash-page-title {
+    font-size: 22px;
+  }
+}

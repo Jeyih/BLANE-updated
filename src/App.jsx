@@ -19,6 +19,9 @@ import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
 import Landing from './pages/Landing';
+import Onboarding from './pages/Onboarding';
+import Dashboard from './pages/Dashboard';
+import MealPlan from './pages/MealPlan';
 import ComingSoon from './pages/ComingSoon';
 
 export default function App() {
@@ -31,9 +34,9 @@ export default function App() {
 
           {/* Protected — placeholders for now, built next in order */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/onboarding" element={<ComingSoon title="Onboarding" />} />
-            <Route path="/dashboard"  element={<ComingSoon title="Dashboard" />} />
-            <Route path="/mealplan"   element={<ComingSoon title="Meal Plan" />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/dashboard"  element={<Dashboard />} />
+            <Route path="/mealplan"   element={<MealPlan />} />
             <Route path="/recipes"    element={<ComingSoon title="Recipes" />} />
             <Route path="/markets"    element={<ComingSoon title="Markets" />} />
             <Route path="/profile"    element={<ComingSoon title="Profile" />} />

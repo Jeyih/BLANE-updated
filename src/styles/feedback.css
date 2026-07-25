@@ -1,0 +1,382 @@
+/* ============================================================
+   BLANE — Real-Time Body Feedback Loop Stylesheet
+   Standalone: no :root variables, all values literal.
+   All units in px (no rem).
+   ============================================================ */
+
+/* ============================================================
+   FEEDBACK WIDGET (inside dashboard grid)
+   ============================================================ */
+.fb-widget {
+  background: #0d1a12;
+  border: 1px solid rgba(45, 220, 122, 0.12);
+  border-radius: 20px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.25s;
+}
+
+.fb-widget:hover {
+  border-color: rgba(45, 220, 122, 0.25);
+}
+
+.fb-widget::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(45, 220, 122, 0.4), transparent);
+}
+
+.fb-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.fb-widget-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fb-widget-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(45, 220, 122, 0.12);
+  border: 1px solid rgba(45, 220, 122, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.fb-widget-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: #e8f5ee;
+}
+
+.fb-widget-sub {
+  font-size: 12px;
+  color: #4d6e5a;
+  margin-top: 2px;
+}
+
+/* Last logged badge */
+.fb-last-logged {
+  font-size: 11px;
+  color: #4d6e5a;
+  background: #111f16;
+  border: 1px solid rgba(45, 220, 122, 0.1);
+  border-radius: 100px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.fb-last-logged.today {
+  color: #2ddc7a;
+  border-color: rgba(45, 220, 122, 0.25);
+  background: rgba(45, 220, 122, 0.08);
+}
+
+/* ============================================================
+   METRIC INPUT GRID
+   ============================================================ */
+.fb-metric-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.fb-metric-card {
+  background: #111f16;
+  border: 1px solid rgba(45, 220, 122, 0.1);
+  border-radius: 14px;
+  padding: 14px;
+  transition: border-color 0.2s;
+  position: relative;
+}
+
+.fb-metric-card:focus-within {
+  border-color: rgba(45, 220, 122, 0.35);
+}
+
+.fb-metric-label {
+  font-size: 11px;
+  color: #4d6e5a;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.fb-metric-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fb-metric-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: 'Syne', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #e8f5ee;
+  width: 100%;
+  min-width: 0;
+}
+
+.fb-metric-input::placeholder {
+  color: #4d6e5a;
+  font-weight: 400;
+  font-size: 20px;
+}
+
+/* Remove spinner arrows */
+.fb-metric-input::-webkit-outer-spin-button,
+.fb-metric-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.fb-metric-unit {
+  font-size: 13px;
+  color: #4d6e5a;
+  flex-shrink: 0;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* Prev value hint */
+.fb-metric-prev {
+  font-size: 11px;
+  color: #4d6e5a;
+  margin-top: 5px;
+}
+
+.fb-metric-prev span {
+  color: #8aab96;
+}
+
+/* Change indicator arrow */
+.fb-change-up   { color: #f87171; font-size: 11px; }
+.fb-change-down { color: #2ddc7a; font-size: 11px; }
+.fb-change-same { color: #4d6e5a; font-size: 11px; }
+
+/* ============================================================
+   LOG BUTTON
+   ============================================================ */
+.fb-log-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #2ddc7a;
+  color: #060d0a;
+  border: none;
+  border-radius: 12px;
+  padding: 12px;
+  font-family: 'Syne', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.fb-log-btn:hover {
+  background: #a8f5c8;
+  transform: translateY(-1px);
+}
+
+.fb-log-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.fb-log-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   DRIFT WARNING PANEL
+   ============================================================ */
+.fb-drift-panel {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fb-drift-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 11px;
+  font-size: 13px;
+  line-height: 1.5;
+  animation: fb-slide-in 0.3s ease both;
+}
+
+@keyframes fb-slide-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fb-drift-alert.warning {
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+}
+
+.fb-drift-alert.danger {
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.18);
+  color: #f87171;
+}
+
+.fb-drift-alert.good {
+  background: rgba(45, 220, 122, 0.07);
+  border: 1px solid rgba(45, 220, 122, 0.18);
+  color: #2ddc7a;
+}
+
+.fb-drift-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.fb-drift-text strong {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 1px;
+}
+
+/* ============================================================
+   RECALC BANNER
+   ============================================================ */
+.fb-recalc-banner {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  background: rgba(45, 220, 122, 0.07);
+  border: 1px solid rgba(45, 220, 122, 0.2);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-top: 14px;
+  animation: fb-slide-in 0.3s ease both;
+}
+
+.fb-recalc-banner.show {
+  display: flex;
+}
+
+.fb-recalc-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.fb-recalc-text {
+  flex: 1;
+  font-size: 13px;
+  color: #8aab96;
+  line-height: 1.5;
+}
+
+.fb-recalc-text strong {
+  color: #2ddc7a;
+  font-weight: 600;
+}
+
+/* ============================================================
+   HISTORY SPARKLINE (7-day mini chart)
+   ============================================================ */
+.fb-history-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(45, 220, 122, 0.07);
+}
+
+.fb-sparkline-wrap {
+  flex: 1;
+}
+
+.fb-sparkline-label {
+  font-size: 11px;
+  color: #4d6e5a;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  margin-bottom: 6px;
+}
+
+.fb-sparkline-svg {
+  width: 100%;
+  height: 32px;
+  display: block;
+}
+
+/* ============================================================
+   TODAY STATUS ROW
+   ============================================================ */
+.fb-today-status {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.fb-status-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #111f16;
+  border: 1px solid rgba(45, 220, 122, 0.1);
+  border-radius: 100px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: #8aab96;
+}
+
+.fb-status-chip.logged {
+  border-color: rgba(45, 220, 122, 0.25);
+  color: #2ddc7a;
+  background: rgba(45, 220, 122, 0.07);
+}
+
+.fb-status-chip.pending {
+  border-color: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.06);
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 640px) {
+  .fb-metric-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .fb-metric-input {
+    font-size: 18px;
+  }
+}
