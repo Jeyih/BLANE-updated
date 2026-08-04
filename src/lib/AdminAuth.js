@@ -8,7 +8,7 @@
    ============================================================ */
 
 export const ADMIN_EMAILS = [
-  'admin@blane.com',
+  'Jelaxamana008@gmail.com',
   'youradmin@gmail.com',
   // add more admin emails here
 ];

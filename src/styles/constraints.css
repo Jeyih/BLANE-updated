@@ -1,0 +1,261 @@
+/* ============================================================
+   BLANE — Constraint-Based Planning Stylesheet
+   Standalone: no :root variables, all values literal.
+   All units in px (no rem).
+   ============================================================ */
+
+/* ============================================================
+   ACTIVE CONSTRAINTS BAR (top of recipes page)
+   ============================================================ */
+.cb-active-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #0d1a12;
+  border: 1px solid rgba(45, 220, 122, 0.12);
+  border-radius: 14px;
+  padding: 12px 18px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.cb-active-bar-label {
+  font-size: 12px;
+  color: #4d6e5a;
+  font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.cb-active-bar-label span {
+  color: #2ddc7a;
+  font-weight: 700;
+}
+
+.cb-active-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.cb-active-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 100px;
+  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.cb-active-chip.allergy {
+  background: rgba(248, 113, 113, 0.1);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.22);
+}
+
+.cb-active-chip.dietary {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+}
+
+.cb-active-chip.medical {
+  background: rgba(251, 146, 60, 0.1);
+  color: #fb923c;
+  border: 1px solid rgba(251, 146, 60, 0.22);
+}
+
+.cb-no-constraints {
+  font-size: 13px;
+  color: #4d6e5a;
+  font-style: italic;
+}
+
+/* ============================================================
+   VIOLATION BADGE (on recipe card)
+   ============================================================ */
+.cb-violation-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 100px;
+  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif;
+  letter-spacing: 0.2px;
+}
+
+.cb-violation-badge.allergy {
+  background: rgba(248, 113, 113, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.25);
+}
+
+.cb-violation-badge.dietary {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+}
+
+.cb-violation-badge.medical {
+  background: rgba(251, 146, 60, 0.1);
+  color: #fb923c;
+  border: 1px solid rgba(251, 146, 60, 0.22);
+}
+
+.cb-violation-badge.safe {
+  background: rgba(45, 220, 122, 0.08);
+  color: #2ddc7a;
+  border: 1px solid rgba(45, 220, 122, 0.18);
+}
+
+/* Dimmed card overlay for violations */
+.recipe-card.has-violation {
+  opacity: 0.82;
+}
+
+.recipe-card.has-violation:hover {
+  opacity: 1;
+}
+
+/* Warning stripe on card banner */
+.recipe-card-banner.violation-stripe::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 8px,
+    rgba(248, 113, 113, 0.06) 8px,
+    rgba(248, 113, 113, 0.06) 16px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ============================================================
+   VIOLATION DETAIL PANEL (inside recipe modal)
+   ============================================================ */
+.cb-modal-section {
+  margin-bottom: 22px;
+}
+
+.cb-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(248, 113, 113, 0.06);
+  border: 1px solid rgba(248, 113, 113, 0.18);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.cb-modal-header.medical {
+  background: rgba(251, 146, 60, 0.06);
+  border-color: rgba(251, 146, 60, 0.18);
+}
+
+.cb-modal-header.dietary {
+  background: rgba(251, 191, 36, 0.06);
+  border-color: rgba(251, 191, 36, 0.18);
+}
+
+.cb-modal-header-icon { font-size: 18px; flex-shrink: 0; }
+
+.cb-modal-header-text {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cb-modal-header.allergy  .cb-modal-header-text { color: #f87171; }
+.cb-modal-header.medical  .cb-modal-header-text { color: #fb923c; }
+.cb-modal-header.dietary  .cb-modal-header-text { color: #fbbf24; }
+
+.cb-modal-header-text strong { font-weight: 700; }
+
+/* Violation rows */
+.cb-violation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cb-violation-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #111f16;
+  border-radius: 9px;
+  border: 1px solid rgba(45, 220, 122, 0.07);
+  font-size: 12px;
+}
+
+.cb-violation-row-ing {
+  flex: 1;
+  color: #e8f5ee;
+  font-weight: 500;
+}
+
+.cb-violation-row-reason {
+  color: #4d6e5a;
+  font-size: 11px;
+}
+
+.cb-violation-severity {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 100px;
+}
+
+.cb-violation-severity.allergy { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
+.cb-violation-severity.dietary { background: rgba(251,191,36,0.1);  color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+.cb-violation-severity.medical { background: rgba(251,146,60,0.1);  color: #fb923c; border: 1px solid rgba(251,146,60,0.2); }
+
+/* ============================================================
+   CONSTRAINT FILTER BUTTON (in recipes filter bar)
+   ============================================================ */
+.cb-filter-active-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.22);
+  border-radius: 100px;
+  padding: 6px 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  color: #f87171;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.cb-filter-active-btn:hover {
+  background: rgba(248, 113, 113, 0.14);
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+.cb-filter-active-btn.off {
+  background: #111f16;
+  border-color: rgba(45, 220, 122, 0.12);
+  color: #4d6e5a;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 640px) {
+  .cb-active-bar { padding: 10px 14px; gap: 8px; }
+}

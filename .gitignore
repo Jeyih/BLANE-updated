@@ -1,7 +1,9 @@
 node_modules
+dist
 .env
 .env.local
 .env.example
 yeah.html
 style.css
 main.js
+Blane

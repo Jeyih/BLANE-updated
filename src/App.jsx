@@ -22,6 +22,10 @@ import Landing from './pages/Landing';
 import Onboarding from './pages/Onboarding';
 import Dashboard from './pages/Dashboard';
 import MealPlan from './pages/MealPlan';
+import Recipes from './pages/Recipes';
+import Markets from './pages/Markets';
+import Profile from './pages/Profile';
+import Admin from './pages/Admin';
 import ComingSoon from './pages/ComingSoon';
 
 export default function App() {
@@ -37,10 +41,10 @@ export default function App() {
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/dashboard"  element={<Dashboard />} />
             <Route path="/mealplan"   element={<MealPlan />} />
-            <Route path="/recipes"    element={<ComingSoon title="Recipes" />} />
-            <Route path="/markets"    element={<ComingSoon title="Markets" />} />
-            <Route path="/profile"    element={<ComingSoon title="Profile" />} />
-            <Route path="/admin"      element={<ComingSoon title="Admin Panel" />} />
+            <Route path="/recipes"    element={<Recipes />} />
+            <Route path="/markets"    element={<Markets />} />
+            <Route path="/profile"    element={<Profile />} />
+            <Route path="/admin"      element={<Admin />} />
           </Route>
         </Routes>
       </BrowserRouter>
