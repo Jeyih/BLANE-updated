@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { isAdmin } from '../lib/adminAuth';
+import { isAdmin } from '../lib/admin-auth';
 import '../styles/admin.css';
 
 const MARKET_TYPES = [
