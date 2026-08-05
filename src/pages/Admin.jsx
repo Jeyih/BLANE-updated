@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -37,6 +37,28 @@ const GOAL_OPTIONS = [
   { value: 'manage_condition', label: 'Manage Condition' },
 ];
 
+const OPTION_GROUPS = [
+  { key: 'goals', label: 'Goals' },
+  { key: 'dietary', label: 'Dietary' },
+  { key: 'medical', label: 'Medical' },
+];
+
+const SEASONS = [
+  { value: 'dry', label: 'Dry Season' },
+  { value: 'wet', label: 'Wet Season' },
+  { value: 'both', label: 'Year-round / Both' },
+];
+
+const EMPTY_OPTION = {
+  id: '',
+  group: 'goals',
+  key: '',
+  label: '',
+  description: '',
+  sort_order: 0,
+  active: true,
+};
+
 const EMPTY_MARKET = {
   id: '',
   name: '',
@@ -49,26 +71,23 @@ const EMPTY_MARKET = {
   open: true,
 };
 
+const MARKET_ICON_CHOICES = ['🏪', '🏬', '🛒', '🥕', '🐟', '🍖', '🌾', '🧺'];
+
 const EMPTY_MARKET_ING = { name: '', qty: '', price: '', status: 'avail' };
 
 const EMPTY_RECIPE = {
   id: '',
   name: '',
-  emoji: '🍽️',
   type: 'Breakfast',
   difficulty: 'easy',
   cookTime: '15',
   servings: '1',
   cost: '0',
-  kcal: '0',
-  protein: '0',
-  carbs: '0',
-  fats: '0',
   dietTags: [],
   goalTags: [],
 };
 
-const EMPTY_RECIPE_ING = { name: '', qty: '', status: 'avail' };
+const EMPTY_RECIPE_ING = { fct_id: '', name: '', grams: '', status: 'avail' };
 const EMPTY_RECIPE_STEP = { title: '', description: '', timer: '' };
 
 const EMPTY_FNRI = {
@@ -94,6 +113,7 @@ export default function Admin() {
   const [searchMarkets, setSearchMarkets] = useState('');
   const [searchRecipes, setSearchRecipes] = useState('');
   const [searchFnri, setSearchFnri] = useState('');
+  const [searchOptions, setSearchOptions] = useState('');
 
   const [marketModalOpen, setMarketModalOpen] = useState(false);
   const [marketModalMode, setMarketModalMode] = useState('add');
@@ -105,10 +125,38 @@ export default function Admin() {
   const [recipeForm, setRecipeForm] = useState(EMPTY_RECIPE);
   const [recipeIngredients, setRecipeIngredients] = useState([EMPTY_RECIPE_ING]);
   const [recipeSteps, setRecipeSteps] = useState([EMPTY_RECIPE_STEP]);
+  const [ingredientSearchIndex, setIngredientSearchIndex] = useState(null);
+  const [ingredientSearchResults, setIngredientSearchResults] = useState([]);
+  const [fnriNutrientCache, setFnriNutrientCache] = useState({});
+  const ingredientSearchTimeout = useRef(null);
 
   const [fnriModalOpen, setFnriModalOpen] = useState(false);
   const [fnriModalMode, setFnriModalMode] = useState('add');
   const [fnriForm, setFnriForm] = useState(EMPTY_FNRI);
+
+  const [optionLists, setOptionLists] = useState([]);
+  const [optionGroup, setOptionGroup] = useState('goals');
+  const [optionModalOpen, setOptionModalOpen] = useState(false);
+  const [optionModalMode, setOptionModalMode] = useState('add');
+  const [optionForm, setOptionForm] = useState(EMPTY_OPTION);
+
+  const [constraintDefs, setConstraintDefs] = useState([]);
+  const [constraintSearch, setConstraintSearch] = useState('');
+  const [constraintModalOpen, setConstraintModalOpen] = useState(false);
+  const [constraintModalMode, setConstraintModalMode] = useState('add');
+  const [constraintForm, setConstraintForm] = useState({
+    id: '', key: '', label: '', severity: 'dietary', reason: '', blocked: '',
+    warn_high_carb: false, carb_threshold: 0, warn_high_fat: false, fat_threshold: 0,
+    warn_high_protein: false, protein_threshold: 0, sort_order: 0, active: true,
+  });
+
+  const [seasonRecords, setSeasonRecords] = useState([]);
+  const [seasonSearch, setSeasonSearch] = useState('');
+  const [seasonModalOpen, setSeasonModalOpen] = useState(false);
+  const [seasonModalMode, setSeasonModalMode] = useState('add');
+  const [seasonForm, setSeasonForm] = useState({
+    id: '', ingredient_name: '', season: 'dry', alt: '', sort_order: 0, active: true,
+  });
 
   const [toast, setToast] = useState({ message: '', error: false, visible: false });
 
@@ -148,6 +196,40 @@ export default function Admin() {
     return recipes.filter((recipe) => recipe.name.toLowerCase().includes(query));
   }, [recipes, searchRecipes]);
 
+  const computedNutrition = useMemo(() => {
+    let kcal = 0;
+    let protein = 0;
+    let carbs = 0;
+    let fats = 0;
+
+    recipeIngredients.forEach((ing) => {
+      const nutrient = ing.fct_id ? fnriNutrientCache[ing.fct_id] : null;
+      const grams = parseFloat(ing.grams) || 0;
+      if (nutrient && grams > 0) {
+        const factor = grams / 100;
+        kcal += (parseFloat(nutrient.energy_kcal) || 0) * factor;
+        protein += (parseFloat(nutrient.protein_g) || 0) * factor;
+        carbs += (parseFloat(nutrient.available_carbohydrate_g) || 0) * factor;
+        fats += (parseFloat(nutrient.total_fat_g) || 0) * factor;
+      }
+    });
+
+    const servings = parseInt(recipeForm.servings, 10) || 1;
+    const round1 = (n) => Math.round(n * 10) / 10;
+
+    return {
+      totalKcal: Math.round(kcal),
+      totalProtein: round1(protein),
+      totalCarbs: round1(carbs),
+      totalFats: round1(fats),
+      kcal: Math.round(kcal / servings),
+      protein: round1(protein / servings),
+      carbs: round1(carbs / servings),
+      fats: round1(fats / servings),
+      unlinkedCount: recipeIngredients.filter((ing) => ing.name.trim() && !ing.fct_id).length,
+    };
+  }, [recipeIngredients, fnriNutrientCache, recipeForm.servings]);
+
   const filteredFnri = useMemo(() => {
     const query = searchFnri.toLowerCase();
     return fnriItems.filter((item) =>
@@ -156,8 +238,45 @@ export default function Admin() {
     );
   }, [fnriItems, searchFnri]);
 
+  const filteredOptionLists = useMemo(() => {
+    const query = searchOptions.toLowerCase();
+    return optionLists
+      .filter((item) => item.group === optionGroup)
+      .filter((item) =>
+        item.label.toLowerCase().includes(query) ||
+        item.key.toLowerCase().includes(query) ||
+        (item.description || '').toLowerCase().includes(query)
+      );
+  }, [optionLists, optionGroup, searchOptions]);
+
+  const filteredConstraintDefs = useMemo(() => {
+    const query = constraintSearch.toLowerCase();
+    return constraintDefs.filter((item) =>
+      item.key.toLowerCase().includes(query) ||
+      item.label.toLowerCase().includes(query) ||
+      item.severity.toLowerCase().includes(query) ||
+      (item.reason || '').toLowerCase().includes(query)
+    );
+  }, [constraintDefs, constraintSearch]);
+
+  const filteredSeasonRecords = useMemo(() => {
+    const query = seasonSearch.toLowerCase();
+    return seasonRecords.filter((item) =>
+      item.ingredient_name.toLowerCase().includes(query) ||
+      item.season.toLowerCase().includes(query) ||
+      (item.alt || '').toLowerCase().includes(query)
+    );
+  }, [seasonRecords, seasonSearch]);
+
   async function loadAllData() {
-    await Promise.all([loadMarkets(), loadRecipes(), loadFnri()]);
+    await Promise.all([
+      loadMarkets(),
+      loadRecipes(),
+      loadFnri(),
+      loadOptionLists(),
+      loadConstraintDefs(),
+      loadSeasonRecords(),
+    ]);
   }
 
   async function loadMarkets() {
@@ -187,6 +306,34 @@ export default function Admin() {
     setFnriItems(data || []);
   }
 
+  async function loadOptionLists() {
+    const { data, error } = await supabase.from('option_lists').select('*').order('group').order('sort_order');
+    if (error) {
+      showToast('Error loading onboarding options: ' + error.message, true);
+      setOptionLists([]);
+      return;
+    }
+    setOptionLists(data || []);
+  }
+
+  async function loadConstraintDefs() {
+    const { data, error } = await supabase.from('constraint_definitions').select('*').order('sort_order');
+    if (error) {
+      showToast('Error loading constraint definitions: ' + error.message, true);
+      return;
+    }
+    setConstraintDefs(data || []);
+  }
+
+  async function loadSeasonRecords() {
+    const { data, error } = await supabase.from('ingredient_seasons').select('*').order('ingredient_name');
+    if (error) {
+      showToast('Error loading seasonal ingredients: ' + error.message, true);
+      return;
+    }
+    setSeasonRecords(data || []);
+  }
+
   function showToast(message, error = false) {
     setToast({ message, error, visible: true });
   }
@@ -200,13 +347,233 @@ export default function Admin() {
   function closeRecipeModal() {
     setRecipeModalOpen(false);
     setRecipeForm(EMPTY_RECIPE);
-    setRecipeIngredients([EMPTY_RECIPE_ING]);
+    setRecipeIngredients([{ ...EMPTY_RECIPE_ING }]);
     setRecipeSteps([EMPTY_RECIPE_STEP]);
+    setIngredientSearchIndex(null);
+    setIngredientSearchResults([]);
   }
 
   function closeFnriModal() {
     setFnriModalOpen(false);
     setFnriForm(EMPTY_FNRI);
+  }
+
+  function closeOptionModal() {
+    setOptionModalOpen(false);
+    setOptionForm(EMPTY_OPTION);
+  }
+
+  function openOptionModal(id, group = 'goals') {
+    const item = optionLists.find((row) => row.id === id);
+    if (!item) {
+      setOptionModalMode('add');
+      setOptionForm({ ...EMPTY_OPTION, group });
+      setOptionModalOpen(true);
+      return;
+    }
+
+    setOptionModalMode('edit');
+    setOptionForm({
+      id: item.id || '',
+      group: item.group || group,
+      key: item.key || '',
+      label: item.label || '',
+      description: item.description || '',
+      sort_order: item.sort_order ?? 0,
+      active: item.active ?? true,
+    });
+    setOptionModalOpen(true);
+  }
+
+  function handleOptionFormChange(key, value) {
+    setOptionForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function saveOption() {
+    if (!optionForm.key.trim() || !optionForm.label.trim()) {
+      showToast('Please enter a key and label for this option.', true);
+      return;
+    }
+
+    const id = optionForm.id || crypto.randomUUID?.() || 'opt-' + Date.now();
+    const payload = {
+      id,
+      group: optionForm.group,
+      key: optionForm.key.trim(),
+      label: optionForm.label.trim(),
+      description: optionForm.description.trim(),
+      sort_order: parseInt(optionForm.sort_order, 10) || 0,
+      active: !!optionForm.active,
+    };
+
+    const { error } = await supabase.from('option_lists').upsert(payload, { onConflict: 'id' });
+    if (error) {
+      showToast('Error saving option: ' + error.message, true);
+      return;
+    }
+
+    showToast('✓ Option saved successfully');
+    closeOptionModal();
+    await loadOptionLists();
+  }
+
+  async function deleteOption(id) {
+    if (!window.confirm('Delete this onboarding option? This cannot be undone.')) return;
+    const { error } = await supabase.from('option_lists').delete().eq('id', id);
+    if (error) {
+      showToast('Error deleting option: ' + error.message, true);
+      return;
+    }
+    showToast('✓ Option deleted');
+    await loadOptionLists();
+  }
+
+  function openConstraintModal(id) {
+    const item = constraintDefs.find((row) => row.id === id);
+    if (!item) {
+      setConstraintModalMode('add');
+      setConstraintForm({
+        id: '', key: '', label: '', severity: 'dietary', reason: '', blocked: '',
+        warn_high_carb: false, carb_threshold: 0, warn_high_fat: false, fat_threshold: 0,
+        warn_high_protein: false, protein_threshold: 0, sort_order: 0, active: true,
+      });
+      setConstraintModalOpen(true);
+      return;
+    }
+
+    setConstraintModalMode('edit');
+    setConstraintForm({
+      id: item.id || '',
+      key: item.key || '',
+      label: item.label || '',
+      severity: item.severity || 'dietary',
+      reason: item.reason || '',
+      blocked: Array.isArray(item.blocked) ? item.blocked.join(', ') : item.blocked || '',
+      warn_high_carb: item.warn_high_carb || false,
+      carb_threshold: item.carb_threshold || 0,
+      warn_high_fat: item.warn_high_fat || false,
+      fat_threshold: item.fat_threshold || 0,
+      warn_high_protein: item.warn_high_protein || false,
+      protein_threshold: item.protein_threshold || 0,
+      sort_order: item.sort_order ?? 0,
+      active: item.active ?? true,
+    });
+    setConstraintModalOpen(true);
+  }
+
+  function handleConstraintFormChange(key, value) {
+    setConstraintForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function saveConstraint() {
+    if (!constraintForm.key.trim() || !constraintForm.label.trim()) {
+      showToast('Please enter a key and label for this constraint.', true);
+      return;
+    }
+
+    const id = constraintForm.id || crypto.randomUUID?.() || 'con-' + Date.now();
+    const payload = {
+      id,
+      key: constraintForm.key.trim(),
+      label: constraintForm.label.trim(),
+      severity: constraintForm.severity,
+      reason: constraintForm.reason.trim(),
+      blocked: constraintForm.blocked
+        ? constraintForm.blocked.split(',').map((s) => s.trim()).filter(Boolean)
+        : [],
+      warn_high_carb: (parseInt(constraintForm.carb_threshold, 10) || 0) > 0,
+      carb_threshold: parseInt(constraintForm.carb_threshold, 10) || 0,
+      warn_high_fat: (parseInt(constraintForm.fat_threshold, 10) || 0) > 0,
+      fat_threshold: parseInt(constraintForm.fat_threshold, 10) || 0,
+      warn_high_protein: (parseInt(constraintForm.protein_threshold, 10) || 0) > 0,
+      protein_threshold: parseInt(constraintForm.protein_threshold, 10) || 0,
+      sort_order: parseInt(constraintForm.sort_order, 10) || 0,
+      active: !!constraintForm.active,
+    };
+
+    const { error } = await supabase.from('constraint_definitions').upsert(payload, { onConflict: 'id' });
+    if (error) {
+      showToast('Error saving constraint: ' + error.message, true);
+      return;
+    }
+
+    showToast('✓ Constraint saved successfully');
+    setConstraintModalOpen(false);
+    await loadConstraintDefs();
+  }
+
+  async function deleteConstraint(id) {
+    if (!window.confirm('Delete this constraint definition? This cannot be undone.')) return;
+    const { error } = await supabase.from('constraint_definitions').delete().eq('id', id);
+    if (error) {
+      showToast('Error deleting constraint: ' + error.message, true);
+      return;
+    }
+    showToast('✓ Constraint deleted');
+    await loadConstraintDefs();
+  }
+
+  function openSeasonModal(id) {
+    const item = seasonRecords.find((row) => row.id === id);
+    if (!item) {
+      setSeasonModalMode('add');
+      setSeasonForm({ id: '', ingredient_name: '', season: 'dry', alt: '', sort_order: 0, active: true });
+      setSeasonModalOpen(true);
+      return;
+    }
+
+    setSeasonModalMode('edit');
+    setSeasonForm({
+      id: item.id || '',
+      ingredient_name: item.ingredient_name || '',
+      season: item.season || 'dry',
+      alt: item.alt || '',
+      sort_order: item.sort_order ?? 0,
+      active: item.active ?? true,
+    });
+    setSeasonModalOpen(true);
+  }
+
+  function handleSeasonFormChange(key, value) {
+    setSeasonForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function saveSeason() {
+    if (!seasonForm.ingredient_name.trim()) {
+      showToast('Please enter an ingredient name.', true);
+      return;
+    }
+
+    const id = seasonForm.id || crypto.randomUUID?.() || 'sea-' + Date.now();
+    const payload = {
+      id,
+      ingredient_name: seasonForm.ingredient_name.trim(),
+      season: seasonForm.season,
+      alt: seasonForm.alt.trim(),
+      sort_order: parseInt(seasonForm.sort_order, 10) || 0,
+      active: !!seasonForm.active,
+    };
+
+    const { error } = await supabase.from('ingredient_seasons').upsert(payload, { onConflict: 'id' });
+    if (error) {
+      showToast('Error saving seasonal ingredient: ' + error.message, true);
+      return;
+    }
+
+    showToast('✓ Seasonal ingredient saved successfully');
+    setSeasonModalOpen(false);
+    await loadSeasonRecords();
+  }
+
+  async function deleteSeason(id) {
+    if (!window.confirm('Delete this seasonal ingredient record? This cannot be undone.')) return;
+    const { error } = await supabase.from('ingredient_seasons').delete().eq('id', id);
+    if (error) {
+      showToast('Error deleting seasonal ingredient: ' + error.message, true);
+      return;
+    }
+    showToast('✓ Seasonal ingredient deleted');
+    await loadSeasonRecords();
   }
 
   function openMarketModal(id) {
@@ -282,8 +649,8 @@ export default function Admin() {
       name: marketForm.name.trim(),
       type: marketForm.type,
       icon: marketForm.icon || '🏪',
-      lat: parseFloat(marketForm.lat),
-      lng: parseFloat(marketForm.lng),
+      lat: parseFloat(marketForm.lat) || null,
+      lng: parseFloat(marketForm.lng) || null,
       address: marketForm.address.trim(),
       hours: marketForm.hours.trim(),
       is_open: Boolean(marketForm.open),
@@ -337,7 +704,7 @@ export default function Admin() {
     if (!recipe) {
       setRecipeModalMode('add');
       setRecipeForm(EMPTY_RECIPE);
-      setRecipeIngredients([EMPTY_RECIPE_ING]);
+      setRecipeIngredients([{ ...EMPTY_RECIPE_ING }]);
       setRecipeSteps([EMPTY_RECIPE_STEP]);
       setRecipeModalOpen(true);
       return;
@@ -347,16 +714,11 @@ export default function Admin() {
     setRecipeForm({
       id: recipe.id,
       name: recipe.name || '',
-      emoji: recipe.emoji || '🍽️',
       type: recipe.type || 'Breakfast',
       difficulty: recipe.difficulty || 'easy',
       cookTime: recipe.cook_time_min?.toString() || '15',
       servings: recipe.servings?.toString() || '1',
       cost: recipe.cost?.toString() || '0',
-      kcal: recipe.kcal?.toString() || '0',
-      protein: recipe.protein_g?.toString() || '0',
-      carbs: recipe.carbs_g?.toString() || '0',
-      fats: recipe.fats_g?.toString() || '0',
       dietTags: recipe.diet_tags || [],
       goalTags: recipe.goal_tags || [],
     });
@@ -381,8 +743,9 @@ export default function Admin() {
 
     setRecipeIngredients((ingRes.data || []).map((item) => ({
       id: item.id,
+      fct_id: item.fct_id || '',
       name: item.name,
-      qty: item.qty,
+      grams: item.grams?.toString() || '',
       status: item.status,
     })));
     setRecipeSteps((stepRes.data || []).map((item) => ({
@@ -391,6 +754,23 @@ export default function Admin() {
       description: item.description,
       timer: item.timer_seconds?.toString() || '',
     })));
+
+    // Pre-load nutrient data for already-linked ingredients so the
+    // auto-calculated totals are correct as soon as the modal opens.
+    const linkedFctIds = [...new Set((ingRes.data || []).map((item) => item.fct_id).filter(Boolean))];
+    if (linkedFctIds.length > 0) {
+      const { data: nutrientRows, error: nutrientError } = await supabase
+        .from('fnri_food_composition')
+        .select('fct_id, food_name, energy_kcal, protein_g, total_fat_g, available_carbohydrate_g')
+        .in('fct_id', linkedFctIds);
+      if (!nutrientError && nutrientRows) {
+        setFnriNutrientCache((prev) => {
+          const next = { ...prev };
+          nutrientRows.forEach((row) => { next[row.fct_id] = row; });
+          return next;
+        });
+      }
+    }
   }
 
   function handleRecipeFormChange(key, value) {
@@ -413,6 +793,60 @@ export default function Admin() {
     setRecipeIngredients((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [key]: value };
+      return next;
+    });
+  }
+
+  async function searchFnriForIngredient(index, query) {
+    if (!query || query.trim().length < 2) {
+      setIngredientSearchResults([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from('fnri_food_composition')
+      .select('fct_id, food_name, alternate_name, energy_kcal, protein_g, total_fat_g, available_carbohydrate_g')
+      .ilike('food_name', `%${query.trim()}%`)
+      .order('food_name')
+      .limit(8);
+    if (error) {
+      showToast('Error searching FNRI data: ' + error.message, true);
+      return;
+    }
+    // Only apply results if this row is still the active search
+    setIngredientSearchIndex((current) => {
+      if (current === index) setIngredientSearchResults(data || []);
+      return current;
+    });
+  }
+
+  function handleIngredientNameChange(index, value) {
+    setRecipeIngredients((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], name: value, fct_id: '' };
+      return next;
+    });
+    setIngredientSearchIndex(index);
+    if (ingredientSearchTimeout.current) clearTimeout(ingredientSearchTimeout.current);
+    ingredientSearchTimeout.current = setTimeout(() => {
+      searchFnriForIngredient(index, value);
+    }, 300);
+  }
+
+  function selectFnriForIngredient(index, item) {
+    setRecipeIngredients((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], fct_id: item.fct_id, name: item.food_name };
+      return next;
+    });
+    setFnriNutrientCache((prev) => ({ ...prev, [item.fct_id]: item }));
+    setIngredientSearchIndex(null);
+    setIngredientSearchResults([]);
+  }
+
+  function clearIngredientLink(index) {
+    setRecipeIngredients((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], fct_id: '', name: '' };
       return next;
     });
   }
@@ -451,16 +885,15 @@ export default function Admin() {
     const payload = {
       id,
       name: recipeForm.name.trim(),
-      emoji: recipeForm.emoji || '🍽️',
       type: recipeForm.type,
       difficulty: recipeForm.difficulty,
       cook_time_min: parseInt(recipeForm.cookTime) || 0,
       servings: parseInt(recipeForm.servings) || 1,
       cost: parseFloat(recipeForm.cost) || 0,
-      kcal: parseFloat(recipeForm.kcal) || 0,
-      protein_g: parseFloat(recipeForm.protein) || 0,
-      carbs_g: parseFloat(recipeForm.carbs) || 0,
-      fats_g: parseFloat(recipeForm.fats) || 0,
+      kcal: computedNutrition.kcal,
+      protein_g: computedNutrition.protein,
+      carbs_g: computedNutrition.carbs,
+      fats_g: computedNutrition.fats,
       diet_tags: recipeForm.dietTags,
       goal_tags: recipeForm.goalTags,
       updated_at: new Date().toISOString(),
@@ -477,8 +910,9 @@ export default function Admin() {
       .filter((item) => item.name.trim())
       .map((item, index) => ({
         recipe_id: id,
+        fct_id: item.fct_id || null,
         name: item.name.trim(),
-        qty: item.qty.trim(),
+        grams: parseFloat(item.grams) || 0,
         status: item.status,
         sort_order: index + 1,
       }));
@@ -627,7 +1061,7 @@ export default function Admin() {
           <div className="ad-page-header">
             <div>
               <div className="ad-page-title">🛠️ Admin Panel <span className="ad-admin-badge">ADMIN ACCESS</span></div>
-              <div className="ad-page-sub">Manage markets, recipes, and FNRI nutrient data</div>
+              <div className="ad-page-sub">Manage markets, recipes, onboarding metadata, seasonal food data, and dietary constraints</div>
             </div>
           </div>
 
@@ -640,6 +1074,15 @@ export default function Admin() {
             </button>
             <button className={activeTab === 'fnri' ? 'ad-tab-btn active' : 'ad-tab-btn'} onClick={() => setActiveTab('fnri')}>
               📊 FNRI Food Data
+            </button>
+            <button className={activeTab === 'options' ? 'ad-tab-btn active' : 'ad-tab-btn'} onClick={() => setActiveTab('options')}>
+              🧩 Onboarding Options
+            </button>
+            <button className={activeTab === 'constraints' ? 'ad-tab-btn active' : 'ad-tab-btn'} onClick={() => setActiveTab('constraints')}>
+              ⚠️ Constraint Definitions
+            </button>
+            <button className={activeTab === 'seasons' ? 'ad-tab-btn active' : 'ad-tab-btn'} onClick={() => setActiveTab('seasons')}>
+              🌱 Seasonal Ingredients
             </button>
           </div>
 
@@ -745,7 +1188,6 @@ export default function Admin() {
                     filteredRecipes.map((recipe) => (
                       <tr key={recipe.id}>
                         <td>
-                          <span className="ad-table-icon">{recipe.emoji}</span>
                           <span className="ad-table-name">{recipe.name}</span>
                         </td>
                         <td>{recipe.type}</td>
@@ -832,6 +1274,197 @@ export default function Admin() {
               </table>
             </div>
           </div>
+
+          <div className={activeTab === 'options' ? 'ad-tab-panel active' : 'ad-tab-panel'}>
+            <div className="ad-toolbar">
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {OPTION_GROUPS.map((group) => (
+                  <button
+                    key={group.key}
+                    className={optionGroup === group.key ? 'ad-tab-btn active' : 'ad-tab-btn'}
+                    type="button"
+                    onClick={() => setOptionGroup(group.key)}
+                  >
+                    {group.label}
+                  </button>
+                ))}
+              </div>
+              <input
+                className="ad-search-input"
+                placeholder="Search onboarding options..."
+                value={searchOptions}
+                onChange={(e) => setSearchOptions(e.target.value)}
+              />
+              <span className="ad-result-count"><span>{filteredOptionLists.length}</span> options</span>
+              <button className="ad-add-btn" type="button" onClick={() => openOptionModal(null, optionGroup)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Option
+              </button>
+            </div>
+            <div className="ad-table-wrap">
+              <table className="ad-table">
+                <thead>
+                  <tr>
+                    <th>Key</th>
+                    <th>Label</th>
+                    <th>Description</th>
+                    <th>Sort</th>
+                    <th>Active</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredOptionLists.length === 0 ? (
+                    <tr className="ad-empty-row"><td colSpan="6">No options found.</td></tr>
+                  ) : (
+                    filteredOptionLists.map((opt) => (
+                      <tr key={opt.id}>
+                        <td>{opt.key}</td>
+                        <td>{opt.label}</td>
+                        <td>{opt.description || '—'}</td>
+                        <td>{opt.sort_order ?? 0}</td>
+                        <td>
+                          <span className={`ad-status-pill ${opt.active ? 'open' : 'closed'}`}>
+                            {opt.active ? 'Yes' : 'No'}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="ad-row-actions">
+                            <button className="ad-icon-btn" type="button" onClick={() => openOptionModal(opt.id, opt.group)}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                            <button className="ad-icon-btn danger" type="button" onClick={() => deleteOption(opt.id)}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1 2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className={activeTab === 'constraints' ? 'ad-tab-panel active' : 'ad-tab-panel'}>
+            <div className="ad-toolbar">
+              <input
+                className="ad-search-input"
+                placeholder="Search constraints..."
+                value={constraintSearch}
+                onChange={(e) => setConstraintSearch(e.target.value)}
+              />
+              <span className="ad-result-count"><span>{filteredConstraintDefs.length}</span> constraints</span>
+              <button className="ad-add-btn" type="button" onClick={() => openConstraintModal(null)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Constraint
+              </button>
+            </div>
+            <div className="ad-table-wrap">
+              <table className="ad-table">
+                <thead>
+                  <tr>
+                    <th>Key</th>
+                    <th>Label</th>
+                    <th>Severity</th>
+                    <th>Blocked</th>
+                    <th>Warning Rules</th>
+                    <th>Active</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredConstraintDefs.length === 0 ? (
+                    <tr className="ad-empty-row"><td colSpan="7">No constraint definitions found.</td></tr>
+                  ) : (
+                    filteredConstraintDefs.map((item) => (
+                      <tr key={item.id}>
+                        <td>{item.key}</td>
+                        <td>{item.label}</td>
+                        <td>{item.severity}</td>
+                        <td>{Array.isArray(item.blocked) ? item.blocked.join(', ') : item.blocked}</td>
+                        <td>{item.warn_high_carb ? `High carb > ${item.carb_threshold}` : ''}{item.warn_high_fat ? ` ${item.warn_high_fat ? `High fat > ${item.fat_threshold}` : ''}` : ''}{item.warn_high_protein ? ` ${item.warn_high_protein ? `High protein > ${item.protein_threshold}` : ''}` : ''}</td>
+                        <td>
+                          <span className={`ad-status-pill ${item.active ? 'open' : 'closed'}`}>
+                            {item.active ? 'Yes' : 'No'}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="ad-row-actions">
+                            <button className="ad-icon-btn" type="button" onClick={() => openConstraintModal(item.id)}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                            <button className="ad-icon-btn danger" type="button" onClick={() => deleteConstraint(item.id)}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1 2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className={activeTab === 'seasons' ? 'ad-tab-panel active' : 'ad-tab-panel'}>
+            <div className="ad-toolbar">
+              <input
+                className="ad-search-input"
+                placeholder="Search seasonal ingredients..."
+                value={seasonSearch}
+                onChange={(e) => setSeasonSearch(e.target.value)}
+              />
+              <span className="ad-result-count"><span>{filteredSeasonRecords.length}</span> records</span>
+              <button className="ad-add-btn" type="button" onClick={() => openSeasonModal(null)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Seasonal Ingredient
+              </button>
+            </div>
+            <div className="ad-table-wrap">
+              <table className="ad-table">
+                <thead>
+                  <tr>
+                    <th>Ingredient</th>
+                    <th>Season</th>
+                    <th>Alternative</th>
+                    <th>Sort</th>
+                    <th>Active</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSeasonRecords.length === 0 ? (
+                    <tr className="ad-empty-row"><td colSpan="6">No seasonal ingredient records found.</td></tr>
+                  ) : (
+                    filteredSeasonRecords.map((item) => (
+                      <tr key={item.id}>
+                        <td>{item.ingredient_name}</td>
+                        <td>{item.season}</td>
+                        <td>{item.alt || '—'}</td>
+                        <td>{item.sort_order ?? 0}</td>
+                        <td>
+                          <span className={`ad-status-pill ${item.active ? 'open' : 'closed'}`}>
+                            {item.active ? 'Yes' : 'No'}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="ad-row-actions">
+                            <button className="ad-icon-btn" type="button" onClick={() => openSeasonModal(item.id)}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                            <button className="ad-icon-btn danger" type="button" onClick={() => deleteSeason(item.id)}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1 2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </main>
 
@@ -853,8 +1486,34 @@ export default function Admin() {
               </select>
             </div>
             <div className="ad-field">
-              <label className="ad-field-label">Icon (emoji)</label>
-              <input className="ad-input" value={marketForm.icon} onChange={(e) => handleMarketFormChange('icon', e.target.value)} placeholder="🏪" />
+              <label className="ad-field-label">Icon</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  className="ad-input"
+                  style={{ width: 56, textAlign: 'center', fontSize: 18 }}
+                  value={marketForm.icon}
+                  maxLength={4}
+                  onChange={(e) => handleMarketFormChange('icon', e.target.value)}
+                  placeholder="🏪"
+                />
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {MARKET_ICON_CHOICES.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      className="ad-icon-btn"
+                      title={emoji}
+                      onClick={() => handleMarketFormChange('icon', emoji)}
+                      style={{
+                        fontSize: 16,
+                        border: marketForm.icon === emoji ? '1px solid #4caf7d' : undefined,
+                      }}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
             <div className="ad-field">
               <label className="ad-field-label">Latitude</label>
@@ -919,10 +1578,6 @@ export default function Admin() {
               <input className="ad-input" value={recipeForm.name} onChange={(e) => handleRecipeFormChange('name', e.target.value)} placeholder="e.g. Egg & Malunggay Scramble" />
             </div>
             <div className="ad-field">
-              <label className="ad-field-label">Emoji</label>
-              <input className="ad-input" value={recipeForm.emoji} onChange={(e) => handleRecipeFormChange('emoji', e.target.value)} placeholder="🍳" />
-            </div>
-            <div className="ad-field">
               <label className="ad-field-label">Meal Type</label>
               <select className="ad-select" value={recipeForm.type} onChange={(e) => handleRecipeFormChange('type', e.target.value)}>
                 {RECIPE_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
@@ -947,21 +1602,27 @@ export default function Admin() {
               <input className="ad-input" type="number" value={recipeForm.cost} onChange={(e) => handleRecipeFormChange('cost', e.target.value)} placeholder="45" />
             </div>
             <div className="ad-field">
-              <label className="ad-field-label">Calories</label>
-              <input className="ad-input" type="number" value={recipeForm.kcal} onChange={(e) => handleRecipeFormChange('kcal', e.target.value)} placeholder="380" />
+              <label className="ad-field-label">Calories (auto)</label>
+              <input className="ad-input" type="number" value={computedNutrition.kcal} disabled readOnly style={{ opacity: 0.75 }} />
             </div>
             <div className="ad-field">
-              <label className="ad-field-label">Protein (g)</label>
-              <input className="ad-input" type="number" value={recipeForm.protein} onChange={(e) => handleRecipeFormChange('protein', e.target.value)} placeholder="24" />
+              <label className="ad-field-label">Protein (g, auto)</label>
+              <input className="ad-input" type="number" value={computedNutrition.protein} disabled readOnly style={{ opacity: 0.75 }} />
             </div>
             <div className="ad-field">
-              <label className="ad-field-label">Carbs (g)</label>
-              <input className="ad-input" type="number" value={recipeForm.carbs} onChange={(e) => handleRecipeFormChange('carbs', e.target.value)} placeholder="18" />
+              <label className="ad-field-label">Carbs (g, auto)</label>
+              <input className="ad-input" type="number" value={computedNutrition.carbs} disabled readOnly style={{ opacity: 0.75 }} />
             </div>
             <div className="ad-field">
-              <label className="ad-field-label">Fats (g)</label>
-              <input className="ad-input" type="number" value={recipeForm.fats} onChange={(e) => handleRecipeFormChange('fats', e.target.value)} placeholder="12" />
+              <label className="ad-field-label">Fats (g, auto)</label>
+              <input className="ad-input" type="number" value={computedNutrition.fats} disabled readOnly style={{ opacity: 0.75 }} />
             </div>
+          </div>
+          <div style={{ fontSize: 12, color: '#8aab96', marginTop: -8, marginBottom: 12 }}>
+            Calculated from FNRI data: {computedNutrition.totalKcal} kcal total ÷ {parseInt(recipeForm.servings, 10) || 1} serving(s).
+            {computedNutrition.unlinkedCount > 0 && (
+              <span style={{ color: '#e0a94c' }}> {computedNutrition.unlinkedCount} ingredient(s) aren't linked to FNRI yet and are excluded from this total.</span>
+            )}
           </div>
 
           <div className="ad-field" style={{ marginBottom: 12 }}>
@@ -997,9 +1658,67 @@ export default function Admin() {
           <div className="ad-sub-section">
             <div className="ad-sub-title">Ingredients</div>
             {recipeIngredients.map((ing, idx) => (
-              <div key={idx} className="ad-sub-row" style={{ gridTemplateColumns: '1fr 90px 90px 32px' }}>
-                <input className="ad-input" placeholder="Ingredient name" value={ing.name} onChange={(e) => updateRecipeIngredient(idx, 'name', e.target.value)} />
-                <input className="ad-input" placeholder="Qty" value={ing.qty} onChange={(e) => updateRecipeIngredient(idx, 'qty', e.target.value)} />
+              <div key={idx} className="ad-sub-row" style={{ gridTemplateColumns: '1fr 80px 90px 32px' }}>
+                <div style={{ position: 'relative' }}>
+                  {ing.fct_id ? (
+                    <div
+                      className="ad-input"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'default' }}
+                    >
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>
+                        ✓ {ing.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => clearIngredientLink(idx)}
+                        title="Change ingredient"
+                        style={{ flexShrink: 0, background: 'none', border: 'none', color: '#8aab96', cursor: 'pointer', fontSize: 13 }}
+                      >
+                        ↺
+                      </button>
+                    </div>
+                  ) : (
+                    <input
+                      className="ad-input"
+                      placeholder="Search FNRI food name..."
+                      value={ing.name}
+                      onChange={(e) => handleIngredientNameChange(idx, e.target.value)}
+                      onFocus={() => setIngredientSearchIndex(idx)}
+                      onBlur={() => setTimeout(() => setIngredientSearchIndex((cur) => (cur === idx ? null : cur)), 150)}
+                    />
+                  )}
+                  {ingredientSearchIndex === idx && !ing.fct_id && ingredientSearchResults.length > 0 && (
+                    <div
+                      style={{
+                        position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30,
+                        background: '#0f1c14', border: '1px solid #2c4636', borderRadius: 8,
+                        marginTop: 4, maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                      }}
+                    >
+                      {ingredientSearchResults.map((item) => (
+                        <div
+                          key={item.fct_id}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => selectFnriForIngredient(idx, item)}
+                          style={{
+                            padding: '8px 10px', cursor: 'pointer', fontSize: 13, color: '#e3f0e8',
+                            borderBottom: '1px solid #1c2f24', display: 'flex', justifyContent: 'space-between', gap: 8,
+                          }}
+                        >
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.food_name}</span>
+                          <span style={{ color: '#8aab96', flexShrink: 0 }}>{item.energy_kcal ?? '—'} kcal/100g</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <input
+                  className="ad-input"
+                  type="number"
+                  placeholder="Grams"
+                  value={ing.grams}
+                  onChange={(e) => updateRecipeIngredient(idx, 'grams', e.target.value)}
+                />
                 <select className="ad-select" value={ing.status} onChange={(e) => updateRecipeIngredient(idx, 'status', e.target.value)}>
                   <option value="avail">Avail</option>
                   <option value="warn">Warn</option>
@@ -1074,6 +1793,145 @@ export default function Admin() {
           <div className="ad-modal-actions">
             <button className="ad-btn ad-btn-outline" type="button" onClick={closeFnriModal}>Cancel</button>
             <button className="ad-btn ad-btn-primary" type="button" onClick={saveFnri}>Save Food Item</button>
+          </div>
+        </div>
+      </div>
+
+      <div className={optionModalOpen ? 'ad-modal-overlay active' : 'ad-modal-overlay'} onClick={(e) => { if (e.target === e.currentTarget) closeOptionModal(); }}>
+        <div className="ad-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="ad-modal-title" id="ad-option-modal-title">
+            {optionModalMode === 'edit' ? 'Edit Onboarding Option' : 'Add New Onboarding Option'}
+          </div>
+          <div className="ad-form-grid">
+            <div className="ad-field">
+              <label className="ad-field-label">Group</label>
+              <select className="ad-select" value={optionForm.group} onChange={(e) => handleOptionFormChange('group', e.target.value)}>
+                {OPTION_GROUPS.map((group) => <option key={group.key} value={group.key}>{group.label}</option>)}
+              </select>
+            </div>
+            <div className="ad-field">
+              <label className="ad-field-label">Key</label>
+              <input className="ad-input" value={optionForm.key} onChange={(e) => handleOptionFormChange('key', e.target.value)} placeholder="e.g. lose_weight" />
+            </div>
+            <div className="ad-field ad-field-full">
+              <label className="ad-field-label">Label</label>
+              <input className="ad-input" value={optionForm.label} onChange={(e) => handleOptionFormChange('label', e.target.value)} placeholder="Lose Weight" />
+            </div>
+            <div className="ad-field">
+              <label className="ad-field-label">Sort Order</label>
+              <input className="ad-input" type="number" value={optionForm.sort_order} onChange={(e) => handleOptionFormChange('sort_order', e.target.value)} />
+            </div>
+            <div className="ad-field ad-field-full">
+              <label className="ad-field-label">Description</label>
+              <input className="ad-input" value={optionForm.description} onChange={(e) => handleOptionFormChange('description', e.target.value)} placeholder="Optional description for admin use" />
+            </div>
+            <div className="ad-field" style={{ gridColumn: 'span 2' }}>
+              <label className="ad-field-label">Active</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 13, color: '#8aab96' }}>
+                <input type="checkbox" checked={optionForm.active} onChange={(e) => handleOptionFormChange('active', e.target.checked)} />
+                Enabled for onboarding
+              </label>
+            </div>
+          </div>
+          <div className="ad-modal-actions">
+            <button className="ad-btn ad-btn-outline" type="button" onClick={closeOptionModal}>Cancel</button>
+            <button className="ad-btn ad-btn-primary" type="button" onClick={saveOption}>Save Option</button>
+          </div>
+        </div>
+      </div>
+
+      <div className={constraintModalOpen ? 'ad-modal-overlay active' : 'ad-modal-overlay'} onClick={(e) => { if (e.target === e.currentTarget) setConstraintModalOpen(false); }}>
+        <div className="ad-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="ad-modal-title">{constraintModalMode === 'edit' ? 'Edit Constraint Definition' : 'Add New Constraint Definition'}</div>
+          <div className="ad-form-grid">
+            <div className="ad-field">
+              <label className="ad-field-label">Key</label>
+              <input className="ad-input" value={constraintForm.key} onChange={(e) => handleConstraintFormChange('key', e.target.value)} placeholder="e.g. lactose_intolerance" />
+            </div>
+            <div className="ad-field">
+              <label className="ad-field-label">Label</label>
+              <input className="ad-input" value={constraintForm.label} onChange={(e) => handleConstraintFormChange('label', e.target.value)} placeholder="Lactose Intolerance" />
+            </div>
+            <div className="ad-field">
+              <label className="ad-field-label">Severity</label>
+              <select className="ad-select" value={constraintForm.severity} onChange={(e) => handleConstraintFormChange('severity', e.target.value)}>
+                <option value="dietary">Dietary</option>
+                <option value="medical">Medical</option>
+                <option value="allergy">Allergy</option>
+              </select>
+            </div>
+            <div className="ad-field ad-field-full">
+              <label className="ad-field-label">Blocked ingredients</label>
+              <input className="ad-input" value={constraintForm.blocked} onChange={(e) => handleConstraintFormChange('blocked', e.target.value)} placeholder="e.g. milk, cheese, cream" />
+            </div>
+            <div className="ad-field ad-field-full">
+              <label className="ad-field-label">Reason</label>
+              <input className="ad-input" value={constraintForm.reason} onChange={(e) => handleConstraintFormChange('reason', e.target.value)} placeholder="Why this constraint applies" />
+            </div>
+            <div className="ad-field">
+              <label className="ad-field-label">Warn if carbs above</label>
+              <input className="ad-input" type="number" value={constraintForm.carb_threshold} onChange={(e) => handleConstraintFormChange('carb_threshold', e.target.value)} placeholder="0" />
+            </div>
+            <div className="ad-field">
+              <label className="ad-field-label">Warn if fats above</label>
+              <input className="ad-input" type="number" value={constraintForm.fat_threshold} onChange={(e) => handleConstraintFormChange('fat_threshold', e.target.value)} placeholder="0" />
+            </div>
+            <div className="ad-field">
+              <label className="ad-field-label">Warn if protein above</label>
+              <input className="ad-input" type="number" value={constraintForm.protein_threshold} onChange={(e) => handleConstraintFormChange('protein_threshold', e.target.value)} placeholder="0" />
+            </div>
+            <div className="ad-field">
+              <label className="ad-field-label">Sort Order</label>
+              <input className="ad-input" type="number" value={constraintForm.sort_order} onChange={(e) => handleConstraintFormChange('sort_order', e.target.value)} />
+            </div>
+            <div className="ad-field" style={{ gridColumn: 'span 2' }}>
+              <label className="ad-field-label">Active</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 13, color: '#8aab96' }}>
+                <input type="checkbox" checked={constraintForm.active} onChange={(e) => handleConstraintFormChange('active', e.target.checked)} />
+                Enabled for app safety checks
+              </label>
+            </div>
+          </div>
+          <div className="ad-modal-actions">
+            <button className="ad-btn ad-btn-outline" type="button" onClick={() => setConstraintModalOpen(false)}>Cancel</button>
+            <button className="ad-btn ad-btn-primary" type="button" onClick={saveConstraint}>Save Constraint</button>
+          </div>
+        </div>
+      </div>
+
+      <div className={seasonModalOpen ? 'ad-modal-overlay active' : 'ad-modal-overlay'} onClick={(e) => { if (e.target === e.currentTarget) setSeasonModalOpen(false); }}>
+        <div className="ad-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="ad-modal-title">{seasonModalMode === 'edit' ? 'Edit Seasonal Ingredient' : 'Add New Seasonal Ingredient'}</div>
+          <div className="ad-form-grid">
+            <div className="ad-field ad-field-full">
+              <label className="ad-field-label">Ingredient Name</label>
+              <input className="ad-input" value={seasonForm.ingredient_name} onChange={(e) => handleSeasonFormChange('ingredient_name', e.target.value)} placeholder="e.g. malunggay" />
+            </div>
+            <div className="ad-field">
+              <label className="ad-field-label">Season</label>
+              <select className="ad-select" value={seasonForm.season} onChange={(e) => handleSeasonFormChange('season', e.target.value)}>
+                {SEASONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </div>
+            <div className="ad-field ad-field-full">
+              <label className="ad-field-label">Alternative Ingredient</label>
+              <input className="ad-input" value={seasonForm.alt} onChange={(e) => handleSeasonFormChange('alt', e.target.value)} placeholder="e.g. kangkong" />
+            </div>
+            <div className="ad-field">
+              <label className="ad-field-label">Sort Order</label>
+              <input className="ad-input" type="number" value={seasonForm.sort_order} onChange={(e) => handleSeasonFormChange('sort_order', e.target.value)} />
+            </div>
+            <div className="ad-field" style={{ gridColumn: 'span 2' }}>
+              <label className="ad-field-label">Active</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 13, color: '#8aab96' }}>
+                <input type="checkbox" checked={seasonForm.active} onChange={(e) => handleSeasonFormChange('active', e.target.checked)} />
+                Enabled for seasonal scoring
+              </label>
+            </div>
+          </div>
+          <div className="ad-modal-actions">
+            <button className="ad-btn ad-btn-outline" type="button" onClick={() => setSeasonModalOpen(false)}>Cancel</button>
+            <button className="ad-btn ad-btn-primary" type="button" onClick={saveSeason}>Save Seasonal Ingredient</button>
           </div>
         </div>
       </div>

@@ -223,42 +223,32 @@ export default function Landing() {
                       <circle cx="50" cy="50" r="42" fill="none" stroke="#a8f5c8" strokeWidth="10" strokeDasharray="37 227" strokeDashoffset="-191" strokeLinecap="round"/>
                     </svg>
                     <div className="ring-center-text">
-                      <span className="ring-kcal">1,840</span>
+                      <span className="ring-kcal">—</span>
                       <span className="ring-label">kcal</span>
                     </div>
                   </div>
 
                   <div className="macro-list">
                     <div className="macro-item">
-                      <div className="macro-row"><span className="macro-name">Protein</span><span className="macro-val">128g</span></div>
-                      <div className="macro-bar-bg"><div className="macro-bar-fill" style={{ width: 0, background: '#2ddc7a' }} data-width="66%"></div></div>
+                      <div className="macro-row"><span className="macro-name">Protein</span><span className="macro-val">—</span></div>
+                      <div className="macro-bar-bg"><div className="macro-bar-fill" style={{ width: 0, background: '#2ddc7a' }} data-width="0"></div></div>
                     </div>
                     <div className="macro-item">
-                      <div className="macro-row"><span className="macro-name">Carbs</span><span className="macro-val">210g</span></div>
-                      <div className="macro-bar-bg"><div className="macro-bar-fill" style={{ width: 0, background: '#1a8c4e' }} data-width="50%"></div></div>
+                      <div className="macro-row"><span className="macro-name">Carbs</span><span className="macro-val">—</span></div>
+                      <div className="macro-bar-bg"><div className="macro-bar-fill" style={{ width: 0, background: '#1a8c4e' }} data-width="0"></div></div>
                     </div>
                     <div className="macro-item">
-                      <div className="macro-row"><span className="macro-name">Fats</span><span className="macro-val">58g</span></div>
-                      <div className="macro-bar-bg"><div className="macro-bar-fill" style={{ width: 0, background: '#a8f5c8' }} data-width="24%"></div></div>
+                      <div className="macro-row"><span className="macro-name">Fats</span><span className="macro-val">—</span></div>
+                      <div className="macro-bar-bg"><div className="macro-bar-fill" style={{ width: 0, background: '#a8f5c8' }} data-width="0"></div></div>
                     </div>
                   </div>
                 </div>
 
                 <div className="meal-strip">
                   <div className="meal-item">
-                    <span className="meal-emoji">🥗</span>
-                    <div className="meal-info"><div className="meal-name">Chicken &amp; Veggie Bowl</div><div className="meal-meta">Lunch · Local market ✓</div></div>
-                    <span className="meal-kcal">520 kcal</span>
-                  </div>
-                  <div className="meal-item">
-                    <span className="meal-emoji">🍳</span>
-                    <div className="meal-info"><div className="meal-name">Egg &amp; Malunggay Scramble</div><div className="meal-meta">Breakfast · ₱45 est.</div></div>
-                    <span className="meal-kcal">380 kcal</span>
-                  </div>
-                  <div className="meal-item">
-                    <span className="meal-emoji">🍚</span>
-                    <div className="meal-info"><div className="meal-name">Sinigang na Isda</div><div className="meal-meta">Dinner · Seasonal ✓</div></div>
-                    <span className="meal-kcal">480 kcal</span>
+                    <span className="meal-emoji">🧾</span>
+                    <div className="meal-info"><div className="meal-name">No sample recipes are included</div><div className="meal-meta">Use the Admin panel to add recipes to the database.</div></div>
+                    <span className="meal-kcal">—</span>
                   </div>
                 </div>
               </div>

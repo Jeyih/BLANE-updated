@@ -4,46 +4,9 @@ import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
 import '../styles/profile.css';
 
-const GOAL_META = {
-  lose_weight:      { icon: '🔥', label: 'Lose Weight' },
-  gain_muscle:      { icon: '💪', label: 'Gain Muscle' },
-  maintain:         { icon: '⚖️', label: 'Maintain' },
-  improve_health:   { icon: '❤️', label: 'Improve Health' },
-  boost_energy:     { icon: '⚡', label: 'Boost Energy' },
-  manage_condition: { icon: '🩺', label: 'Manage Condition' },
-};
-
-const ALL_GOALS = Object.keys(GOAL_META);
-
-const DIETARY_OPTS = [
-  { value: 'vegetarian',        label: '🥦 Vegetarian' },
-  { value: 'vegan',             label: '🌱 Vegan' },
-  { value: 'halal',             label: '☪️ Halal' },
-  { value: 'kosher',            label: '✡️ Kosher' },
-  { value: 'gluten_free',       label: '🌾 Gluten-Free' },
-  { value: 'dairy_free',        label: '🥛 Dairy-Free' },
-  { value: 'nut_allergy',       label: '🥜 Nut Allergy' },
-  { value: 'shellfish_allergy', label: '🦐 Shellfish Allergy' },
-  { value: 'egg_free',          label: '🥚 Egg-Free' },
-  { value: 'soy_free',          label: '🫘 Soy-Free' },
-  { value: 'low_sodium',        label: '🧂 Low Sodium' },
-  { value: 'low_sugar',         label: '🍬 Low Sugar' },
-];
-
-const MEDICAL_OPTS = [
-  { value: 'diabetes_t1',      label: '💉 Diabetes Type 1' },
-  { value: 'diabetes_t2',      label: '🩸 Diabetes Type 2' },
-  { value: 'hypertension',     label: '❤️ Hypertension' },
-  { value: 'high_cholesterol', label: '🫀 High Cholesterol' },
-  { value: 'gerd',             label: '🔥 GERD / Acid Reflux' },
-  { value: 'ibs',              label: '🫃 IBS / Gut Issues' },
-  { value: 'kidney_disease',   label: '🫘 Kidney Disease' },
-  { value: 'thyroid',          label: '🦋 Thyroid Disorder' },
-  { value: 'anemia',           label: '🩺 Anemia' },
-  { value: 'pcos',             label: '🔵 PCOS' },
-  { value: 'gout',             label: '🦵 Gout' },
-  { value: 'celiac',          label: '🌾 Celiac Disease' },
-];
+// Goal, dietary and medical option metadata are managed in the DB
+// via the Admin panel. Load them at runtime and fall back to
+// empty structures when unavailable.
 
 const ACTIVITY_LABELS = {
   sedentary:    'Sedentary',
@@ -77,6 +40,10 @@ export default function Profile() {
   const { user } = useAuth();
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [loading, setLoading] = useState(true);
+  const [goalMeta, setGoalMeta] = useState({});
+  const [allGoals, setAllGoals] = useState([]);
+  const [dietaryOpts, setDietaryOpts] = useState([]);
+  const [medicalOpts, setMedicalOpts] = useState([]);
   const [activeTab, setActiveTab] = useState('basic');
   const [editingBasic, setEditingBasic] = useState(false);
   const [editingHealth, setEditingHealth] = useState(false);
@@ -104,6 +71,32 @@ export default function Profile() {
     if (!user) return;
     loadProfile();
   }, [user]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadOptions() {
+      try {
+        const { data: goals, error: gErr } = await supabase.from('option_lists').select('*').eq('group', 'goals');
+        if (!gErr && mounted && Array.isArray(goals)) {
+          const meta = {};
+          const keys = [];
+          goals.filter((item) => item.active !== false).forEach((g) => { meta[g.key] = { icon: g.icon || '', label: g.label || g.key }; keys.push(g.key); });
+          setGoalMeta(meta);
+          setAllGoals(keys);
+        }
+      } catch (e) { console.warn('load goals failed', e); }
+      try {
+        const { data: dietary, error: dErr } = await supabase.from('option_lists').select('*').eq('group', 'dietary').order('sort_order');
+        if (!dErr && mounted && Array.isArray(dietary)) setDietaryOpts(dietary.filter((item) => item.active !== false));
+      } catch (e) { console.warn('load dietary failed', e); }
+      try {
+        const { data: medical, error: mErr } = await supabase.from('option_lists').select('*').eq('group', 'medical').order('sort_order');
+        if (!mErr && mounted && Array.isArray(medical)) setMedicalOpts(medical.filter((item) => item.active !== false));
+      } catch (e) { console.warn('load medical failed', e); }
+    }
+    loadOptions();
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     if (!toast.visible) return;
@@ -408,7 +401,7 @@ export default function Profile() {
                 <div className="pf-hero-meta">
                   <span>{joinedDate}</span>
                   <span className="pf-hero-badge">
-                    {GOAL_META[profile.goal]?.icon || '—'} {GOAL_META[profile.goal]?.label || '—'}
+                    {goalMeta[profile.goal]?.icon || '—'} {goalMeta[profile.goal]?.label || '—'}
                   </span>
                 </div>
               </div>
@@ -646,8 +639,8 @@ export default function Profile() {
 
                 <div className="pf-field-label" style={{ marginBottom: 10 }}>Health Goal</div>
                 <div className="pf-goal-display">
-                  {ALL_GOALS.map((key) => {
-                    const meta = GOAL_META[key];
+                  {allGoals.map((key) => {
+                    const meta = goalMeta[key] || { icon: '', label: key };
                     const selected = (editingHealth ? healthForm.goal : profile.goal) === key;
                     return (
                       <div
@@ -666,15 +659,15 @@ export default function Profile() {
 
                 <div className="pf-field-label" style={{ marginBottom: 10 }}>Dietary Restrictions</div>
                 <div className="pf-tag-grid">
-                  {(editingHealth ? DIETARY_OPTS : DIETARY_OPTS.filter((opt) => (profile.dietary_restrictions || []).includes(opt.value))).map((opt) => {
-                    const selected = editingHealth ? healthForm.dietary.includes(opt.value) : true;
+                  {(editingHealth ? dietaryOpts : dietaryOpts.filter((opt) => (profile.dietary_restrictions || []).includes(opt.key))).map((opt) => {
+                    const selected = editingHealth ? healthForm.dietary.includes(opt.key) : true;
                     if (!editingHealth && !selected) return null;
                     return (
                       <div
-                        key={opt.value}
+                        key={opt.key}
                         className={`pf-tag-pill${selected ? ' selected' : ''}${editingHealth ? '' : ' readonly'}`}
-                        data-value={opt.value}
-                        onClick={editingHealth ? () => toggleHealthTag('dietary', opt.value) : undefined}
+                        data-value={opt.key}
+                        onClick={editingHealth ? () => toggleHealthTag('dietary', opt.key) : undefined}
                       >
                         {opt.label}
                       </div>
@@ -689,15 +682,15 @@ export default function Profile() {
 
                 <div className="pf-field-label" style={{ marginBottom: 10 }}>Medical Conditions</div>
                 <div className="pf-tag-grid">
-                  {(editingHealth ? MEDICAL_OPTS : MEDICAL_OPTS.filter((opt) => (profile.medical_conditions || []).includes(opt.value))).map((opt) => {
-                    const selected = editingHealth ? healthForm.medical.includes(opt.value) : true;
+                  {(editingHealth ? medicalOpts : medicalOpts.filter((opt) => (profile.medical_conditions || []).includes(opt.key))).map((opt) => {
+                    const selected = editingHealth ? healthForm.medical.includes(opt.key) : true;
                     if (!editingHealth && !selected) return null;
                     return (
                       <div
-                        key={opt.value}
+                        key={opt.key}
                         className={`pf-tag-pill${selected ? ' selected' : ''}${editingHealth ? '' : ' readonly'}`}
-                        data-value={opt.value}
-                        onClick={editingHealth ? () => toggleHealthTag('medical', opt.value) : undefined}
+                        data-value={opt.key}
+                        onClick={editingHealth ? () => toggleHealthTag('medical', opt.key) : undefined}
                       >
                         {opt.label}
                       </div>

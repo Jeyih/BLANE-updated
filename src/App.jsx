@@ -14,9 +14,12 @@
    Placeholder pages will be filled in one-by-one in the
    following migration steps, same order as the original build.
    ============================================================ */
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import { loadConstraintDefinitions } from './lib/constraints';
+import { loadIngredientSeasons } from './lib/seasonal';
 
 import Landing from './pages/Landing';
 import Onboarding from './pages/Onboarding';
@@ -29,6 +32,20 @@ import Admin from './pages/Admin';
 import ComingSoon from './pages/ComingSoon';
 
 export default function App() {
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function initDatabaseLookups() {
+      await Promise.all([loadConstraintDefinitions(), loadIngredientSeasons()]);
+      if (active) setDataLoaded(true);
+    }
+
+    initDatabaseLookups();
+    return () => { active = false; };
+  }, []);
+
   return (
     <AuthProvider>
       <BrowserRouter>

@@ -8,90 +8,142 @@
    ============================================================ */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import '../styles/recommend.css';
 
-const REC_RECIPES = [
-  { id:'r1',  emoji:'🍳', name:'Egg & Malunggay Scramble',       type:'Breakfast', kcal:380, cost:45,  protein:24, carbs:18,  fats:12,
-    diet:['vegetarian'], goal:['maintain','gain_muscle'],
-    ingredients:[{name:'Eggs'},{name:'Malunggay leaves'},{name:'Garlic'},{name:'Onion'},{name:'Cooking oil'}] },
-  { id:'r2',  emoji:'🥣', name:'Oatmeal with Banana & Honey',    type:'Breakfast', kcal:320, cost:35,  protein:10, carbs:58,  fats:6,
-    diet:['vegetarian','dairy_free'], goal:['lose_weight','boost_energy'],
-    ingredients:[{name:'Rolled oats'},{name:'Banana'},{name:'Honey'},{name:'Milk'}] },
-  { id:'r3',  emoji:'🍜', name:'Arroz Caldo',                    type:'Breakfast', kcal:340, cost:55,  protein:18, carbs:48,  fats:7,
-    diet:[], goal:['improve_health','manage_condition'],
-    ingredients:[{name:'Glutinous rice'},{name:'Chicken'},{name:'Ginger'},{name:'Garlic'},{name:'Fish sauce'},{name:'Spring onion'}] },
-  { id:'r4',  emoji:'🥗', name:'Chicken & Veggie Rice Bowl',     type:'Lunch',     kcal:520, cost:95,  protein:38, carbs:52,  fats:10,
-    diet:['gluten_free'], goal:['gain_muscle','maintain'],
-    ingredients:[{name:'Chicken breast'},{name:'Brown rice'},{name:'Broccoli'},{name:'Soy sauce'},{name:'Sesame oil'},{name:'Garlic'}] },
-  { id:'r5',  emoji:'🩵', name:'Tinolang Manok',                 type:'Lunch',     kcal:310, cost:75,  protein:28, carbs:20,  fats:8,
-    diet:['gluten_free','dairy_free'], goal:['improve_health','lose_weight','manage_condition'],
-    ingredients:[{name:'Chicken'},{name:'Green papaya'},{name:'Malunggay'},{name:'Ginger'},{name:'Fish sauce'}] },
-  { id:'r6',  emoji:'🥩', name:'Grilled Pork Liempo',            type:'Lunch',     kcal:560, cost:110, protein:42, carbs:10,  fats:28,
-    diet:['gluten_free','dairy_free'], goal:['gain_muscle','maintain'],
-    ingredients:[{name:'Pork belly'},{name:'Calamansi'},{name:'Soy sauce'},{name:'Garlic'},{name:'Brown sugar'}] },
-  { id:'r7',  emoji:'🍲', name:'Sinigang na Isda',               type:'Dinner',    kcal:280, cost:80,  protein:32, carbs:18,  fats:5,
-    diet:['gluten_free','dairy_free'], goal:['lose_weight','improve_health','manage_condition'],
-    ingredients:[{name:'Bangus'},{name:'Kangkong'},{name:'Tamarind mix'},{name:'Tomatoes'},{name:'Fish sauce'},{name:'Radish'}] },
-  { id:'r8',  emoji:'🍛', name:'Monggo Guisado',                 type:'Dinner',    kcal:380, cost:55,  protein:22, carbs:50,  fats:6,
-    diet:['dairy_free'], goal:['lose_weight','improve_health'],
-    ingredients:[{name:'Mung beans'},{name:'Pork'},{name:'Ampalaya leaves'},{name:'Garlic'},{name:'Tomato'},{name:'Fish sauce'}] },
-  { id:'r9',  emoji:'🍌', name:'Banana & Peanut Butter',         type:'Snack',     kcal:210, cost:25,  protein:6,  carbs:30,  fats:8,
-    diet:['vegetarian','gluten_free'], goal:['boost_energy','gain_muscle'],
-    ingredients:[{name:'Banana'},{name:'Peanut butter'}] },
-  { id:'r10', emoji:'🧁', name:'Camote Cue',                     type:'Snack',     kcal:260, cost:30,  protein:2,  carbs:54,  fats:7,
-    diet:['vegan','gluten_free','dairy_free'], goal:['boost_energy'],
-    ingredients:[{name:'Sweet potato'},{name:'Brown sugar'},{name:'Cooking oil'}] },
-  { id:'r11', emoji:'🥬', name:'Pinakbet',                       type:'Dinner',    kcal:220, cost:60,  protein:12, carbs:22,  fats:8,
-    diet:['gluten_free','dairy_free'], goal:['lose_weight','improve_health','manage_condition'],
-    ingredients:[{name:'Ampalaya'},{name:'Eggplant'},{name:'Squash'},{name:'String beans'},{name:'Bagoong alamang'},{name:'Pork'}] },
-  { id:'r12', emoji:'🫙', name:'Ensaladang Talong',              type:'Snack',     kcal:120, cost:20,  protein:4,  carbs:12,  fats:6,
-    diet:['vegan','gluten_free','dairy_free'], goal:['lose_weight','improve_health'],
-    ingredients:[{name:'Eggplant'},{name:'Tomato'},{name:'Onion'},{name:'Salted egg'},{name:'Fish sauce'}] },
-];
-
-const CONSTRAINT_BLOCKS = {
-  nut_allergy: ['peanut butter','ground peanuts'],
-  shellfish_allergy: ['bagoong alamang','shrimp','bagoong'],
-  egg_free: ['eggs','salted egg'],
-  soy_free: ['soy sauce','tofu'],
-  vegetarian: ['chicken','pork','bangus','tilapia','fish sauce','beef'],
-  vegan: ['chicken','pork','bangus','tilapia','fish sauce','eggs','salted egg','milk','honey'],
-  halal: ['pork','pork belly','bagoong'],
-  gluten_free: ['soy sauce'],
-  dairy_free: ['milk','butter','cream','yogurt'],
-  low_sodium: ['fish sauce','soy sauce','bagoong alamang','salted egg'],
-  low_sugar: ['brown sugar','honey','sugar'],
-  diabetes_t1: ['brown sugar','honey','sugar'],
-  diabetes_t2: ['brown sugar','honey','sugar'],
-  hypertension: ['fish sauce','soy sauce','bagoong alamang','salted egg'],
-  high_cholesterol: ['pork belly','butter'],
-  gerd: ['calamansi','vinegar','chili','tomato'],
-  gout: ['pork belly','beef','bagoong'],
-};
-const ALLERGY_KEYS = ['nut_allergy','shellfish_allergy','egg_free','soy_free'];
+// Data-driven metadata is loaded from the database.
+const CONSTRAINT_BLOCKS = {};
+const ALLERGY_KEYS = [];
 const GOAL_IDEALS = {
-  lose_weight: { maxKcal:500, minProtein:20, maxFats:18, minCarbs:0 },
-  gain_muscle: { maxKcal:999, minProtein:30, maxFats:999, minCarbs:40 },
-  maintain: { maxKcal:650, minProtein:15, maxFats:999, minCarbs:0 },
-  improve_health: { maxKcal:999, minProtein:15, maxFats:20, minCarbs:0 },
-  boost_energy: { maxKcal:999, minProtein:0, maxFats:999, minCarbs:35 },
-  manage_condition: { maxKcal:500, minProtein:15, maxFats:18, minCarbs:0 },
+  maintain: {
+    minProtein: 15,
+    maxKcal: 550,
+    maxFats: 25,
+    minCarbs: 20,
+  },
 };
+
+async function loadRecommendationData() {
+  const { data: constraintData, error: constraintErr } = await supabase
+    .from('constraint_definitions')
+    .select('*')
+    .order('sort_order');
+
+  if (constraintErr) {
+    console.error('Failed to load recommendation constraints:', constraintErr);
+  } else {
+    Object.keys(CONSTRAINT_BLOCKS).forEach((key) => delete CONSTRAINT_BLOCKS[key]);
+    ALLERGY_KEYS.length = 0;
+
+    (constraintData || []).forEach((row) => {
+      if (row.active === false || !row.key) return;
+      const blocked = Array.isArray(row.blocked)
+        ? row.blocked.map((item) => item.trim()).filter(Boolean)
+        : typeof row.blocked === 'string'
+          ? row.blocked.split(',').map((item) => item.trim()).filter(Boolean)
+          : [];
+
+      CONSTRAINT_BLOCKS[row.key] = blocked;
+      if (row.severity === 'allergy') ALLERGY_KEYS.push(row.key);
+    });
+  }
+
+  const { data: goalData, error: goalErr } = await supabase.from('goal_ideals').select('*');
+  if (goalErr) {
+    console.error('Failed to load goal ideals:', goalErr);
+  } else {
+    Object.keys(GOAL_IDEALS).forEach((key) => { if (key !== 'maintain') delete GOAL_IDEALS[key]; });
+    (goalData || []).forEach((row) => {
+      if (!row.goal_key) return;
+      GOAL_IDEALS[row.goal_key] = {
+        minProtein: row.min_protein || 0,
+        maxKcal: row.max_kcal || 9999,
+        maxFats: row.max_fats || 9999,
+        minCarbs: row.min_carbs || 0,
+      };
+    });
+  }
+}
 
 export default function RecommendWidget({ profile }) {
   const [loading, setLoading] = useState(true);
-  const [top3, setTop3]       = useState(null);
+  const [recipes, setRecipes] = useState([]);
+  const [top3, setTop3]       = useState([]);
 
   useEffect(() => {
     let cancelled = false;
+    async function loadRecipes() {
+      setLoading(true);
+      const { data: recipesData, error: recipesErr } = await supabase.from('recipes').select('*').order('name');
+      if (cancelled) return;
+      if (recipesErr) {
+        console.error('Failed to load recommended recipes:', recipesErr.message);
+        setRecipes([]);
+        setLoading(false);
+        return;
+      }
+
+      const { data: ingData, error: ingErr } = await supabase.from('recipe_ingredients').select('*').order('sort_order');
+      if (cancelled) return;
+      if (ingErr) {
+        console.error('Failed to load recipe ingredients:', ingErr.message);
+        setRecipes([]);
+        setLoading(false);
+        return;
+      }
+
+      const ingByRecipe = {};
+      (ingData || []).forEach((ing) => {
+        if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
+        ingByRecipe[ing.recipe_id].push({ name: ing.name });
+      });
+
+      setRecipes((recipesData || []).map((r) => ({
+        id: r.id,
+        emoji: r.emoji,
+        name: r.name,
+        type: r.type,
+        diet: r.diet_tags || [],
+        goal: r.goal_tags || [],
+        kcal: r.kcal,
+        cost: r.cost,
+        protein: r.protein_g,
+        carbs: r.carbs_g,
+        fats: r.fats_g,
+        ingredients: ingByRecipe[r.id] || [],
+      })));
+      setLoading(false);
+    }
+
+    loadRecipes();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function prepareMetadata() {
+      await loadRecommendationData();
+      if (!cancelled) setLoading(false);
+    }
+    prepareMetadata();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!profile || recipes.length === 0) {
+      setTop3([]);
+      return;
+    }
+
     setLoading(true);
     const timer = setTimeout(() => {
       if (cancelled) return;
-      setTop3(profile ? scoreAndRankRecipes(profile) : []);
+      setTop3(scoreAndRankRecipes(profile, recipes));
       setLoading(false);
-    }, 400); /* perceived "thinking" delay, matches old widget */
+    }, 400);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [profile]);
+  }, [profile, recipes]);
 
   return (
     <div className="rec-widget col-12">
@@ -185,7 +237,7 @@ function SkeletonLoader() {
 /* ============================================================
    SCORING ENGINE (ported unchanged from recommend.js)
    ============================================================ */
-function scoreAndRankRecipes(profile) {
+function scoreAndRankRecipes(profile, recipes) {
   const goal = profile.goal || 'maintain';
   const dietary = profile.dietary_restrictions || [];
   const medical = profile.medical_conditions || [];
@@ -194,7 +246,7 @@ function scoreAndRankRecipes(profile) {
   const dailyTarget = computeDailyTarget(profile);
   const perMealKcal = Math.round(dailyTarget / 4);
 
-  const scored = REC_RECIPES.map((recipe) => {
+  const scored = (recipes || []).map((recipe) => {
     let score = 0;
     let goalScore = 0;
 

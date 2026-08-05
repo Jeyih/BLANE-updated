@@ -1,27 +1,5 @@
-/* ============================================================
-   BLANE — Dashboard Page
-   Replaces: dashboard.html (markup) + js/dashboard.js
-   (initGreeting, initDateHeader, initBmiWidget, initMealTabs —
-   nav dropdown/mobile logic is now handled entirely by <Navbar />).
-
-   Widget order matches dashboard.html exactly:
-   Meal Plan (col-8) -> BMI & Body Stats (col-4) ->
-   Recommended for You -> Real-Time Body Feedback Loop ->
-   Health Drift Detection.
-
-   Note: dashboard.js still referenced initWaterTracker() /
-   initMarketWidget(), but dashboard.html never actually
-   contained the matching markup for a water tracker or market
-   widget — they were dead code in the old build, so they're
-   intentionally left out here to keep the UI a 1:1 match.
-
-   Composes the 3 modular feature widgets built separately:
-   FeedbackWidget (01), DriftWidget (02), RecommendWidget (09).
-   BMI and meal tabs stay inline here since they were part of
-   dashboard.js itself, not separate feature files, in the
-   original build.
-   ============================================================ */
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
@@ -30,32 +8,42 @@ import DriftWidget from '../components/DriftWidget';
 import RecommendWidget from '../components/RecommendWidget';
 import '../styles/dashboard.css';
 
-const DEMO_MEALS = {
-  breakfast: { emoji: '🍳', name: 'Egg & Malunggay Scramble', time: '7:00 AM', prep: '15 min prep', difficulty: 'Easy', protein: 24, carbs: 18, fats: 12, kcal: 380,
-    ingredients: [
-      { name: 'Eggs', amount: '2 pcs', avail: true },
-      { name: 'Malunggay leaves', amount: '1 handful', avail: true },
-      { name: 'Garlic', amount: '2 cloves', avail: true },
-      { name: 'Cooking oil', amount: '1 tsp', avail: true },
-    ] },
-  lunch: { emoji: '🥗', name: 'Chicken & Veggie Rice Bowl', time: '12:00 PM', prep: '25 min prep', difficulty: 'Medium', protein: 38, carbs: 52, fats: 10, kcal: 520,
-    ingredients: [
-      { name: 'Chicken breast', amount: '150g', avail: true },
-      { name: 'Brown rice', amount: '1 cup cooked', avail: true },
-      { name: 'Broccoli', amount: '80g', avail: false },
-    ] },
-  dinner: { emoji: '🍲', name: 'Sinigang na Isda', time: '6:30 PM', prep: '35 min prep', difficulty: 'Medium', protein: 32, carbs: 28, fats: 8, kcal: 480,
-    ingredients: [
-      { name: 'Bangus / Tilapia', amount: '200g', avail: true },
-      { name: 'Kangkong', amount: '1 bundle', avail: true, label: '✓ Seasonal' },
-      { name: 'Tamarind mix', amount: '1 pack', avail: true },
-    ] },
-  snack: { emoji: '🍌', name: 'Banana & Peanut Butter', time: '3:00 PM', prep: '5 min prep', difficulty: 'Easy', protein: 6, carbs: 30, fats: 8, kcal: 210,
-    ingredients: [
-      { name: 'Ripe banana', amount: '1 pc', avail: true },
-      { name: 'Peanut butter', amount: '1 tbsp', avail: true },
-    ] },
-};
+function getCalorieGoal(profile) {
+  if (!profile) return 1840;
+  const h = parseFloat(profile.height_cm) || 170;
+  const w = parseFloat(profile.weight_kg) || 70;
+  const age = parseInt(profile.age) || 25;
+  const sex = profile.sex || 'male';
+  const bmr = sex === 'male' ? 10 * w + 6.25 * h - 5 * age + 5 : 10 * w + 6.25 * h - 5 * age - 161;
+  const tdee = bmr * 1.55;
+  const adj = { lose_weight: 0.85, gain_muscle: 1.1, maintain: 1.0, improve_health: 1.0, boost_energy: 1.0, manage_condition: 0.9 };
+  return Math.round(tdee * (adj[profile.goal] || 1.0)) || 1840;
+}
+
+function generateDefaultPlan(recipeList) {
+  if (!recipeList || recipeList.length === 0) return {};
+  const breakfasts = recipeList.filter((r) => r.type === 'Breakfast');
+  const lunches    = recipeList.filter((r) => r.type === 'Lunch');
+  const dinners    = recipeList.filter((r) => r.type === 'Dinner');
+  const snacks     = recipeList.filter((r) => r.type === 'Snack');
+
+  const defaultSlots = {};
+  for (let day = 0; day < 7; day++) {
+    const bMeal = breakfasts.length ? breakfasts[day % breakfasts.length] : recipeList[0];
+    const lMeal = lunches.length ? lunches[day % lunches.length] : (recipeList[1] || recipeList[0]);
+    const sMeal = snacks.length ? snacks[day % snacks.length] : null;
+    const dMeal = dinners.length ? dinners[day % dinners.length] : (recipeList[2] || recipeList[0]);
+
+    const dayArr = [];
+    if (bMeal) dayArr.push({ type: 'Breakfast', time: '7:00 AM', mealId: bMeal.id });
+    if (lMeal) dayArr.push({ type: 'Lunch', time: '12:00 PM', mealId: lMeal.id });
+    if (sMeal) dayArr.push({ type: 'Snack', time: '3:00 PM', mealId: sMeal.id });
+    if (dMeal) dayArr.push({ type: 'Dinner', time: '6:30 PM', mealId: dMeal.id });
+
+    defaultSlots[day] = dayArr;
+  }
+  return defaultSlots;
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -93,7 +81,7 @@ export default function Dashboard() {
           </div>
 
           <div className="dash-grid">
-            <MealPlanWidget />
+            <MealPlanWidget profile={profile} />
             <BmiWidget profile={profile} />
 
             <RecommendWidget profile={profile} />
@@ -116,11 +104,85 @@ export default function Dashboard() {
 }
 
 /* ============================================================
-   WIDGET 1 — TODAY'S MEAL PLAN (static demo, tabs)
+   WIDGET 1 — TODAY'S MEAL PLAN (Dynamic from MealPlan / Supabase)
    ============================================================ */
-function MealPlanWidget() {
-  const [tab, setTab] = useState('breakfast');
-  const meal = DEMO_MEALS[tab];
+function MealPlanWidget({ profile }) {
+  const [recipes, setRecipes] = useState([]);
+  const [daySlots, setDaySlots] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [activeTabIdx, setActiveTabIdx] = useState(0);
+
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+      const { data: recipesData } = await supabase.from('recipes').select('*').order('name');
+      const { data: ingData } = await supabase.from('recipe_ingredients').select('*').order('sort_order');
+
+      const ingByRecipe = {};
+      (ingData || []).forEach((ing) => {
+        if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
+        ingByRecipe[ing.recipe_id].push({ name: ing.name, qty: ing.qty, status: ing.status || 'avail' });
+      });
+
+      const formattedRecipes = (recipesData || []).map((r) => ({
+        id: r.id,
+        emoji: r.emoji || '🍲',
+        name: r.name,
+        type: r.type,
+        difficulty: r.difficulty || 'medium',
+        cookTime: r.cook_time_min || 20,
+        prep: `${r.cook_time_min || 20} min`,
+        kcal: r.kcal || 0,
+        cost: r.cost || 0,
+        protein: r.protein_g || 0,
+        carbs: r.carbs_g || 0,
+        fats: r.fats_g || 0,
+        ingredients: ingByRecipe[r.id] || [],
+      }));
+
+      setRecipes(formattedRecipes);
+
+      // Load meal plan from localStorage or generate default
+      const saved = localStorage.getItem('blane_meal_plan');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && Object.keys(parsed).length > 0) {
+            setDaySlots(parsed);
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      if (formattedRecipes.length > 0) {
+        const defaultPlan = generateDefaultPlan(formattedRecipes);
+        setDaySlots(defaultPlan);
+      }
+      setLoading(false);
+    }
+
+    loadData();
+  }, []);
+
+  function getMeal(id) {
+    if (!id) return null;
+    return recipes.find((r) => r.id === id || String(r.id) === String(id)) || null;
+  }
+
+  const todayIndex = new Date().getDay();
+  const todaySlots = daySlots[todayIndex] || [];
+  const plannedMeals = todaySlots.map((s) => ({ slot: s, meal: getMeal(s.mealId) })).filter((item) => item.meal);
+
+  const totalKcal = plannedMeals.reduce((acc, item) => acc + item.meal.kcal, 0);
+  const totalProtein = plannedMeals.reduce((acc, item) => acc + item.meal.protein, 0);
+  const totalCost = plannedMeals.reduce((acc, item) => acc + item.meal.cost, 0);
+  const calGoal = getCalorieGoal(profile);
+  const calPct = Math.min(Math.round((totalKcal / calGoal) * 100), 100);
+
+  const currentItem = plannedMeals[activeTabIdx] || plannedMeals[0];
 
   return (
     <div className="widget col-8">
@@ -132,60 +194,86 @@ function MealPlanWidget() {
             <div className="widget-subtitle">Adapted to your goals &amp; local market</div>
           </div>
         </div>
-        <span className="widget-badge">AI Generated</span>
+        <Link to="/mealplan" className="widget-badge" style={{ textDecoration: 'none' }}>
+          Open Meal Plan →
+        </Link>
       </div>
 
-      <div className="meal-tabs">
-        {Object.keys(DEMO_MEALS).map((key) => (
-          <button
-            key={key}
-            className={'meal-tab-btn' + (tab === key ? ' active' : '')}
-            onClick={() => setTab(key)}
-          >
-            {key.charAt(0).toUpperCase() + key.slice(1)}
-          </button>
-        ))}
-      </div>
+      {loading ? (
+        <div style={{ padding: '32px 0', textAlign: 'center', color: '#4d6e5a' }}>Loading today's meal plan…</div>
+      ) : plannedMeals.length === 0 ? (
+        <div className="dash-empty-state" style={{ padding: '32px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: 44, marginBottom: 14 }}>🍽️</div>
+          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>No meals planned for today yet.</div>
+          <div style={{ color: '#4d6e5a', lineHeight: 1.6, marginBottom: 16 }}>
+            Customize your schedule or pick recipes on the Meal Plan page.
+          </div>
+          <Link to="/mealplan" className="widget-badge" style={{ textDecoration: 'none', padding: '8px 16px', fontSize: 13 }}>
+            Plan Today's Meals →
+          </Link>
+        </div>
+      ) : (
+        <>
+          <div className="meal-tabs">
+            {plannedMeals.map((item, idx) => (
+              <button
+                key={idx}
+                className={'meal-tab-btn' + (idx === activeTabIdx ? ' active' : '')}
+                onClick={() => setActiveTabIdx(idx)}
+              >
+                {item.slot.type}
+              </button>
+            ))}
+          </div>
 
-      <div className="meal-panel active">
-        <div className="meal-main-card">
-          <div className="meal-emoji-big">{meal.emoji}</div>
-          <div className="meal-main-info">
-            <div className="meal-main-name">{meal.name}</div>
-            <div className="meal-main-meta">{meal.time} &nbsp;·&nbsp; {meal.prep} &nbsp;·&nbsp; {meal.difficulty}</div>
-            <div className="meal-macros-row">
-              <div className="meal-macro-chip"><span>{meal.protein}g</span> <small>Protein</small></div>
-              <div className="meal-macro-chip"><span>{meal.carbs}g</span> <small>Carbs</small></div>
-              <div className="meal-macro-chip"><span>{meal.fats}g</span> <small>Fats</small></div>
+          {currentItem && (
+            <div className="meal-panel active">
+              <div className="meal-main-card">
+                <div className="meal-emoji-big">{currentItem.meal.emoji}</div>
+                <div className="meal-main-info">
+                  <div className="meal-main-name">{currentItem.meal.name}</div>
+                  <div className="meal-main-meta">{currentItem.slot.time || 'Today'} &nbsp;·&nbsp; {currentItem.meal.prep} prep &nbsp;·&nbsp; ₱{currentItem.meal.cost}</div>
+                  <div className="meal-macros-row">
+                    <div className="meal-macro-chip"><span>{currentItem.meal.protein}g</span> <small>Protein</small></div>
+                    <div className="meal-macro-chip"><span>{currentItem.meal.carbs}g</span> <small>Carbs</small></div>
+                    <div className="meal-macro-chip"><span>{currentItem.meal.fats}g</span> <small>Fats</small></div>
+                  </div>
+                </div>
+                <div className="meal-kcal-tag">
+                  {currentItem.meal.kcal}
+                  <small>kcal</small>
+                </div>
+              </div>
+
+              {currentItem.meal.ingredients.length > 0 && (
+                <div className="meal-ingredients">
+                  <div style={{ fontSize: 11, color: '#4d6e5a', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Key Ingredients</div>
+                  {currentItem.meal.ingredients.slice(0, 4).map((ing, i) => (
+                    <div key={i} className="meal-ingredient-row">
+                      <div className="ingredient-dot"></div>
+                      <span className="ingredient-name">{ing.name}</span>
+                      <span className="ingredient-amount">{ing.qty}</span>
+                      <span className={'ingredient-avail ' + (ing.status === 'avail' ? 'yes' : 'no')}>
+                        {ing.status === 'avail' ? '✓ In stock' : '⚠ Check market'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="daily-cal-summary">
+            <div className="daily-cal-row">
+              <span className="daily-cal-label">Today's Total: <b>{totalProtein}g</b> P · <b>₱{totalCost}</b> Est. Cost</span>
+              <span className="daily-cal-numbers"><span>{totalKcal}</span> / {calGoal} kcal</span>
+            </div>
+            <div className="daily-cal-bar-bg">
+              <div className="daily-cal-bar-fill" style={{ width: calPct + '%' }}></div>
             </div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div className="meal-kcal-tag">{meal.kcal}<small>kcal</small></div>
-          </div>
-        </div>
-        <div className="meal-ingredients">
-          {meal.ingredients.map((ing) => (
-            <div key={ing.name} className="meal-ingredient-row">
-              <div className="ingredient-dot"></div>
-              <span className="ingredient-name">{ing.name}</span>
-              <span className="ingredient-amount">{ing.amount}</span>
-              <span className={'ingredient-avail ' + (ing.avail ? 'yes' : 'no')}>
-                {ing.label || (ing.avail ? '✓ Available' : '⚠ Check market')}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="daily-cal-summary">
-        <div className="daily-cal-row">
-          <span className="daily-cal-label">Daily calories</span>
-          <span className="daily-cal-numbers"><span>1,590</span> / 1,840 kcal</span>
-        </div>
-        <div className="daily-cal-bar-bg">
-          <div className="daily-cal-bar-fill" style={{ width: '86%' }}></div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }

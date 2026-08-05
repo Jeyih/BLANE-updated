@@ -6,51 +6,48 @@
    The HTML-string generators (renderConstraintBar, badge/detail
    HTML) are now React components — see ConstraintWarnings.jsx.
    ============================================================ */
+import { supabase } from './supabase';
 
-export const CB_CONSTRAINTS = {
-  nut_allergy: { label: 'Nut Allergy', severity: 'allergy', icon: '🥜',
-    blocked: ['peanut butter', 'ground peanuts', 'cashew', 'almond', 'peanuts'], reason: 'contains nut-based ingredient' },
-  shellfish_allergy: { label: 'Shellfish Allergy', severity: 'allergy', icon: '🦐',
-    blocked: ['bagoong alamang', 'shrimp', 'prawn', 'crab', 'squid', 'bagoong'], reason: 'contains shellfish or shellfish-derived ingredient' },
-  egg_free: { label: 'Egg-Free', severity: 'allergy', icon: '🥚',
-    blocked: ['eggs', 'egg', 'salted egg', 'egg yolk', 'egg white'], reason: 'contains egg' },
-  soy_free: { label: 'Soy-Free', severity: 'allergy', icon: '🫘',
-    blocked: ['soy sauce', 'tofu', 'soy milk', 'edamame', 'miso'], reason: 'contains soy-based ingredient' },
+// Constraint definitions are now managed by the Admin panel and stored
+// in the database. Keep an empty placeholder so code reads gracefully.
+export const CB_CONSTRAINTS = {};
 
-  vegetarian: { label: 'Vegetarian', severity: 'dietary', icon: '🥦',
-    blocked: ['chicken', 'chicken breast', 'chicken thigh', 'pork', 'pork belly', 'bangus', 'tilapia', 'fish sauce', 'bagoong alamang', 'beef', 'grilled pork'],
-    reason: 'contains meat or fish' },
-  vegan: { label: 'Vegan', severity: 'dietary', icon: '🌱',
-    blocked: ['chicken', 'chicken breast', 'pork', 'pork belly', 'bangus', 'tilapia', 'fish sauce', 'bagoong alamang', 'eggs', 'salted egg', 'milk', 'honey'],
-    reason: 'contains animal product' },
-  halal: { label: 'Halal', severity: 'dietary', icon: '☪️',
-    blocked: ['pork', 'pork belly', 'bagoong', 'bagoong alamang'], reason: 'contains non-halal ingredient' },
-  gluten_free: { label: 'Gluten-Free', severity: 'dietary', icon: '🌾',
-    blocked: ['soy sauce', 'wheat', 'bread', 'flour', 'pasta'], reason: 'may contain gluten' },
-  dairy_free: { label: 'Dairy-Free', severity: 'dietary', icon: '🥛',
-    blocked: ['milk', 'cheese', 'butter', 'cream', 'yogurt', 'kesong puti'], reason: 'contains dairy' },
-  low_sodium: { label: 'Low Sodium', severity: 'dietary', icon: '🧂',
-    blocked: ['fish sauce', 'soy sauce', 'bagoong alamang', 'salted egg', 'bagoong'], reason: 'high sodium ingredient' },
-  low_sugar: { label: 'Low Sugar', severity: 'dietary', icon: '🍬',
-    blocked: ['honey', 'brown sugar', 'sugar', 'condensed milk'], reason: 'high sugar ingredient' },
-  kosher: { label: 'Kosher', severity: 'dietary', icon: '✡️',
-    blocked: ['pork', 'pork belly', 'shellfish', 'bagoong alamang'], reason: 'not kosher ingredient' },
+export async function loadConstraintDefinitions() {
+  const { data, error } = await supabase
+    .from('constraint_definitions')
+    .select('*')
+    .order('sort_order');
 
-  diabetes_t1: { label: 'Diabetes Type 1', severity: 'medical', icon: '💉', warnHighCarb: true, carbThreshold: 45,
-    blocked: ['brown sugar', 'sugar', 'honey', 'condensed milk'], reason: 'high glycemic ingredient — monitor blood sugar' },
-  diabetes_t2: { label: 'Diabetes Type 2', severity: 'medical', icon: '🩸', warnHighCarb: true, carbThreshold: 45,
-    blocked: ['brown sugar', 'sugar', 'honey', 'condensed milk'], reason: 'high glycemic ingredient — monitor blood sugar' },
-  hypertension: { label: 'Hypertension', severity: 'medical', icon: '❤️',
-    blocked: ['fish sauce', 'soy sauce', 'bagoong alamang', 'salted egg', 'bagoong'], reason: 'high sodium — may raise blood pressure' },
-  high_cholesterol: { label: 'High Cholesterol', severity: 'medical', icon: '🫀', warnHighFat: true, fatThreshold: 20,
-    blocked: ['pork belly', 'butter', 'cream', 'coconut cream'], reason: 'high saturated fat — may raise cholesterol' },
-  gerd: { label: 'GERD / Acid Reflux', severity: 'medical', icon: '🔥',
-    blocked: ['calamansi', 'vinegar', 'chili', 'tomato', 'garlic'], reason: 'may trigger acid reflux' },
-  kidney_disease: { label: 'Kidney Disease', severity: 'medical', icon: '🫘', warnHighProtein: true, proteinThreshold: 30,
-    blocked: ['bagoong alamang', 'fish sauce', 'soy sauce'], reason: 'high phosphorus/sodium — avoid with kidney disease' },
-  gout: { label: 'Gout', severity: 'medical', icon: '🦵',
-    blocked: ['pork belly', 'beef', 'sardines', 'anchovies', 'bagoong'], reason: 'high purine content — may trigger gout' },
-};
+  if (error) {
+    console.error('Failed to load constraint definitions:', error);
+    return false;
+  }
+
+  Object.keys(CB_CONSTRAINTS).forEach((key) => delete CB_CONSTRAINTS[key]);
+
+  (data || []).forEach((row) => {
+    if (row.active === false || !row.key) return;
+    CB_CONSTRAINTS[row.key] = {
+      label: row.label || row.key,
+      severity: row.severity || 'dietary',
+      icon: row.icon || '⚠️',
+      reason: row.reason || 'Contains ingredients that may conflict with your preferences or medical profile.',
+      blocked: Array.isArray(row.blocked)
+        ? row.blocked.map((item) => item.trim()).filter(Boolean)
+        : typeof row.blocked === 'string'
+          ? row.blocked.split(',').map((item) => item.trim()).filter(Boolean)
+          : [],
+      warnHighCarb: !!row.warn_high_carb,
+      carbThreshold: row.carb_threshold || 0,
+      warnHighFat: !!row.warn_high_fat,
+      fatThreshold: row.fat_threshold || 0,
+      warnHighProtein: !!row.warn_high_protein,
+      proteinThreshold: row.protein_threshold || 0,
+    };
+  });
+
+  return true;
+}
 
 export function getActiveConstraints(profile) {
   const dietary = profile?.dietary_restrictions || [];

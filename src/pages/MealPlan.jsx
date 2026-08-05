@@ -2,10 +2,9 @@
    BLANE — Meal Plan Page
    Replaces: mealplan.html + js/mealplan.js entirely.
 
-   State that used to live in module-level `let` variables
-   (currentWeekOffset, selectedDayIndex, daySlots, groceryList)
-   is now React state on the page component. Modals are
-   conditionally rendered instead of toggled via CSS classes.
+   Fetches real recipes from Supabase (recipes, recipe_ingredients)
+   and manages weekly meal slots, calorie goals, swap options,
+   and grocery list generation.
    ============================================================ */
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -17,25 +16,6 @@ import { scoreRecipe } from '../lib/seasonal';
 import { SeasonBadge, IngSeasonTag, SeasonalAltBanner } from '../components/SeasonalBadges';
 import '../styles/mealplan.css';
 
-const MEAL_DB = [
-  { id: 'm1', emoji: '🍳', name: 'Egg & Malunggay Scramble', type: 'Breakfast', time: '7:00 AM', prep: '15 min', kcal: 380, cost: 45, protein: 24, carbs: 18, fats: 12,
-    ingredients: [{ name: 'Eggs', qty: '2 pcs', status: 'avail' }, { name: 'Malunggay', qty: '1 handful', status: 'avail' }, { name: 'Garlic', qty: '2 cloves', status: 'avail' }, { name: 'Cooking oil', qty: '1 tsp', status: 'avail' }] },
-  { id: 'm2', emoji: '🥗', name: 'Chicken & Veggie Rice Bowl', type: 'Lunch', time: '12:00 PM', prep: '25 min', kcal: 520, cost: 95, protein: 38, carbs: 52, fats: 10,
-    ingredients: [{ name: 'Chicken breast', qty: '150g', status: 'avail' }, { name: 'Brown rice', qty: '1 cup', status: 'avail' }, { name: 'Broccoli', qty: '80g', status: 'warn' }, { name: 'Soy sauce', qty: '1 tbsp', status: 'avail' }] },
-  { id: 'm3', emoji: '🍲', name: 'Sinigang na Isda', type: 'Dinner', time: '6:30 PM', prep: '35 min', kcal: 480, cost: 80, protein: 32, carbs: 28, fats: 8,
-    ingredients: [{ name: 'Bangus / Tilapia', qty: '200g', status: 'avail' }, { name: 'Kangkong', qty: '1 bundle', status: 'avail' }, { name: 'Tamarind mix', qty: '1 pack', status: 'avail' }, { name: 'Tomatoes', qty: '2 pcs', status: 'avail' }] },
-  { id: 'm4', emoji: '🍌', name: 'Banana & Peanut Butter', type: 'Snack', time: '3:00 PM', prep: '5 min', kcal: 210, cost: 25, protein: 6, carbs: 30, fats: 8,
-    ingredients: [{ name: 'Ripe banana', qty: '1 pc', status: 'avail' }, { name: 'Peanut butter', qty: '1 tbsp', status: 'avail' }] },
-  { id: 'm5', emoji: '🥣', name: 'Oatmeal with Banana & Honey', type: 'Breakfast', time: '7:00 AM', prep: '10 min', kcal: 320, cost: 35, protein: 10, carbs: 58, fats: 6,
-    ingredients: [{ name: 'Rolled oats', qty: '1/2 cup', status: 'avail' }, { name: 'Banana', qty: '1 pc', status: 'avail' }, { name: 'Honey', qty: '1 tsp', status: 'avail' }, { name: 'Milk', qty: '1 cup', status: 'avail' }] },
-  { id: 'm6', emoji: '🍜', name: 'Arroz Caldo', type: 'Breakfast', time: '7:30 AM', prep: '30 min', kcal: 340, cost: 50, protein: 18, carbs: 48, fats: 7,
-    ingredients: [{ name: 'Glutinous rice', qty: '1/2 cup', status: 'avail' }, { name: 'Chicken', qty: '100g', status: 'avail' }, { name: 'Ginger', qty: '2 slices', status: 'avail' }] },
-  { id: 'm7', emoji: '🥩', name: 'Grilled Pork Liempo', type: 'Lunch', time: '12:00 PM', prep: '40 min', kcal: 560, cost: 110, protein: 42, carbs: 10, fats: 28,
-    ingredients: [{ name: 'Pork belly', qty: '200g', status: 'avail' }, { name: 'Calamansi', qty: '4 pcs', status: 'avail' }, { name: 'Garlic', qty: '4 cloves', status: 'avail' }] },
-  { id: 'm8', emoji: '🍛', name: 'Monggo Soup', type: 'Dinner', time: '6:00 PM', prep: '45 min', kcal: 380, cost: 55, protein: 22, carbs: 45, fats: 6,
-    ingredients: [{ name: 'Mung beans', qty: '1/2 cup', status: 'avail' }, { name: 'Ampalaya leaves', qty: '1 handful', status: 'warn' }, { name: 'Garlic & onion', qty: 'to taste', status: 'avail' }] },
-];
-
 const SLOT_PRESETS = [
   { type: 'Breakfast', icon: '🌅', time: '7:00 AM' },
   { type: 'Brunch', icon: '🍳', time: '10:00 AM' },
@@ -45,28 +25,70 @@ const SLOT_PRESETS = [
   { type: 'Custom', icon: '✏️', time: 'Your own' },
 ];
 
-const CAL_GOAL = 1840;
+function getCalorieGoal(profile) {
+  if (!profile) return 1840;
+  const h = parseFloat(profile.height_cm) || 170;
+  const w = parseFloat(profile.weight_kg) || 70;
+  const age = parseInt(profile.age) || 25;
+  const sex = profile.sex || 'male';
+  const bmr = sex === 'male' ? 10 * w + 6.25 * h - 5 * age + 5 : 10 * w + 6.25 * h - 5 * age - 161;
+  const tdee = bmr * 1.55;
+  const adj = { lose_weight: 0.85, gain_muscle: 1.1, maintain: 1.0, improve_health: 1.0, boost_energy: 1.0, manage_condition: 0.9 };
+  return Math.round(tdee * (adj[profile.goal] || 1.0)) || 1840;
+}
 
-function getMeal(id) { return MEAL_DB.find((m) => m.id === id) || null; }
+function generateDefaultPlan(recipeList) {
+  if (!recipeList || recipeList.length === 0) return {};
+  const breakfasts = recipeList.filter((r) => r.type === 'Breakfast');
+  const lunches    = recipeList.filter((r) => r.type === 'Lunch');
+  const dinners    = recipeList.filter((r) => r.type === 'Dinner');
+  const snacks     = recipeList.filter((r) => r.type === 'Snack');
+
+  const defaultSlots = {};
+  for (let day = 0; day < 7; day++) {
+    const bMeal = breakfasts.length ? breakfasts[day % breakfasts.length] : recipeList[0];
+    const lMeal = lunches.length ? lunches[day % lunches.length] : (recipeList[1] || recipeList[0]);
+    const sMeal = snacks.length ? snacks[day % snacks.length] : null;
+    const dMeal = dinners.length ? dinners[day % dinners.length] : (recipeList[2] || recipeList[0]);
+
+    const dayArr = [];
+    if (bMeal) dayArr.push({ type: 'Breakfast', time: '7:00 AM', mealId: bMeal.id });
+    if (lMeal) dayArr.push({ type: 'Lunch', time: '12:00 PM', mealId: lMeal.id });
+    if (sMeal) dayArr.push({ type: 'Snack', time: '3:00 PM', mealId: sMeal.id });
+    if (dMeal) dayArr.push({ type: 'Dinner', time: '6:30 PM', mealId: dMeal.id });
+
+    defaultSlots[day] = dayArr;
+  }
+  return defaultSlots;
+}
 
 export default function MealPlan() {
   const { user } = useAuth();
-  const [profile, setProfile]               = useState(null);
-  const [currentWeekOffset, setWeekOffset]   = useState(0);
-  const [selectedDayIndex, setSelectedDay]   = useState(new Date().getDay());
-  const [daySlots, setDaySlots]              = useState(() => seedDemoSlots());
-  const [groceryList, setGroceryList]        = useState(() => JSON.parse(sessionStorage.getItem('blane_grocery') || '[]'));
+  const [profile, setProfile]                 = useState(null);
+  const [recipes, setRecipes]                 = useState([]);
+  const [loadingRecipes, setLoadingRecipes]   = useState(true);
+  const [currentWeekOffset, setWeekOffset]     = useState(0);
+  const [selectedDayIndex, setSelectedDay]     = useState(new Date().getDay());
+  const [daySlots, setDaySlots]                = useState({});
+  const [groceryList, setGroceryList]          = useState(() => JSON.parse(sessionStorage.getItem('blane_grocery') || '[]'));
   const [openOptimizerId, setOpenOptimizerId] = useState(null);
 
-  const [addSlotOpen, setAddSlotOpen]   = useState(false);
-  const [slotTypeChoice, setSlotTypeChoice] = useState(null);
-  const [customSlotName, setCustomSlotName] = useState('');
+  const [addSlotOpen, setAddSlotOpen]             = useState(false);
+  const [slotTypeChoice, setSlotTypeChoice]       = useState(null);
+  const [customSlotName, setCustomSlotName]       = useState('');
+  const [selectedRecipeForAdd, setSelectedRecipeForAdd] = useState('');
 
   const [swapTarget, setSwapTarget] = useState(null);
   const [swapChoice, setSwapChoice] = useState(null);
 
-  useEffect(() => { loadProfile(); }, [user]);
-  useEffect(() => { sessionStorage.setItem('blane_grocery', JSON.stringify(groceryList)); }, [groceryList]);
+  useEffect(() => {
+    loadProfile();
+    loadRecipes();
+  }, [user]);
+
+  useEffect(() => {
+    sessionStorage.setItem('blane_grocery', JSON.stringify(groceryList));
+  }, [groceryList]);
 
   async function loadProfile() {
     if (!user) return;
@@ -74,16 +96,128 @@ export default function MealPlan() {
     if (data) setProfile(data);
   }
 
-  function seedDemoSlots() {
-    const todayNum = new Date().getDay();
-    const slots = {};
-    slots[todayNum] = [
-      { type: 'Breakfast', mealId: 'm1' }, { type: 'Lunch', mealId: 'm2' },
-      { type: 'Snack', mealId: 'm4' }, { type: 'Dinner', mealId: 'm3' },
-    ];
-    slots[(todayNum + 6) % 7] = [{ type: 'Breakfast', mealId: 'm5' }, { type: 'Dinner', mealId: 'm8' }];
-    slots[(todayNum + 1) % 7] = [{ type: 'Breakfast', mealId: 'm6' }, { type: 'Lunch', mealId: 'm7' }];
-    return slots;
+  async function loadRecipes() {
+    setLoadingRecipes(true);
+    const { data: recipesData, error: recipesErr } = await supabase.from('recipes').select('*').order('name');
+    if (recipesErr) {
+      console.error('Failed to load recipes:', recipesErr.message);
+      setRecipes([]);
+      setLoadingRecipes(false);
+      return;
+    }
+
+    const { data: ingData } = await supabase.from('recipe_ingredients').select('*').order('sort_order');
+    const ingByRecipe = {};
+    (ingData || []).forEach((ing) => {
+      if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
+      ingByRecipe[ing.recipe_id].push({ name: ing.name, qty: ing.qty, status: ing.status || 'avail' });
+    });
+
+    const formatted = (recipesData || []).map((r) => ({
+      id: r.id,
+      emoji: r.emoji || '🍲',
+      name: r.name,
+      type: r.type,
+      diet: r.diet_tags || [],
+      goal: r.goal_tags || [],
+      difficulty: r.difficulty || 'medium',
+      cookTime: r.cook_time_min || 20,
+      prep: `${r.cook_time_min || 20} min`,
+      servings: r.servings || 1,
+      kcal: r.kcal || 0,
+      cost: r.cost || 0,
+      protein: r.protein_g || 0,
+      carbs: r.carbs_g || 0,
+      fats: r.fats_g || 0,
+      ingredients: ingByRecipe[r.id] || [],
+    }));
+
+    setRecipes(formatted);
+    setLoadingRecipes(false);
+
+    // Initialize daySlots if empty
+    const saved = localStorage.getItem('blane_meal_plan');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && Object.keys(parsed).length > 0) {
+          setDaySlots(parsed);
+          return;
+        }
+      } catch (e) {
+        console.error('Error parsing stored meal plan:', e);
+      }
+    }
+    setDaySlots(generateDefaultPlan(formatted));
+  }
+
+  useEffect(() => {
+    if (Object.keys(daySlots).length > 0) {
+      localStorage.setItem('blane_meal_plan', JSON.stringify(daySlots));
+    }
+  }, [daySlots]);
+
+  function getMeal(id) {
+    if (!id) return null;
+    return recipes.find((m) => m.id === id || String(m.id) === String(id)) || null;
+  }
+
+  function regeneratePlan() {
+    if (recipes.length === 0) return;
+    const newSlots = {};
+    for (let day = 0; day < 7; day++) {
+      const breakfasts = recipes.filter((r) => r.type === 'Breakfast');
+      const lunches    = recipes.filter((r) => r.type === 'Lunch');
+      const dinners    = recipes.filter((r) => r.type === 'Dinner');
+      const snacks     = recipes.filter((r) => r.type === 'Snack');
+
+      const getRandom = (arr) => arr.length ? arr[Math.floor(Math.random() * arr.length)] : recipes[Math.floor(Math.random() * recipes.length)];
+
+      const b = getRandom(breakfasts);
+      const l = getRandom(lunches);
+      const s = getRandom(snacks);
+      const d = getRandom(dinners);
+
+      newSlots[day] = [
+        { type: 'Breakfast', time: '7:00 AM', mealId: b?.id },
+        { type: 'Lunch', time: '12:00 PM', mealId: l?.id },
+        { type: 'Snack', time: '3:00 PM', mealId: s?.id },
+        { type: 'Dinner', time: '6:30 PM', mealId: d?.id },
+      ].filter((slot) => slot.mealId);
+    }
+    setDaySlots(newSlots);
+  }
+
+  function exportWeekPlan() {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    let text = `=== BLANE WEEKLY MEAL PLAN ===\nWeek of ${weekLabel}\n\n`;
+
+    const dayIndices = [1, 2, 3, 4, 5, 6, 0];
+    dayIndices.forEach((dIdx, i) => {
+      text += `--- ${days[i]} ---\n`;
+      const dayArr = daySlots[dIdx] || [];
+      if (dayArr.length === 0) {
+        text += `  No meals planned.\n`;
+      } else {
+        dayArr.forEach((s) => {
+          const m = getMeal(s.mealId);
+          if (m) {
+            text += `  [${s.type} - ${s.time || 'Meal'}] ${m.name} (${m.kcal} kcal, ${m.protein}g P, ₱${m.cost})\n`;
+          } else {
+            text += `  [${s.type}] No meal assigned\n`;
+          }
+        });
+      }
+      text += `\n`;
+    });
+
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `BLANE_MealPlan_${new Date().toISOString().split('T')[0]}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   const slots = daySlots[selectedDayIndex] || [];
@@ -100,7 +234,8 @@ export default function MealPlan() {
   const totalKcal = slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.kcal || 0), 0);
   const totalCost = slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.cost || 0), 0);
   const totalProtein = slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.protein || 0), 0);
-  const dayPct = Math.min(Math.round((totalKcal / CAL_GOAL) * 100), 100);
+  const calGoal = getCalorieGoal(profile);
+  const dayPct = Math.min(Math.round((totalKcal / calGoal) * 100), 100);
 
   function removeSlot(idx) {
     setDaySlots((prev) => {
@@ -114,28 +249,34 @@ export default function MealPlan() {
   function confirmAddSlot() {
     if (!slotTypeChoice) { alert('Please select a meal type.'); return; }
     let type = slotTypeChoice;
+    let time = SLOT_PRESETS.find((p) => p.type === type)?.time || '12:00 PM';
     if (type === 'Custom') {
       if (!customSlotName.trim()) { alert('Please enter a custom slot name.'); return; }
       type = customSlotName.trim();
+      time = 'Your own';
     }
-    const match = MEAL_DB.find((m) => m.type === type);
+
     setDaySlots((prev) => {
       const next = { ...prev };
-      next[selectedDayIndex] = [...(next[selectedDayIndex] || []), { type, mealId: match ? match.id : null }];
+      next[selectedDayIndex] = [
+        ...(next[selectedDayIndex] || []),
+        { type, time, mealId: selectedRecipeForAdd || null }
+      ];
       return next;
     });
     setAddSlotOpen(false);
     setSlotTypeChoice(null);
     setCustomSlotName('');
+    setSelectedRecipeForAdd('');
   }
 
-  function openSwap(meal, slotIdx) {
-    setSwapTarget({ meal, slotIdx });
+  function openSwap(mealOrSlot, slotIdx) {
+    setSwapTarget({ meal: mealOrSlot, slotIdx });
     setSwapChoice(null);
   }
 
   function confirmSwap() {
-    if (!swapChoice) { alert('Please select an alternative meal.'); return; }
+    if (!swapChoice) { alert('Please select a recipe.'); return; }
     setDaySlots((prev) => {
       const next = { ...prev };
       const arr = [...(next[selectedDayIndex] || [])];
@@ -147,9 +288,24 @@ export default function MealPlan() {
   }
 
   function addMealToGrocery(meal) {
+    if (!meal || !meal.ingredients) return;
     setGroceryList((prev) => {
       const filtered = prev.filter((g) => g.mealId !== meal.id);
       return [...filtered, ...meal.ingredients.map((ing) => ({ mealId: meal.id, name: ing.name, qty: ing.qty, checked: false }))];
+    });
+  }
+
+  function addAllTodayToGrocery() {
+    const todayMeals = slots.map((s) => getMeal(s.mealId)).filter(Boolean);
+    if (todayMeals.length === 0) return;
+    setGroceryList((prev) => {
+      let current = [...prev];
+      todayMeals.forEach((meal) => {
+        current = current.filter((g) => g.mealId !== meal.id);
+        const newItems = meal.ingredients.map((ing) => ({ mealId: meal.id, name: ing.name, qty: ing.qty, checked: false }));
+        current = [...current, ...newItems];
+      });
+      return current;
     });
   }
 
@@ -160,6 +316,11 @@ export default function MealPlan() {
   function removeGroceryItem(idx) {
     setGroceryList((prev) => prev.filter((_, i) => i !== idx));
   }
+
+  // Filter candidate recipes for Add/Swap modals
+  const availableRecipesForAdd = slotTypeChoice
+    ? recipes.filter((r) => r.type === slotTypeChoice || slotTypeChoice === 'Custom' || slotTypeChoice === 'Brunch')
+    : recipes;
 
   return (
     <>
@@ -173,8 +334,8 @@ export default function MealPlan() {
               <p className="mp-page-sub">Weekly adaptive plan — updated by BLANE AI</p>
             </div>
             <div className="mp-header-actions">
-              <button className="mp-btn mp-btn-outline">Export Week</button>
-              <button className="mp-btn mp-btn-primary">Regenerate Plan</button>
+              <button className="mp-btn mp-btn-outline" onClick={exportWeekPlan}>Export Week</button>
+              <button className="mp-btn mp-btn-primary" onClick={regeneratePlan}>Regenerate Plan</button>
             </div>
           </div>
 
@@ -186,8 +347,8 @@ export default function MealPlan() {
                 const d = new Date(base); d.setDate(base.getDate() + i);
                 const jsDay = d.getDay();
                 const isToday = d.toDateString() === today.toDateString();
-                const isActive = jsDay === selectedDayIndex && currentWeekOffset === 0;
-                const hasMeals = daySlots[jsDay]?.length > 0;
+                const isActive = jsDay === selectedDayIndex;
+                const hasMeals = (daySlots[jsDay] || []).some((s) => s.mealId);
                 return (
                   <button
                     key={i}
@@ -209,7 +370,7 @@ export default function MealPlan() {
               <div className="day-summary-bar">
                 <div className="day-summary-item">
                   <span className="day-summary-label">Calories</span>
-                  <span className="day-summary-value green">{totalKcal} <small style={{ fontSize: 13, color: '#4d6e5a', fontWeight: 400 }}>kcal</small></span>
+                  <span className="day-summary-value green">{totalKcal} <small style={{ fontSize: 13, color: '#4d6e5a', fontWeight: 400 }}>/ {calGoal} kcal</small></span>
                 </div>
                 <div className="day-summary-divider"></div>
                 <div className="day-summary-item">
@@ -228,7 +389,9 @@ export default function MealPlan() {
                 </div>
               </div>
 
-              {slots.length === 0 ? (
+              {loadingRecipes ? (
+                <div className="empty-slot">Loading recipes from database…</div>
+              ) : slots.length === 0 ? (
                 <div className="empty-slot"><span className="empty-slot-icon">🍽️</span>No meals planned yet. Add a slot below!</div>
               ) : (
                 slots.map((slot, idx) => (
@@ -237,6 +400,7 @@ export default function MealPlan() {
                     slot={slot}
                     idx={idx}
                     profile={profile}
+                    getMeal={getMeal}
                     totalMealsToday={slots.length}
                     groceryList={groceryList}
                     openOptimizerId={openOptimizerId}
@@ -264,6 +428,16 @@ export default function MealPlan() {
                 <button className="grocery-clear-btn" onClick={() => setGroceryList([])}>Clear all</button>
               </div>
 
+              <div style={{ marginBottom: 12 }}>
+                <button
+                  className="mp-btn mp-btn-outline"
+                  style={{ width: '100%', justifyContent: 'center', fontSize: 13, padding: '8px 12px' }}
+                  onClick={addAllTodayToGrocery}
+                >
+                  + Add all today's meals to list
+                </button>
+              </div>
+
               <div className="grocery-list">
                 {groceryList.length === 0 ? (
                   <div className="grocery-empty"><span className="grocery-empty-icon">🛒</span>No items yet. Add meals to build your list.</div>
@@ -284,7 +458,20 @@ export default function MealPlan() {
                 <span className="grocery-cost-value">₱{totalCost}</span>
               </div>
 
-              <button className="mp-btn mp-btn-primary" style={{ width: '100%', justifyContent: 'center' }}>Download List</button>
+              <button
+                className="mp-btn mp-btn-primary"
+                style={{ width: '100%', justifyContent: 'center' }}
+                onClick={() => {
+                  if (groceryList.length === 0) { alert('Grocery list is empty.'); return; }
+                  const text = groceryList.map((g) => `[${g.checked ? 'x' : ' '}] ${g.name} (${g.qty})`).join('\n');
+                  const blob = new Blob([`BLANE GROCERY LIST\n\n${text}`], { type: 'text/plain' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a'); a.href = url; a.download = 'BLANE_Grocery_List.txt'; a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                Download List
+              </button>
             </div>
           </div>
 
@@ -293,7 +480,7 @@ export default function MealPlan() {
 
       {addSlotOpen && (
         <div className="slot-modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) setAddSlotOpen(false); }}>
-          <div className="slot-modal">
+          <div className="slot-modal" style={{ maxWidth: 440 }}>
             <button className="slot-modal-close" onClick={() => setAddSlotOpen(false)}>✕</button>
             <div className="slot-modal-title">Add Meal Slot</div>
             <div className="slot-type-grid">
@@ -305,36 +492,76 @@ export default function MealPlan() {
                 </div>
               ))}
             </div>
+
             {slotTypeChoice === 'Custom' && (
               <div className="slot-custom-input-wrap show">
                 <label className="form-label">Custom slot name</label>
                 <input className="form-input" value={customSlotName} onChange={(e) => setCustomSlotName(e.target.value)} placeholder="e.g. Pre-workout, Late night..." />
               </div>
             )}
-            <button className="mp-btn mp-btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }} onClick={confirmAddSlot}>Add Slot</button>
+
+            {slotTypeChoice && (
+              <div style={{ marginTop: 14, marginBottom: 14 }}>
+                <label className="form-label" style={{ fontSize: 12, color: '#8aab96', marginBottom: 6, display: 'block' }}>
+                  Assign Recipe (Optional)
+                </label>
+                <select
+                  className="form-input"
+                  style={{ width: '100%', background: '#111f16', color: '#e8f5ee', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(45, 220, 122, 0.2)' }}
+                  value={selectedRecipeForAdd}
+                  onChange={(e) => setSelectedRecipeForAdd(e.target.value)}
+                >
+                  <option value="">-- Choose a recipe from database --</option>
+                  {(availableRecipesForAdd.length > 0 ? availableRecipesForAdd : recipes).map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.emoji} {r.name} ({r.kcal} kcal · ₱{r.cost})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <button className="mp-btn mp-btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }} onClick={confirmAddSlot}>
+              Add Slot
+            </button>
           </div>
         </div>
       )}
 
       {swapTarget && (
         <div className="swap-modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) setSwapTarget(null); }}>
-          <div className="swap-modal">
+          <div className="swap-modal" style={{ maxWidth: 520 }}>
             <button className="swap-close" onClick={() => setSwapTarget(null)}>✕</button>
-            <div className="swap-modal-label">Swap Meal</div>
-            <div className="swap-modal-title">Swapping: {swapTarget.meal.name}</div>
-            <div className="swap-options">
-              {MEAL_DB.filter((m) => m.type === swapTarget.meal.type && m.id !== swapTarget.meal.id).slice(0, 3).map((alt) => (
-                <div key={alt.id} className={'swap-option-card' + (swapChoice === alt.id ? ' selected' : '')} onClick={() => setSwapChoice(alt.id)}>
-                  <div className="swap-option-emoji">{alt.emoji}</div>
-                  <div className="swap-option-info">
-                    <div className="swap-option-name">{alt.name}</div>
-                    <div className="swap-option-meta"><span>{alt.kcal} kcal</span> &nbsp;{alt.protein}g protein &nbsp;{alt.prep} prep</div>
-                  </div>
-                  <div className="swap-option-cost">₱{alt.cost}</div>
-                </div>
-              ))}
+            <div className="swap-modal-label">Choose Recipe</div>
+            <div className="swap-modal-title">
+              {swapTarget.meal?.name ? `Swapping: ${swapTarget.meal.name}` : `Select recipe for ${swapTarget.meal?.type || 'slot'}`}
             </div>
-            <button className="mp-btn mp-btn-primary swap-confirm-btn" style={{ width: '100%', justifyContent: 'center' }} onClick={confirmSwap}>Confirm Swap</button>
+            <div className="swap-options" style={{ maxHeight: 360, overflowY: 'auto' }}>
+              {recipes
+                .filter((r) => !swapTarget.meal?.id || r.id !== swapTarget.meal.id)
+                .map((alt) => (
+                  <div
+                    key={alt.id}
+                    className={'swap-option-card' + (swapChoice === alt.id ? ' selected' : '')}
+                    onClick={() => setSwapChoice(alt.id)}
+                    style={{ cursor: 'pointer', padding: 12, borderRadius: 12, marginBottom: 8, background: swapChoice === alt.id ? 'rgba(45, 220, 122, 0.12)' : '#111f16', border: swapChoice === alt.id ? '1px solid #2ddc7a' : '1px solid rgba(45, 220, 122, 0.1)' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div className="swap-option-emoji" style={{ fontSize: 24 }}>{alt.emoji}</div>
+                      <div className="swap-option-info" style={{ flex: 1 }}>
+                        <div className="swap-option-name" style={{ fontWeight: 600, color: '#e8f5ee' }}>{alt.name}</div>
+                        <div className="swap-option-meta" style={{ fontSize: 12, color: '#8aab96' }}>
+                          <span>{alt.type}</span> &nbsp;·&nbsp; <span>{alt.kcal} kcal</span> &nbsp;·&nbsp; {alt.protein}g protein &nbsp;·&nbsp; {alt.prep}
+                        </div>
+                      </div>
+                      <div className="swap-option-cost" style={{ color: '#fbbf24', fontWeight: 600 }}>₱{alt.cost}</div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+            <button className="mp-btn mp-btn-primary swap-confirm-btn" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }} onClick={confirmSwap}>
+              Confirm Selection
+            </button>
           </div>
         </div>
       )}
@@ -342,7 +569,7 @@ export default function MealPlan() {
   );
 }
 
-function SlotCard({ slot, idx, profile, totalMealsToday, groceryList, openOptimizerId, onSetOpenOptimizer, onRemove, onSwap, onAddGrocery }) {
+function SlotCard({ slot, idx, profile, getMeal, totalMealsToday, groceryList, openOptimizerId, onSetOpenOptimizer, onRemove, onSwap, onAddGrocery }) {
   const meal = getMeal(slot.mealId);
   const [ingredientsOpen, setIngredientsOpen] = useState(false);
   const alreadyAdded = meal && groceryList.some((g) => g.mealId === meal.id);
@@ -351,13 +578,19 @@ function SlotCard({ slot, idx, profile, totalMealsToday, groceryList, openOptimi
   return (
     <div>
       <div className="slot-header">
-        <div className="slot-time-pill">⏰ {meal ? meal.time : '--:--'}</div>
+        <div className="slot-time-pill">⏰ {slot.time || (meal ? meal.prep : '--:--')}</div>
         <span className="slot-type-label">{slot.type}</span>
         <button className="slot-remove-btn" title="Remove slot" onClick={onRemove}>✕</button>
       </div>
 
       {!meal ? (
-        <div className="empty-slot">No meal assigned to this slot.</div>
+        <div className="empty-slot" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '24px' }}>
+          <span className="empty-slot-icon">🍽️</span>
+          <span>No recipe assigned to this {slot.type} slot.</span>
+          <button className="mp-btn mp-btn-outline" style={{ fontSize: 13, marginTop: 4 }} onClick={() => onSwap({ type: slot.type }, idx)}>
+            + Select Recipe
+          </button>
+        </div>
       ) : (
         <>
           <div className="meal-card" data-meal-id={meal.id}>
@@ -365,7 +598,7 @@ function SlotCard({ slot, idx, profile, totalMealsToday, groceryList, openOptimi
               <div className="meal-card-emoji">{meal.emoji}</div>
               <div className="meal-card-info">
                 <div className="meal-card-name">{meal.name}</div>
-                <div className="meal-card-meta">{meal.time} &nbsp;·&nbsp; {meal.prep} prep</div>
+                <div className="meal-card-meta">{slot.time || 'Meal'} &nbsp;·&nbsp; {meal.prep} prep</div>
                 <div className="meal-macro-chips">
                   <div className="macro-chip"><b>{meal.protein}g</b> Protein</div>
                   <div className="macro-chip"><b>{meal.carbs}g</b> Carbs</div>

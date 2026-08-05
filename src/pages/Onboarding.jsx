@@ -18,44 +18,9 @@ import '../styles/onboarding.css';
 const TOTAL_STEPS = 4;
 const STEP_LABELS = ['Basic Info', 'Health Goals', 'Dietary Restrictions', 'Medical Conditions'];
 
-const GOALS = [
-  { key: 'lose_weight',      icon: '🔥', label: 'Lose Weight',      desc: 'Reduce body fat with a sustainable calorie deficit' },
-  { key: 'gain_muscle',      icon: '💪', label: 'Gain Muscle',      desc: 'Build lean mass with a protein-rich surplus plan' },
-  { key: 'maintain',         icon: '⚖️', label: 'Maintain',         desc: 'Stay at current weight with balanced nutrition' },
-  { key: 'improve_health',   icon: '❤️', label: 'Improve Health',   desc: 'Optimize nutrients for overall wellness and energy' },
-  { key: 'boost_energy',     icon: '⚡', label: 'Boost Energy',     desc: 'Fuel your day with steady energy and fewer crashes' },
-  { key: 'manage_condition', icon: '🩺', label: 'Manage Condition', desc: 'Eat around a specific health condition or diagnosis' },
-];
-
-const DIETARY_OPTIONS = [
-  { key: 'vegetarian',        icon: '🥦', label: 'Vegetarian' },
-  { key: 'vegan',             icon: '🌱', label: 'Vegan' },
-  { key: 'halal',             icon: '☪️', label: 'Halal' },
-  { key: 'kosher',            icon: '✡️', label: 'Kosher' },
-  { key: 'gluten_free',       icon: '🌾', label: 'Gluten-Free' },
-  { key: 'dairy_free',        icon: '🥛', label: 'Dairy-Free' },
-  { key: 'nut_allergy',       icon: '🥜', label: 'Nut Allergy' },
-  { key: 'shellfish_allergy', icon: '🦐', label: 'Shellfish Allergy' },
-  { key: 'egg_free',          icon: '🥚', label: 'Egg-Free' },
-  { key: 'soy_free',          icon: '🫘', label: 'Soy-Free' },
-  { key: 'low_sodium',        icon: '🧂', label: 'Low Sodium' },
-  { key: 'low_sugar',         icon: '🍬', label: 'Low Sugar' },
-];
-
-const MEDICAL_OPTIONS = [
-  { key: 'diabetes_t1',       icon: '💉', label: 'Diabetes Type 1' },
-  { key: 'diabetes_t2',       icon: '🩸', label: 'Diabetes Type 2' },
-  { key: 'hypertension',      icon: '❤️', label: 'Hypertension' },
-  { key: 'high_cholesterol',  icon: '🫀', label: 'High Cholesterol' },
-  { key: 'gerd',              icon: '🔥', label: 'GERD / Acid Reflux' },
-  { key: 'ibs',               icon: '🫃', label: 'IBS / Gut Issues' },
-  { key: 'kidney_disease',    icon: '🫘', label: 'Kidney Disease' },
-  { key: 'thyroid',           icon: '🦋', label: 'Thyroid Disorder' },
-  { key: 'anemia',            icon: '🩺', label: 'Anemia' },
-  { key: 'pcos',              icon: '🔵', label: 'PCOS' },
-  { key: 'gout',              icon: '🦵', label: 'Gout' },
-  { key: 'celiac',            icon: '🌾', label: 'Celiac Disease' },
-];
+// Option lists have been moved to the database and are managed via
+// the Admin panel. Keep no hardcoded lists here — Onboarding will
+// fetch the lists at runtime and fall back to empty arrays.
 
 const emptyForm = {
   fullName: '', age: '', sex: '', height: '', weight: '', activity: '',
@@ -70,6 +35,30 @@ export default function Onboarding() {
   const [form, setForm]               = useState(emptyForm);
   const [error, setError]             = useState('');
   const [saving, setSaving]           = useState(false);
+
+  const [goalsList, setGoalsList] = useState([]);
+  const [dietaryList, setDietaryList] = useState([]);
+  const [medicalList, setMedicalList] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadOptions() {
+      try {
+        const { data: goals, error: gErr } = await supabase.from('option_lists').select('*').eq('group', 'goals').order('sort_order');
+        if (!gErr && mounted && goals) setGoalsList(goals.filter((item) => item.active !== false));
+      } catch (e) { console.warn('load goals failed', e); }
+      try {
+        const { data: dietary, error: dErr } = await supabase.from('option_lists').select('*').eq('group', 'dietary').order('sort_order');
+        if (!dErr && mounted && dietary) setDietaryList(dietary.filter((item) => item.active !== false));
+      } catch (e) { console.warn('load dietary failed', e); }
+      try {
+        const { data: medical, error: mErr } = await supabase.from('option_lists').select('*').eq('group', 'medical').order('sort_order');
+        if (!mErr && mounted && medical) setMedicalList(medical.filter((item) => item.active !== false));
+      } catch (e) { console.warn('load medical failed', e); }
+    }
+    loadOptions();
+    return () => { mounted = false; };
+  }, []);
 
   /* Pre-fill full name from auth metadata (replaces the old
      "meta.full_name" prefill in onboarding.js) */
@@ -253,7 +242,7 @@ export default function Onboarding() {
             <h2>What is your main goal?</h2>
             <p className="sub">BLANE tailors your calorie targets and macro ratios around this.</p>
             <div className="goal-grid">
-              {GOALS.map((g) => (
+              {goalsList.map((g) => (
                 <div
                   key={g.key}
                   className={'goal-card' + (form.goal === g.key ? ' selected' : '')}
@@ -273,7 +262,7 @@ export default function Onboarding() {
             <h2>Any dietary restrictions?</h2>
             <p className="sub">Select all that apply. BLANE will never suggest meals that violate these. Skip if none apply.</p>
             <div className="tag-grid">
-              {DIETARY_OPTIONS.map((opt) => (
+              {dietaryList.map((opt) => (
                 <div
                   key={opt.key}
                   className={'tag-pill' + (form.dietary.includes(opt.key) ? ' selected' : '')}
@@ -296,7 +285,7 @@ export default function Onboarding() {
             <h2>Any medical conditions?</h2>
             <p className="sub">This helps BLANE avoid nutrients that may affect your condition. All data is private and stored securely. Skip if none apply.</p>
             <div className="tag-grid">
-              {MEDICAL_OPTIONS.map((opt) => (
+              {medicalList.map((opt) => (
                 <div
                   key={opt.key}
                   className={'tag-pill' + (form.medical.includes(opt.key) ? ' selected' : '')}
