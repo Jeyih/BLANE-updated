@@ -6,7 +6,8 @@
    below a meal card (not a portal — matches the old inline
    .opt-panel behavior, unlike the fixed-position WhyButton).
    ============================================================ */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { supabase, SUPABASE_URL } from '../lib/supabase';
 import '../styles/optimizer.css';
 
 const OPT_MIN_SCALE = 0.5;
@@ -29,8 +30,79 @@ export function OptimizeButton({ open, onToggle }) {
   );
 }
 
+function getOptimizeMealUrl() {
+  if (!SUPABASE_URL) return null;
+  return SUPABASE_URL.replace('.supabase.co', '.functions.supabase.co') + '/optimize-meal';
+}
+
 export default function PortionOptimizerPanel({ meal, profile, totalMealsToday, open, onClose, onApplied }) {
   const [applied, setApplied] = useState(false);
+  const [aiResult, setAiResult] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [aiMode, setAiMode] = useState('local');
+
+  useEffect(() => {
+    if (!open || !meal || !profile || !meal.ingredients) return;
+
+    let cancelled = false;
+    const fallbackResult = optimizeMeal(meal, totalMealsToday || 3, profile);
+
+    async function loadAiOptimization() {
+      setAiLoading(true);
+      setAiError('');
+      setAiMode('local');
+      setAiResult(fallbackResult);
+
+      try {
+        const optimizeUrl = getOptimizeMealUrl();
+        if (!optimizeUrl) {
+          throw new Error('Supabase function URL is not configured.');
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          if (!cancelled) {
+            setAiMode('local');
+            setAiError('Sign in to enable Gemini optimization. Using a smart local estimate instead.');
+          }
+          return;
+        }
+
+        const res = await fetch(optimizeUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + session.access_token,
+          },
+          body: JSON.stringify({ meal, profile, totalMealsToday: totalMealsToday || 3 }),
+        });
+
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(payload.error || 'BLANE AI could not optimize this meal.');
+        }
+
+        if (!cancelled) {
+          setAiResult(payload);
+          setAiMode('ai');
+          setAiError('');
+        }
+      } catch (err) {
+        console.error('Portion optimizer AI failed:', err);
+        if (!cancelled) {
+          setAiResult(fallbackResult);
+          setAiMode('local');
+          setAiError('BLANE AI is temporarily unavailable. Showing the smart local estimate instead.');
+        }
+      } finally {
+        if (!cancelled) setAiLoading(false);
+      }
+    }
+
+    loadAiOptimization();
+    return () => { cancelled = true; };
+  }, [open, meal?.id, profile?.height_cm, profile?.weight_kg, profile?.goal, profile?.activity_level, totalMealsToday]);
 
   if (!open) return null;
 
@@ -46,7 +118,7 @@ export default function PortionOptimizerPanel({ meal, profile, totalMealsToday, 
     );
   }
 
-  const result = optimizeMeal(meal, totalMealsToday || 3, profile);
+  const result = aiResult || optimizeMeal(meal, totalMealsToday || 3, profile);
   const scaleClass = result.scaleFactor > 1.05 ? 'over' : result.scaleFactor < 0.95 ? 'under' : '';
   const scaleLabel = result.scaleFactor > 1.05
     ? '↑ ' + result.scaleFactor.toFixed(2) + '× Increase'
@@ -81,6 +153,12 @@ export default function PortionOptimizerPanel({ meal, profile, totalMealsToday, 
             </div>
           </div>
           <button className="opt-close-btn" onClick={onClose}>✕ Close</button>
+        </div>
+
+        <div className="opt-header-strip">
+          <span className={'opt-mode-badge ' + aiMode}>{aiMode === 'ai' ? '✦ Gemini AI' : '⚙ Smart estimate'}</span>
+          {aiLoading && <span className="opt-loading-text">Calculating your ideal portions…</span>}
+          {!aiLoading && aiError && <span className="opt-warning-text">{aiError}</span>}
         </div>
 
         <div className="opt-target-row">
