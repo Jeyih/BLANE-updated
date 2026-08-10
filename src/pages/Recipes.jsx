@@ -18,8 +18,8 @@ import { getActiveConstraints, checkRecipeViolations } from '../lib/constraints'
 import { ConstraintActiveBar, ViolationBadge, ViolationDetail } from '../components/ConstraintWarnings';
 import '../styles/recipes.css';
 
-const TYPE_FILTERS = ['All', 'Breakfast', 'Lunch', 'Dinner', 'Snack'];
-const DIET_FILTERS = ['All diets', 'Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free'];
+const TYPE_FILTERS = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+const DIET_FILTERS = ['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free'];
 const DIFF_COLORS  = { easy: '#2ddc7a', medium: '#fbbf24', hard: '#f87171' };
 
 export default function Recipes() {
@@ -29,11 +29,10 @@ export default function Recipes() {
   const [profile, setProfile]   = useState(null);
   const [recipes, setRecipes]   = useState([]);
   const [loading, setLoading]   = useState(true);
-  const [typeFilter, setTypeFilter] = useState('All');
-  const [dietFilter, setDietFilter] = useState('All');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [dietFilter, setDietFilter] = useState('');
   const [search, setSearch]     = useState('');
   const [openRecipeId, setOpenRecipeId] = useState(null);
-  const [filterOn, setFilterOn] = useState(true);
 
   useEffect(() => { loadAll(); }, [user]);
 
@@ -77,15 +76,18 @@ export default function Recipes() {
 
   const activeConstraints = getActiveConstraints(profile);
 
-  const filtered = recipes.filter((r) => {
-    const matchType = typeFilter === 'All' || r.type === typeFilter;
-    const dietKey = dietFilter === 'All' ? 'All' : dietFilter.toLowerCase().replace('-', '_').replace(' ', '_');
-    const matchDiet = dietKey === 'All' || r.diet.includes(dietKey);
-    const q = search.toLowerCase();
-    const matchSearch = !q || r.name.toLowerCase().includes(q) || r.type.toLowerCase().includes(q) ||
-      r.ingredients.some((i) => i.name.toLowerCase().includes(q));
-    return matchType && matchDiet && matchSearch;
-  });
+  const hasActiveSelection = Boolean(typeFilter || dietFilter || search.trim());
+  const filtered = hasActiveSelection
+    ? recipes.filter((r) => {
+        const matchType = !typeFilter || r.type === typeFilter;
+        const dietKey = dietFilter ? dietFilter.toLowerCase().replace('-', '_').replace(' ', '_') : '';
+        const matchDiet = !dietFilter || r.diet.includes(dietKey);
+        const q = search.trim().toLowerCase();
+        const matchSearch = !q || r.name.toLowerCase().includes(q) || r.type.toLowerCase().includes(q) ||
+          r.ingredients.some((i) => i.name.toLowerCase().includes(q));
+        return matchType && matchDiet && matchSearch;
+      })
+    : [];
 
   const openRecipe = recipes.find((r) => r.id === openRecipeId);
 
@@ -106,11 +108,7 @@ export default function Recipes() {
             </span>
           </div>
 
-          <ConstraintActiveBar
-            activeConstraints={activeConstraints}
-            filterOn={filterOn}
-            onToggleFilter={() => setFilterOn((v) => !v)}
-          />
+          <ConstraintActiveBar activeConstraints={activeConstraints} />
 
           <div className="rp-toolbar">
             <div className="rp-search-wrap">
@@ -126,12 +124,23 @@ export default function Recipes() {
 
           <div className="rp-filter-row">
             {TYPE_FILTERS.map((f) => (
-              <button key={f} className={'rp-filter-btn' + (typeFilter === f ? ' active' : '')} onClick={() => setTypeFilter(f)}>{f}</button>
+              <button
+                key={f}
+                className={'rp-filter-btn' + (typeFilter === f ? ' active' : '')}
+                onClick={() => setTypeFilter((current) => (current === f ? '' : f))}
+              >
+                {f}
+              </button>
             ))}
             <div className="rp-filter-divider"></div>
             {DIET_FILTERS.map((f) => (
-              <button key={f} className={'rp-filter-btn' + (dietFilter === f || (f === 'All diets' && dietFilter === 'All') ? ' active' : '')}
-                onClick={() => setDietFilter(f === 'All diets' ? 'All' : f)}>{f}</button>
+              <button
+                key={f}
+                className={'rp-filter-btn' + (dietFilter === f ? ' active' : '')}
+                onClick={() => setDietFilter((current) => (current === f ? '' : f))}
+              >
+                {f}
+              </button>
             ))}
           </div>
 
@@ -149,7 +158,6 @@ export default function Recipes() {
                   key={recipe.id}
                   recipe={recipe}
                   activeConstraints={activeConstraints}
-                  filterOn={filterOn}
                   onClick={() => setOpenRecipeId(recipe.id)}
                 />
               ))
@@ -163,7 +171,6 @@ export default function Recipes() {
         <RecipeModal
           recipe={openRecipe}
           activeConstraints={activeConstraints}
-          filterOn={filterOn}
           onClose={() => setOpenRecipeId(null)}
           onAddToMealPlan={() => { setOpenRecipeId(null); navigate('/mealplan'); }}
         />
@@ -172,9 +179,9 @@ export default function Recipes() {
   );
 }
 
-function RecipeCard({ recipe, activeConstraints, filterOn, onClick }) {
+function RecipeCard({ recipe, activeConstraints, onClick }) {
   const seasonScore = scoreRecipe(recipe.ingredients);
-  const violations = checkRecipeViolations(recipe, activeConstraints, filterOn);
+  const violations = checkRecipeViolations(recipe, activeConstraints);
   const bannerGlow = seasonScore.cssClass === 'in-season' ? ' in-season-glow' : '';
   const stripeClass = violations.some((v) => v.severity === 'allergy') ? ' violation-stripe' : '';
   const hasViolation = violations.length > 0;
@@ -209,9 +216,9 @@ function RecipeCard({ recipe, activeConstraints, filterOn, onClick }) {
   );
 }
 
-function RecipeModal({ recipe, activeConstraints, filterOn, onClose, onAddToMealPlan }) {
+function RecipeModal({ recipe, activeConstraints, onClose, onAddToMealPlan }) {
   const macroMax = Math.max(recipe.protein, recipe.carbs, recipe.fats);
-  const violations = checkRecipeViolations(recipe, activeConstraints, filterOn);
+  const violations = checkRecipeViolations(recipe, activeConstraints);
   const dc = DIFF_COLORS[recipe.difficulty] || '#2ddc7a';
 
   useEffect(() => {

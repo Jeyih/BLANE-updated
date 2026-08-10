@@ -241,7 +241,8 @@ function scoreAndRankRecipes(profile, recipes) {
   const goal = profile.goal || 'maintain';
   const dietary = profile.dietary_restrictions || [];
   const medical = profile.medical_conditions || [];
-  const allConstraints = [...dietary, ...medical];
+  const allergies = profile.allergies || [];
+  const allConstraints = [...dietary, ...medical, ...allergies];
   const ideals = GOAL_IDEALS[goal] || GOAL_IDEALS.maintain;
   const dailyTarget = computeDailyTarget(profile);
   const perMealKcal = Math.round(dailyTarget / 4);
@@ -293,7 +294,7 @@ function scoreAndRankRecipes(profile, recipes) {
 
 function generateReason(recipe, goal, violations, perMealKcal, profile) {
   if (violations > 0 && ALLERGY_KEYS.some((k) =>
-    (profile.dietary_restrictions || []).includes(k) || (profile.medical_conditions || []).includes(k)
+    (profile.dietary_restrictions || []).includes(k) || (profile.medical_conditions || []).includes(k) || (profile.allergies || []).includes(k)
   )) {
     return 'Flagged — contains an ingredient that may conflict with your allergy profile.';
   }

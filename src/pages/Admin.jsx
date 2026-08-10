@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { isAdmin } from '../lib/admin-auth';
+import { loadConstraintDefinitions } from '../lib/constraints';
 import '../styles/admin.css';
 
 const MARKET_TYPES = [
@@ -500,6 +501,7 @@ export default function Admin() {
     showToast('✓ Constraint saved successfully');
     setConstraintModalOpen(false);
     await loadConstraintDefs();
+    await loadConstraintDefinitions();
   }
 
   async function deleteConstraint(id) {
@@ -511,6 +513,7 @@ export default function Admin() {
     }
     showToast('✓ Constraint deleted');
     await loadConstraintDefs();
+    await loadConstraintDefinitions();
   }
 
   function openSeasonModal(id) {

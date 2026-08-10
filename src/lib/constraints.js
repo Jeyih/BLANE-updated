@@ -52,7 +52,8 @@ export async function loadConstraintDefinitions() {
 export function getActiveConstraints(profile) {
   const dietary = profile?.dietary_restrictions || [];
   const medical = profile?.medical_conditions || [];
-  return [...dietary, ...medical].filter((key) => CB_CONSTRAINTS[key] !== undefined);
+  const allergies = profile?.allergies || [];
+  return [...dietary, ...medical, ...allergies].filter((key) => CB_CONSTRAINTS[key] !== undefined);
 }
 
 export function checkRecipeViolations(recipe, activeConstraints, filterOn = true) {

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
 import '../styles/markets.css';
+import '../styles/geomarket.css';
 import 'leaflet/dist/leaflet.css';
 
 const FILTERS = ['All', 'Palengke', 'Supermarket', 'Talipapa', 'Grocery'];
@@ -488,8 +489,306 @@ export default function Markets() {
               ) : null}
             </div>
           </div>
+
+          <div className="mk-aux-panels">
+            <GeoMarketScanner markets={markets} userCoords={userCoords} onLocate={locateUser} />
+          </div>
         </div>
       </main>
     </>
   );
 }
+
+function GeoMarketScanner({ markets, userCoords, onLocate }) {
+  const [activeTab, setActiveTab] = useState('search');
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [scanData, setScanData] = useState(null);
+  const [gpsLabel, setGpsLabel] = useState('📡 Enable GPS Location');
+  // Data moved to DB: placeholders to be populated by effects or parent loader
+  const [quickSuggestions, setQuickSuggestions] = useState([]);
+  const [todayPlanIngredients, setTodayPlanIngredients] = useState([]);
+  const [substitutes, setSubstitutes] = useState({});
+
+  useEffect(() => {
+    if (userCoords) {
+      setGpsLabel(`✓ GPS: ${userCoords.lat.toFixed(4)}, ${userCoords.lng.toFixed(4)}`);
+    }
+  }, [userCoords]);
+
+  function runSearch(searchQuery) {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) {
+      setResults([]);
+      return;
+    }
+
+    const matches = markets
+      .map((market) => {
+        const ingredients = market.ingredients.filter((ing) => ing.name.toLowerCase().includes(q));
+        return { market, ingredients };
+      })
+      .filter((item) => item.ingredients.length > 0)
+      .sort((a, b) => {
+        if (a.market.open !== b.market.open) return b.market.open ? 1 : -1;
+        return a.market.distance - b.market.distance;
+      });
+
+    setResults(matches);
+  }
+
+  function handleSearch() {
+    runSearch(query);
+    setActiveTab('search');
+  }
+
+  function handleQuickSearch(value) {
+    setQuery(value);
+    runSearch(value);
+    setActiveTab('search');
+  }
+
+  function buildScanMatrix() {
+    const marketsToScan = markets.slice(0, 5);
+    const found = [];
+    const limited = [];
+    const missing = [];
+
+    const matrix = todayPlanIngredients.map((ingredient) => {
+      const row = { name: ingredient, statusByMarket: {} };
+      let ingredientFound = false;
+      let ingredientLimited = false;
+
+      marketsToScan.forEach((market) => {
+        const match = market.ingredients.find((ing) =>
+          ing.name.toLowerCase().includes(ingredient.toLowerCase()) ||
+          ingredient.toLowerCase().includes(ing.name.toLowerCase().split(' ')[0])
+        );
+
+        const status = match ? match.status : 'unknown';
+        row.statusByMarket[market.id] = status;
+
+        if (status === 'avail') ingredientFound = true;
+        if (status === 'limited') ingredientLimited = true;
+      });
+
+      if (ingredientFound) found.push(ingredient);
+      else if (ingredientLimited) limited.push(ingredient);
+      else missing.push(ingredient);
+
+      return row;
+    });
+
+    const marketScores = marketsToScan.map((market) => {
+      const score = matrix.reduce((count, row) => count + (row.statusByMarket[market.id] === 'avail' ? 1 : 0), 0);
+      return { market, score };
+    });
+
+    const bestMarket = marketScores.sort((a, b) => b.score - a.score)[0] || null;
+
+    setScanData({ matrix, markets: marketsToScan, found, limited, missing, bestMarket });
+    setActiveTab('scan');
+  }
+
+  function getSubstitutes(ingredient) {
+    return (substitutes[ingredient.toLowerCase()] || substitutes.default) || [];
+  }
+
+  return (
+    <div className="gm-scanner">
+      <div className="gm-header">
+        <div className="gm-header-left">
+          <div className="gm-header-icon">🔍</div>
+          <div>
+            <div className="gm-title">GeoMarket Ingredient Scanner</div>
+            <div className="gm-sub">Find ingredients at nearby markets · Module 04</div>
+          </div>
+        </div>
+        <button className="gm-gps-badge" type="button" onClick={() => { setGpsLabel('📡 Locating...'); onLocate(); }}>
+          {gpsLabel}
+        </button>
+      </div>
+
+      <div className="gm-tabs">
+        <button className={`gm-tab ${activeTab === 'search' ? 'active' : ''}`} type="button" onClick={() => setActiveTab('search')}>
+          Search Ingredient
+        </button>
+        <button className={`gm-tab ${activeTab === 'scan' ? 'active' : ''}`} type="button" onClick={() => setActiveTab('scan')}>
+          Scan Meal Plan
+        </button>
+        <button className={`gm-tab ${activeTab === 'subs' ? 'active' : ''}`} type="button" onClick={() => setActiveTab('subs')}>
+          Substitutes
+        </button>
+      </div>
+
+      <div className="gm-tab-body">
+        <div className={`gm-panel ${activeTab === 'search' ? 'active' : ''}`}>
+          <div className="gm-search-row">
+            <div className="gm-search-wrap">
+              <span className="gm-search-icon">🔍</span>
+              <input
+                className="gm-search-input"
+                type="text"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') handleSearch();
+                }}
+                placeholder="e.g. Malunggay, Bangus, Broccoli..."
+              />
+            </div>
+            <button className="gm-search-btn" type="button" onClick={handleSearch}>
+              Search
+            </button>
+          </div>
+
+          <div className="gm-quick-pills">
+            {quickSuggestions.map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                className="gm-quick-pill"
+                onClick={() => handleQuickSearch(suggestion)}
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+
+          <div className="gm-search-results">
+            {results.length === 0 ? (
+              <div className="gm-no-results">
+                Type an ingredient above or tap a suggestion to search.
+              </div>
+            ) : (
+              results.map(({ market, ingredients }) => (
+                <div key={market.id} className="gm-result-market">
+                  <div className="gm-result-market-header">
+                    <span className="gm-result-market-icon">{market.icon}</span>
+                    <span className="gm-result-market-name">{market.name}</span>
+                    <span className="gm-result-market-dist">
+                      {market.distance} km · {market.open ? 'Open' : 'Closed'}
+                    </span>
+                  </div>
+                  {ingredients.map((ing) => (
+                    <div key={ing.name} className="gm-result-ing-row">
+                      <div className="gm-result-ing-name">
+                        <div className="gm-result-ing-dot" />
+                        {ing.name}
+                      </div>
+                      <div className="gm-result-ing-price">{ing.price}</div>
+                      <span className={`gm-result-ing-status ${ing.status}`}>
+                        {ing.status === 'avail'
+                          ? '✓ Available'
+                          : ing.status === 'limited'
+                          ? '⚠ Limited'
+                          : '✕ Unavailable'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className={`gm-panel ${activeTab === 'scan' ? 'active' : ''}`}>
+          <div className="gm-scan-btn-row">
+            <button className="gm-scan-btn" type="button" onClick={buildScanMatrix}>
+              Scan Today's Meal Plan
+            </button>
+            <span className="gm-scan-meta">{todayPlanIngredients.length} ingredients to scan</span>
+          </div>
+
+          {!scanData ? (
+            <div className="gm-no-results">
+              Run the scan to compare today's plan against nearby market availability.
+            </div>
+          ) : (
+            <>
+              <div className="gm-scan-summary">
+                <div className="gm-summary-chip found">✓ {scanData.found.length} Available</div>
+                <div className="gm-summary-chip limited">⚠ {scanData.limited.length} Limited</div>
+                <div className="gm-summary-chip missing">✕ {scanData.missing.length} Not Found</div>
+              </div>
+
+              <div className="gm-matrix-wrap">
+                <table className="gm-matrix">
+                  <thead>
+                    <tr>
+                      <th>Ingredient</th>
+                      {scanData.markets.map((market) => (
+                        <th key={market.id} className="market-col">
+                          {market.icon}
+                          <br />
+                          <span style={{ fontSize: 10 }}>{market.name.split(' ')[0]}</span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scanData.matrix.map((row) => (
+                      <tr key={row.name}>
+                        <td className="gm-matrix-ing-cell">{row.name}</td>
+                        {scanData.markets.map((market) => {
+                          const status = row.statusByMarket[market.id] || 'unknown';
+                          const symbol = status === 'avail' ? '✓' : status === 'limited' ? '⚠' : status === 'unavail' ? '✕' : '?';
+                          return (
+                            <td key={market.id} className="gm-matrix-status-cell">
+                              <div className={`gm-matrix-dot ${status}`}>{symbol}</div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {scanData.bestMarket && (
+                  <div className="gm-best-market">
+                    <span className="gm-best-icon">🏆</span>
+                    <div className="gm-best-text">
+                      <strong>Best market: {scanData.bestMarket.market.name}</strong> carries {scanData.bestMarket.score} of {todayPlanIngredients.length} ingredients from today's meal plan · {scanData.bestMarket.market.open ? 'Open' : 'Closed'}
+                    </div>
+                  </div>
+                )}
+            </>
+          )}
+        </div>
+
+        <div className={`gm-panel ${activeTab === 'subs' ? 'active' : ''}`}>
+          <p className="gm-sub-intro">
+            Missing meal plan ingredients that are not found nearby and locally recommended substitutes.
+          </p>
+          <div className="gm-missing-list">
+            {!scanData || scanData.missing.length === 0 ? (
+              <div className="gm-no-results">
+                {scanData ? 'No missing ingredients detected — everything on your meal plan is available.' : 'Run Scan Meal Plan first to identify missing ingredients.'}
+              </div>
+            ) : (
+              scanData.missing.map((missing) => {
+                const substitutes = getSubstitutes(missing);
+                return (
+                  <div key={missing} className="gm-missing-card">
+                    <div className="gm-missing-name">{missing}</div>
+                    {substitutes.map((sub) => (
+                      <div key={sub.name} className="gm-sub-row">
+                        <div className="gm-sub-icon">{sub.icon}</div>
+                        <div>
+                          <div className="gm-sub-meta"><strong>{sub.name}</strong></div>
+                          <div className="gm-sub-note">{sub.note}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

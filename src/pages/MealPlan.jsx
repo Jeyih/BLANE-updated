@@ -6,7 +6,7 @@
    and manages weekly meal slots, calorie goals, swap options,
    and grocery list generation.
    ============================================================ */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
@@ -15,6 +15,7 @@ import PortionOptimizerPanel, { OptimizeButton } from '../components/PortionOpti
 import { scoreRecipe } from '../lib/seasonal';
 import { SeasonBadge, IngSeasonTag, SeasonalAltBanner } from '../components/SeasonalBadges';
 import '../styles/mealplan.css';
+import '../styles/priceopt.css';
 
 const SLOT_PRESETS = [
   { type: 'Breakfast', icon: '🌅', time: '7:00 AM' },
@@ -113,24 +114,31 @@ export default function MealPlan() {
       ingByRecipe[ing.recipe_id].push({ name: ing.name, qty: ing.qty, status: ing.status || 'avail' });
     });
 
-    const formatted = (recipesData || []).map((r) => ({
-      id: r.id,
-      emoji: r.emoji || '🍲',
-      name: r.name,
-      type: r.type,
-      diet: r.diet_tags || [],
-      goal: r.goal_tags || [],
-      difficulty: r.difficulty || 'medium',
-      cookTime: r.cook_time_min || 20,
-      prep: `${r.cook_time_min || 20} min`,
-      servings: r.servings || 1,
-      kcal: r.kcal || 0,
-      cost: r.cost || 0,
-      protein: r.protein_g || 0,
-      carbs: r.carbs_g || 0,
-      fats: r.fats_g || 0,
-      ingredients: ingByRecipe[r.id] || [],
-    }));
+    const formatted = (recipesData || []).map((r) => {
+      const recipeIngredients = (ingByRecipe[r.id] || []).map((ing) => ({
+        ...ing,
+        cost: Number(((r.cost || 0) / Math.max((ingByRecipe[r.id] || []).length, 1)).toFixed(2)),
+      }));
+
+      return {
+        id: r.id,
+        emoji: r.emoji || '🍲',
+        name: r.name,
+        type: r.type,
+        diet: r.diet_tags || [],
+        goal: r.goal_tags || [],
+        difficulty: r.difficulty || 'medium',
+        cookTime: r.cook_time_min || 20,
+        prep: `${r.cook_time_min || 20} min`,
+        servings: r.servings || 1,
+        kcal: r.kcal || 0,
+        cost: r.cost || 0,
+        protein: r.protein_g || 0,
+        carbs: r.carbs_g || 0,
+        fats: r.fats_g || 0,
+        ingredients: recipeIngredients,
+      };
+    });
 
     setRecipes(formatted);
     setLoadingRecipes(false);
@@ -412,6 +420,8 @@ export default function MealPlan() {
                 ))
               )}
 
+              <PriceOptimizerPanel meals={recipes} />
+
               <button className="add-slot-btn" onClick={() => setAddSlotOpen(true)}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                 Add meal slot
@@ -567,6 +577,225 @@ export default function MealPlan() {
       )}
     </>
   );
+}
+
+function PriceOptimizerPanel({ meals = [] }) {
+  const [dailyBudget, setDailyBudget] = useState(200);
+  const [sortMode, setSortMode] = useState('cost');
+  const [filterOver, setFilterOver] = useState(false);
+  const [expandedId, setExpandedId] = useState(null);
+
+  const perMeal = Math.round(dailyBudget / 4);
+
+  const sortedMeals = useMemo(() => {
+    const list = [...meals];
+    if (sortMode === 'cost') {
+      return list.sort((a, b) => a.cost - b.cost);
+    }
+    return list.sort((a, b) => (b.kcal / b.cost || 0) - (a.kcal / a.cost || 0));
+  }, [sortMode, meals]);
+
+  const visibleMeals = filterOver ? sortedMeals.filter((meal) => meal.cost <= perMeal) : sortedMeals;
+  const affordableCount = sortedMeals.filter((meal) => meal.cost <= perMeal).length;
+  const cheapestDay = computeCheapestDay(meals, perMeal);
+
+  function toggleExpand(id) {
+    setExpandedId((prev) => (prev === id ? null : id));
+  }
+
+  function buildSubSuggestion(meal) {
+    const ingredients = meal.ingredients || [];
+    if (!ingredients.length) {
+      return (
+        <div className="po-sub-suggestion">
+          <span className="po-sub-suggestion-icon">📍</span>
+          <div className="po-sub-suggestion-text">Shop at local palengke or talipapa for better value on this meal.</div>
+        </div>
+      );
+    }
+
+    const expensiveIngredient = [...ingredients].sort((a, b) => (b.cost || 0) - (a.cost || 0))[0];
+    if (!expensiveIngredient) {
+      return (
+        <div className="po-sub-suggestion">
+          <span className="po-sub-suggestion-icon">📍</span>
+          <div className="po-sub-suggestion-text">Shop at local palengke or talipapa for better value on this meal.</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="po-sub-suggestion">
+        <span className="po-sub-suggestion-icon">💡</span>
+        <div className="po-sub-suggestion-text">
+          Keep this meal under budget by using a local substitute for <strong>{expensiveIngredient.name}</strong> when it is cheaper at nearby markets.
+        </div>
+        <div className="po-sub-saving">Save on local pricing</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="po-panel">
+      <div className="po-header">
+        <div className="po-header-left">
+          <div className="po-header-icon">💸</div>
+          <div>
+            <div className="po-title">Price-Aware Meal Optimizer</div>
+            <div className="po-sub">Rank and filter meals by your daily budget · Module 05</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="po-budget-row">
+        <div className="po-budget-input-wrap">
+          <span className="po-currency-prefix">₱</span>
+          <input
+            className="po-budget-input"
+            type="number"
+            value={dailyBudget}
+            min={50}
+            max={2000}
+            step={10}
+            onChange={(event) => setDailyBudget(parseInt(event.target.value, 10) || 200)}
+          />
+        </div>
+        <span className="po-budget-label">daily budget</span>
+        <div className="po-per-meal-chip">≈ <strong>₱{perMeal}</strong> / meal</div>
+        <button className="po-apply-btn" type="button" onClick={() => setDailyBudget(dailyBudget)}>
+          Apply Budget
+        </button>
+      </div>
+
+      <div className="po-summary-bar">
+        <div className="po-summary-item">
+          <div className="po-summary-label">Daily Budget</div>
+          <div className="po-summary-value yellow">₱{dailyBudget}</div>
+        </div>
+        <div className="po-summary-divider" />
+        <div className="po-summary-item">
+          <div className="po-summary-label">Per Meal</div>
+          <div className="po-summary-value yellow">₱{perMeal}</div>
+        </div>
+        <div className="po-summary-divider" />
+        <div className="po-summary-item">
+          <div className="po-summary-label">Affordable Meals</div>
+          <div className="po-summary-value green">{affordableCount} / {meals.length}</div>
+        </div>
+        <div className="po-summary-divider" />
+        <div className="po-summary-item">
+          <div className="po-summary-label">Cheapest Full Day</div>
+          <div className={`po-summary-value ${cheapestDay <= dailyBudget ? 'green' : 'red'}`}>₱{cheapestDay}</div>
+        </div>
+        <div className="po-summary-divider" />
+        <div className="po-budget-progress">
+          <div className="po-budget-bar-labels"><span>Cheapest day cost</span><span>{Math.min(Math.round((cheapestDay / dailyBudget) * 100), 120)}%</span></div>
+          <div className="po-budget-bar-bg">
+            <div
+              className="po-budget-bar-fill"
+              style={{
+                width: `${Math.min(Math.round((cheapestDay / dailyBudget) * 100), 100)}%`,
+                background: cheapestDay <= dailyBudget ? '#2ddc7a' : '#f87171',
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="po-controls">
+        <span className="po-sort-label">Sort by:</span>
+        <button
+          type="button"
+          className={`po-sort-btn ${sortMode === 'cost' ? 'active' : ''}`}
+          onClick={() => setSortMode('cost')}
+        >
+          ₱ Price
+        </button>
+        <button
+          type="button"
+          className={`po-sort-btn ${sortMode === 'kcal_per_peso' ? 'active' : ''}`}
+          onClick={() => setSortMode('kcal_per_peso')}
+        >
+          ⚡ Best Value
+        </button>
+        <span className="po-count-badge"><span>{visibleMeals.length}</span> meals</span>
+        <button
+          type="button"
+          className={`po-filter-toggle ${filterOver ? 'active' : ''}`}
+          onClick={() => setFilterOver((prev) => !prev)}
+        >
+          {filterOver ? 'Show all meals' : 'Hide over budget'}
+        </button>
+      </div>
+
+      <div className="po-meals-list">
+        {visibleMeals.map((meal) => {
+          const isOver = meal.cost > perMeal;
+          const affordClass = meal.cost <= perMeal * 0.6 ? 'cheap'
+            : meal.cost <= perMeal ? 'okay'
+            : meal.cost <= perMeal * 1.3 ? 'pricey'
+            : 'over';
+          const valueScore = Math.round((meal.kcal / meal.cost) * 10) / 10;
+
+          return (
+            <div key={meal.id} className={`po-meal-row ${isOver ? 'over-budget' : ''}`}>
+              <div className="po-meal-main" onClick={() => toggleExpand(meal.id)}>
+                <div className={`po-meal-rank ${meal.id.startsWith('m') && parseInt(meal.id.slice(1), 10) <= 3 ? 'top3' : ''}`}>{meal.id.startsWith('m') ? `#${meal.id.slice(1)}` : meal.id}</div>
+                <div className="po-meal-emoji">{meal.emoji}</div>
+                <div className="po-meal-info">
+                  <div className="po-meal-name">{meal.name}</div>
+                  <div className="po-meal-meta">
+                    <span>{meal.type}</span>
+                    <span>· {meal.kcal} kcal</span>
+                    <span>· ⚡ {valueScore} kcal/₱</span>
+                  </div>
+                </div>
+                <div className="po-meal-cost-wrap">
+                  <div className="po-meal-cost">₱{meal.cost}</div>
+                  <span className={`po-afford-badge ${affordClass}`}>{affordClass === 'cheap' ? 'Budget-Friendly' : affordClass === 'okay' ? 'Affordable' : affordClass === 'pricey' ? 'Slightly Over' : 'Over Budget'}</span>
+                </div>
+                <button className={`po-expand-btn ${expandedId === meal.id ? 'open' : ''}`} type="button" onClick={(event) => { event.stopPropagation(); toggleExpand(meal.id); }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+              </div>
+              <div className={`po-meal-detail ${expandedId === meal.id ? 'open' : ''}`}>
+                <div className="po-detail-inner">
+                  <div style={{ fontSize: 11, color: '#4d6e5a', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 8 }}>
+                    Ingredient Cost Breakdown
+                  </div>
+                  <div className="po-ing-cost-table">
+                    {(meal.ingredients || []).map((ing) => {
+                      const ingredientValues = (meal.ingredients || []).map((item) => item.cost || 0);
+                      const maxCost = Math.max(...ingredientValues, 0);
+                      const barPct = maxCost > 0 ? Math.round(((ing.cost || 0) / maxCost) * 100) : 0;
+                      return (
+                        <div key={ing.name} className="po-ing-cost-row">
+                          <div className="po-ing-cost-name"><div className="po-ing-dot" />{ing.name} <span style={{ color: '#4d6e5a' }}>({ing.qty})</span></div>
+                          <div className="po-cost-bar-wrap"><div className="po-cost-bar-bg"><div className="po-cost-bar-fill" style={{ width: `${barPct}%` }} /></div></div>
+                          <div className="po-ing-cost-price">₱{ing.cost || 0}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {buildSubSuggestion(meal)}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function computeCheapestDay(meals = [], perMeal) {
+  const types = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+  return types.reduce((total, type) => {
+    const mealsOfType = meals.filter((meal) => meal.type === type);
+    if (mealsOfType.length === 0) return total;
+    const cheapest = mealsOfType.reduce((a, b) => (a.cost < b.cost ? a : b));
+    return total + cheapest.cost;
+  }, 0);
 }
 
 function SlotCard({ slot, idx, profile, getMeal, totalMealsToday, groceryList, openOptimizerId, onSetOpenOptimizer, onRemove, onSwap, onAddGrocery }) {

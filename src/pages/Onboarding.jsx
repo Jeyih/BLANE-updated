@@ -15,8 +15,8 @@ import { useAuth } from '../context/AuthContext';
 import { supabase, REDIRECT_AFTER_ONBOARD } from '../lib/supabase';
 import '../styles/onboarding.css';
 
-const TOTAL_STEPS = 4;
-const STEP_LABELS = ['Basic Info', 'Health Goals', 'Dietary Restrictions', 'Medical Conditions'];
+const TOTAL_STEPS = 5;
+const STEP_LABELS = ['Basic Info', 'Health Goals', 'Dietary Restrictions', 'Medical Conditions', 'Allergies'];
 
 // Option lists have been moved to the database and are managed via
 // the Admin panel. Keep no hardcoded lists here — Onboarding will
@@ -25,6 +25,7 @@ const STEP_LABELS = ['Basic Info', 'Health Goals', 'Dietary Restrictions', 'Medi
 const emptyForm = {
   fullName: '', age: '', sex: '', height: '', weight: '', activity: '',
   goal: '', dietary: [], dietaryOther: '', medical: [], medicalOther: '',
+  allergies: [], allergiesOther: '',
 };
 
 export default function Onboarding() {
@@ -39,6 +40,7 @@ export default function Onboarding() {
   const [goalsList, setGoalsList] = useState([]);
   const [dietaryList, setDietaryList] = useState([]);
   const [medicalList, setMedicalList] = useState([]);
+  const [allergyList, setAllergyList] = useState([]);
 
   useEffect(() => {
     let mounted = true;
@@ -55,6 +57,10 @@ export default function Onboarding() {
         const { data: medical, error: mErr } = await supabase.from('option_lists').select('*').eq('group', 'medical').order('sort_order');
         if (!mErr && mounted && medical) setMedicalList(medical.filter((item) => item.active !== false));
       } catch (e) { console.warn('load medical failed', e); }
+      try {
+        const { data: allergies, error: aErr } = await supabase.from('constraint_definitions').select('*').eq('severity', 'allergy').order('sort_order');
+        if (!aErr && mounted && allergies) setAllergyList(allergies.filter((item) => item.active !== false));
+      } catch (e) { console.warn('load allergies failed', e); }
     }
     loadOptions();
     return () => { mounted = false; };
@@ -127,6 +133,9 @@ export default function Onboarding() {
     const medical = [...form.medical];
     if (form.medicalOther.trim()) medical.push(form.medicalOther.trim());
 
+    const allergies = [...form.allergies];
+    if (form.allergiesOther.trim()) allergies.push(form.allergiesOther.trim());
+
     const { error: dbError } = await supabase.from('profiles').upsert({
       id:                   session.user.id,
       full_name:            form.fullName.trim(),
@@ -138,6 +147,7 @@ export default function Onboarding() {
       goal:                 form.goal,
       dietary_restrictions: dietary,
       medical_conditions:   medical,
+      allergies:            allergies,
       updated_at:           new Date().toISOString(),
     });
 
@@ -302,6 +312,29 @@ export default function Onboarding() {
             </div>
           </div>
 
+          {/* STEP 5: Allergies */}
+          <div className={'onboard-step' + (currentStep === 5 ? ' active' : '')}>
+            <div className="onboard-step-icon">⚠️</div>
+            <h2>Any food allergies?</h2>
+            <p className="sub">BLANE will block meals and ingredients containing these. Skip if none apply.</p>
+            <div className="tag-grid">
+              {allergyList.map((opt) => (
+                <div
+                  key={opt.key}
+                  className={'tag-pill' + (form.allergies.includes(opt.key) ? ' selected' : '')}
+                  onClick={() => toggleTag('allergies', opt.key)}
+                >
+                  {opt.label}
+                </div>
+              ))}
+            </div>
+            <div className="form-group" style={{ marginTop: '18px' }}>
+              <label className="form-label">Other allergy (optional)</label>
+              <input className="form-input" type="text" placeholder="e.g. Shellfish, Peanuts..."
+                value={form.allergiesOther} onChange={(e) => updateField('allergiesOther', e.target.value)} />
+            </div>
+          </div>
+
           {/* NAV BUTTONS */}
           <div className="onboard-nav">
             <button className="btn btn-outline" style={{ visibility: currentStep === 1 ? 'hidden' : 'visible' }} onClick={goBack}>
@@ -321,4 +354,4 @@ export default function Onboarding() {
       </div>
     </>
   );
-}
+} 

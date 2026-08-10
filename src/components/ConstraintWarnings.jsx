@@ -6,7 +6,7 @@
 import { CB_CONSTRAINTS } from '../lib/constraints';
 import '../styles/constraints.css';
 
-export function ConstraintActiveBar({ activeConstraints, filterOn, onToggleFilter }) {
+export function ConstraintActiveBar({ activeConstraints }) {
   if (activeConstraints.length === 0) {
     return (
       <div className="cb-active-bar">
@@ -27,9 +27,6 @@ export function ConstraintActiveBar({ activeConstraints, filterOn, onToggleFilte
           return <span key={key} className={'cb-active-chip ' + c.severity}>{c.icon} {c.label}</span>;
         })}
       </div>
-      <button className={'cb-filter-active-btn' + (filterOn ? '' : ' off')} onClick={onToggleFilter}>
-        {filterOn ? '⚠️ Warnings ON' : '○ Warnings OFF'}
-      </button>
     </div>
   );
 }

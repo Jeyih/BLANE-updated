@@ -34,6 +34,7 @@ const EMPTY_PROFILE = {
   goal: '',
   dietary_restrictions: [],
   medical_conditions: [],
+  allergies: [],
 };
 
 export default function Profile() {
@@ -44,6 +45,7 @@ export default function Profile() {
   const [allGoals, setAllGoals] = useState([]);
   const [dietaryOpts, setDietaryOpts] = useState([]);
   const [medicalOpts, setMedicalOpts] = useState([]);
+  const [allergyOpts, setAllergyOpts] = useState([]);
   const [activeTab, setActiveTab] = useState('basic');
   const [editingBasic, setEditingBasic] = useState(false);
   const [editingHealth, setEditingHealth] = useState(false);
@@ -59,6 +61,7 @@ export default function Profile() {
     goal: '',
     dietary: [],
     medical: [],
+    allergies: [],
   });
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ newPwd: '', confirmPwd: '' });
@@ -93,6 +96,10 @@ export default function Profile() {
         const { data: medical, error: mErr } = await supabase.from('option_lists').select('*').eq('group', 'medical').order('sort_order');
         if (!mErr && mounted && Array.isArray(medical)) setMedicalOpts(medical.filter((item) => item.active !== false));
       } catch (e) { console.warn('load medical failed', e); }
+      try {
+        const { data: allergies, error: aErr } = await supabase.from('constraint_definitions').select('*').eq('severity', 'allergy').order('sort_order');
+        if (!aErr && mounted && Array.isArray(allergies)) setAllergyOpts(allergies.filter((item) => item.active !== false));
+      } catch (e) { console.warn('load allergies failed', e); }
     }
     loadOptions();
     return () => { mounted = false; };
@@ -130,6 +137,7 @@ export default function Profile() {
       goal: nextProfile.goal || '',
       dietary: nextProfile.dietary_restrictions || [],
       medical: nextProfile.medical_conditions || [],
+      allergies: nextProfile.allergies || [],
     });
     setLoading(false);
   }
@@ -249,6 +257,7 @@ export default function Profile() {
       goal: profile.goal || '',
       dietary: profile.dietary_restrictions || [],
       medical: profile.medical_conditions || [],
+      allergies: profile.allergies || [],
     });
     setEditingHealth(true);
   }
@@ -330,6 +339,7 @@ export default function Profile() {
       goal: healthForm.goal,
       dietary_restrictions: healthForm.dietary,
       medical_conditions: healthForm.medical,
+      allergies: healthForm.allergies,
       updated_at: new Date().toISOString(),
     });
 
@@ -345,6 +355,7 @@ export default function Profile() {
       goal: healthForm.goal,
       dietary_restrictions: healthForm.dietary,
       medical_conditions: healthForm.medical,
+      allergies: healthForm.allergies,
     }));
     setEditingHealth(false);
     showToast('✓ Health info saved successfully');
@@ -697,6 +708,29 @@ export default function Profile() {
                     );
                   })}
                   {!editingHealth && (!profile.medical_conditions || profile.medical_conditions.length === 0) && (
+                    <span className="pf-empty-tag">None selected</span>
+                  )}
+                </div>
+
+                <div className="pf-section-divider" />
+
+                <div className="pf-field-label" style={{ marginBottom: 10 }}>Allergies</div>
+                <div className="pf-tag-grid">
+                  {(editingHealth ? allergyOpts : allergyOpts.filter((opt) => (profile.allergies || []).includes(opt.key))).map((opt) => {
+                    const selected = editingHealth ? healthForm.allergies.includes(opt.key) : true;
+                    if (!editingHealth && !selected) return null;
+                    return (
+                      <div
+                        key={opt.key}
+                        className={`pf-tag-pill${selected ? ' selected' : ''}${editingHealth ? '' : ' readonly'}`}
+                        data-value={opt.key}
+                        onClick={editingHealth ? () => toggleHealthTag('allergies', opt.key) : undefined}
+                      >
+                        {opt.label}
+                      </div>
+                    );
+                  })}
+                  {!editingHealth && (!profile.allergies || profile.allergies.length === 0) && (
                     <span className="pf-empty-tag">None selected</span>
                   )}
                 </div>

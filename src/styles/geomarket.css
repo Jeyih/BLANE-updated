@@ -1,0 +1,595 @@
+/* ============================================================
+   BLANE — GeoMarket Ingredient Scanner Stylesheet
+   Standalone: no :root variables, all values literal.
+   All units in px (no rem).
+   ============================================================ */
+
+/* ============================================================
+   SCANNER SECTION WRAPPER
+   ============================================================ */
+.gm-scanner {
+  background: #0d1a12;
+  border: 1px solid rgba(45, 220, 122, 0.15);
+  border-radius: 20px;
+  margin-top: 20px;
+  overflow: hidden;
+  position: relative;
+}
+
+.gm-scanner::before {
+  content: '';
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(45, 220, 122, 0.5), transparent);
+}
+
+/* ---- Scanner header ---- */
+.gm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 0;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.gm-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gm-header-icon {
+  width: 36px;
+  height: 36px;
+  background: rgba(45, 220, 122, 0.12);
+  border: 1px solid rgba(45, 220, 122, 0.2);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.gm-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #e8f5ee;
+}
+
+.gm-sub {
+  font-size: 12px;
+  color: #4d6e5a;
+  margin-top: 1px;
+}
+
+.gm-gps-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 100px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  border: 1px solid rgba(45, 220, 122, 0.2);
+  background: rgba(45, 220, 122, 0.08);
+  color: #2ddc7a;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.gm-gps-badge:hover {
+  background: rgba(45, 220, 122, 0.15);
+}
+
+.gm-gps-badge.locating {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.25);
+  background: rgba(251, 191, 36, 0.08);
+  animation: gm-pulse 1.2s ease infinite;
+}
+
+.gm-gps-badge.located {
+  color: #2ddc7a;
+}
+
+@keyframes gm-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ============================================================
+   TABS
+   ============================================================ */
+.gm-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 16px 24px 0;
+}
+
+.gm-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid rgba(45, 220, 122, 0.12);
+  border-radius: 10px 10px 0 0;
+  padding: 8px 16px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4d6e5a;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom-color: transparent;
+}
+
+.gm-tab:hover {
+  color: #8aab96;
+  background: rgba(45, 220, 122, 0.04);
+}
+
+.gm-tab.active {
+  background: #111f16;
+  color: #2ddc7a;
+  border-color: rgba(45, 220, 122, 0.25);
+  border-bottom-color: #111f16;
+}
+
+/* ============================================================
+   TAB PANELS
+   ============================================================ */
+.gm-tab-body {
+  background: #111f16;
+  border-top: 1px solid rgba(45, 220, 122, 0.12);
+  padding: 22px 24px 24px;
+}
+
+.gm-panel {
+  display: none;
+}
+
+.gm-panel.active {
+  display: block;
+}
+
+/* ============================================================
+   TAB 1 — INGREDIENT SEARCH
+   ============================================================ */
+.gm-search-row {
+  display:flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.gm-search-wrap {
+  position: relative;
+  flex: 1;
+}
+
+.gm-search-icon {
+  position:absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  pointer-events: none;
+  color: #4d6e5a;
+}
+
+.gm-search-input {
+  width: 80%;
+  background: #0d1a12;
+  border: 1px solid rgba(45, 220, 122, 0.15);
+  border-radius: 11px;
+  padding: 10px 14px 10px 38px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  color: #e8f5ee;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.gm-search-input::placeholder {
+  color: #4d6e5a;
+}
+
+.gm-search-input:focus {
+  border-color: #1a8c4e;
+  box-shadow: 0 0 0 3px rgba(45, 220, 122, 0.1);
+}
+
+.gm-search-btn {
+  background: #2ddc7a;
+  border: none;
+  border-radius: 11px;
+  padding: 10px 18px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #060d0a;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.gm-search-btn:hover {
+  background: #a8f5c8;
+}
+
+/* Quick ingredient pills */
+.gm-quick-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.gm-quick-pill {
+  background: #0d1a12;
+  border: 1px solid rgba(45, 220, 122, 0.15);
+  border-radius: 100px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #8aab96;
+  cursor: pointer;
+  transition: all 0.18s;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.gm-quick-pill:hover {
+  border-color: rgba(45, 220, 122, 0.35);
+  color: #2ddc7a;
+  background: rgba(45, 220, 122, 0.06);
+}
+
+/* Search results */
+.gm-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gm-result-market {
+  background: #0d1a12;
+  border: 1px solid rgba(45, 220, 122, 0.1);
+  border-radius: 14px;
+  overflow: hidden;
+  animation: gm-fadein 0.3s ease both;
+}
+
+@keyframes gm-fadein {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.gm-result-market-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(45, 220, 122, 0.03);
+  border-bottom: 1px solid rgba(45, 220, 122, 0.07);
+}
+
+.gm-result-market-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.gm-result-market-name {
+  font-family: 'Syne', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8f5ee;
+  flex: 1;
+}
+
+.gm-result-market-dist {
+  font-size: 12px;
+  color: #4d6e5a;
+}
+
+.gm-result-ing-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(45, 220, 122, 0.05);
+}
+
+.gm-result-ing-row:last-child {
+  border-bottom: none;
+}
+
+.gm-result-ing-name {
+  flex: 1;
+  font-size: 13px;
+  color: #8aab96;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.gm-result-ing-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #2ddc7a;
+  flex-shrink: 0;
+}
+
+.gm-result-ing-price {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fbbf24;
+  min-width: 48px;
+  text-align: right;
+}
+
+.gm-result-ing-status {
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+
+.gm-result-ing-status.avail {
+  background: rgba(45, 220, 122, 0.08);
+  color: #2ddc7a;
+  border: 1px solid rgba(45, 220, 122, 0.18);
+}
+
+.gm-result-ing-status.limited {
+  background: rgba(251, 191, 36, 0.08);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.18);
+}
+
+.gm-result-ing-status.unavail {
+  background: rgba(248, 113, 113, 0.06);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.15);
+}
+
+.gm-no-results {
+  text-align: center;
+  padding: 28px;
+  color: #4d6e5a;
+  font-size: 14px;
+}
+
+/* ============================================================
+   TAB 2 — MEAL PLAN SCAN
+   ============================================================ */
+.gm-scan-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.gm-scan-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #2ddc7a;
+  border: none;
+  border-radius: 11px;
+  padding: 10px 20px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #060d0a;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.gm-scan-btn:hover {
+  background: #a8f5c8;
+  transform: translateY(-1px);
+}
+
+.gm-scan-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.gm-scan-meta {
+  font-size: 13px;
+  color: #4d6e5a;
+}
+
+.gm-scan-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.gm-summary-chip {
+  background: rgba(45, 220, 122, 0.08);
+  border: 1px solid rgba(45, 220, 122, 0.18);
+  border-radius: 100px;
+  color: #2ddc7a;
+  padding: 7px 14px;
+  font-size: 12px;
+}
+
+.gm-summary-chip.limited {
+  background: rgba(251, 191, 36, 0.08);
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.18);
+}
+
+.gm-summary-chip.missing {
+  background: rgba(248, 113, 113, 0.08);
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.18);
+}
+
+.gm-matrix-wrap {
+  overflow-x: auto;
+  border-radius: 14px;
+  margin-bottom: 18px;
+}
+
+.gm-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 620px;
+}
+
+.gm-matrix th,
+.gm-matrix td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(45, 220, 122, 0.08);
+}
+
+.gm-matrix th {
+  background: rgba(45, 220, 122, 0.05);
+  color: #e8f5ee;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+
+.gm-matrix-ing-cell {
+  font-size: 13px;
+  color: #8aab96;
+  min-width: 180px;
+}
+
+.gm-matrix-status-cell {
+  text-align: center;
+}
+
+.gm-matrix-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(45, 220, 122, 0.08);
+  color: #2ddc7a;
+  font-size: 12px;
+}
+
+.gm-matrix-dot.limited {
+  background: rgba(251, 191, 36, 0.08);
+  color: #fbbf24;
+}
+
+.gm-matrix-dot.unavail {
+  background: rgba(248, 113, 113, 0.08);
+  color: #f87171;
+}
+
+.gm-best-market {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(45, 220, 122, 0.08);
+  border: 1px solid rgba(45, 220, 122, 0.16);
+  border-radius: 14px;
+}
+
+.gm-best-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #2ddc7a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #060d0a;
+  font-size: 16px;
+}
+
+.gm-best-text {
+  font-size: 13px;
+  color: #e8f5ee;
+  line-height: 1.4;
+}
+
+/* ============================================================
+   TAB 3 — SUBSTITUTES
+   ============================================================ */
+.gm-sub-intro {
+  font-size: 13px;
+  color: #4d6e5a;
+  margin-bottom: 14px;
+}
+
+.gm-missing-list {
+  display: grid;
+  gap: 12px;
+}
+
+.gm-missing-card {
+  background: #0d1a12;
+  border: 1px solid rgba(251, 191, 36, 0.08);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.gm-missing-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Syne', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8f5ee;
+  margin-bottom: 10px;
+}
+
+.gm-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(45, 220, 122, 0.06);
+}
+
+.gm-sub-row:first-of-type {
+  border-top: none;
+}
+
+.gm-sub-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: rgba(45, 220, 122, 0.1);
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+}
+
+.gm-sub-meta {
+  font-size: 13px;
+  color: #8aab96;
+}
+
+.gm-sub-note {
+  font-size: 12px;
+  color: #4d6e5a;
+}
