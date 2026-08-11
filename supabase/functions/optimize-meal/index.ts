@@ -4,14 +4,7 @@
 // Returns: exact ingredient amounts and macro-adjusted meal plan
 // ============================================================
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY")!;
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-const GEMINI_MODEL = "gemini-2.5-flash-lite";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+import { createClient } from "@supabase/supabase-js";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -19,7 +12,7 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const ACTIVITY_MULT = {
+const ACTIVITY_MULT: Record<string, number> = {
   sedentary: 1.2,
   light: 1.375,
   moderate: 1.55,
@@ -27,7 +20,7 @@ const ACTIVITY_MULT = {
   extra_active: 1.9,
 };
 
-const GOAL_ADJUST = {
+const GOAL_ADJUST: Record<string, number> = {
   lose_weight: 0.85,
   gain_muscle: 1.1,
   maintain: 1.0,
@@ -37,6 +30,7 @@ const GOAL_ADJUST = {
 };
 
 const MACRO_TARGETS = { protein: 0.3, carbs: 0.45, fats: 0.25 };
+const GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash"];
 
 function jsonError(message: string, status = 400) {
   return new Response(JSON.stringify({ error: message }), {
@@ -51,8 +45,10 @@ function computeDailyTargets(profile: any) {
   const age = Number(profile?.age) || 25;
   const sex = profile?.sex || "male";
   const bmr = sex === "male" ? 10 * w + 6.25 * h - 5 * age + 5 : 10 * w + 6.25 * h - 5 * age - 161;
-  const tdee = bmr * (ACTIVITY_MULT[profile?.activity_level] || 1.55);
-  const calTarget = Math.round(tdee * (GOAL_ADJUST[profile?.goal] || 1.0));
+  const actKey = String(profile?.activity_level || "").toLowerCase();
+  const goalKey = String(profile?.goal || "").toLowerCase();
+  const tdee = bmr * (ACTIVITY_MULT[actKey] || 1.55);
+  const calTarget = Math.round(tdee * (GOAL_ADJUST[goalKey] || 1.0));
 
   return {
     calories: calTarget,
@@ -76,14 +72,18 @@ function parseFraction(str: string) {
   return Number(str) || 0;
 }
 
-function formatCup(value: number) {
-  const rounded = Math.round(value * 100) / 100;
+function formatCup(val: number) {
+  const rounded = Math.round(val * 100) / 100;
+  if (rounded >= 0.875) return String(Math.round(rounded));
+  if (rounded >= 0.625) return "¾";
+  if (rounded >= 0.375) return "½";
+  if (rounded >= 0.175) return "¼";
   if (rounded % 1 === 0) return String(rounded);
   return rounded.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 function scaleQtyString(qtyStr: string | undefined, factor: number) {
-  if (!qtyStr || qtyStr === "to taste") return qtyStr;
+  if (!qtyStr || qtyStr === "to taste") return qtyStr || "";
 
   const match = qtyStr.match(/^([\d./½¼¾⅓⅔]+)\s*(.*)/);
   if (!match) return qtyStr;
@@ -112,11 +112,13 @@ function scaleQtyString(qtyStr: string | undefined, factor: number) {
 }
 
 function scaleIngredient(ing: any, factor: number) {
-  const original = ing?.qty || "";
-  const optimized = scaleQtyString(original, factor);
+  const isStr = typeof ing === "string";
+  const name = isStr ? ing : ing?.name || "Ingredient";
+  const original = isStr ? ing : ing?.original || ing?.qty || "";
+  const optimized = ing?.optimized || scaleQtyString(original, factor);
 
   return {
-    name: ing?.name || "Ingredient",
+    name,
     original,
     optimized,
     factor,
@@ -187,18 +189,121 @@ Important rules:
 `;
 }
 
+async function callGemini(apiKey: string, prompt: string) {
+  let lastErrText = "";
+  for (const model of GEMINI_MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 500,
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                scaleFactor: { type: "NUMBER" },
+                reason: { type: "STRING" },
+                daily: {
+                  type: "OBJECT",
+                  properties: {
+                    calories: { type: "INTEGER" },
+                    protein: { type: "INTEGER" },
+                    carbs: { type: "INTEGER" },
+                    fats: { type: "INTEGER" },
+                  },
+                  required: ["calories", "protein", "carbs", "fats"],
+                },
+                original: {
+                  type: "OBJECT",
+                  properties: {
+                    protein: { type: "INTEGER" },
+                    carbs: { type: "INTEGER" },
+                    fats: { type: "INTEGER" },
+                  },
+                  required: ["protein", "carbs", "fats"],
+                },
+                optimized: {
+                  type: "OBJECT",
+                  properties: {
+                    protein: { type: "INTEGER" },
+                    carbs: { type: "INTEGER" },
+                    fats: { type: "INTEGER" },
+                  },
+                  required: ["protein", "carbs", "fats"],
+                },
+                targets: {
+                  type: "OBJECT",
+                  properties: {
+                    protein: { type: "INTEGER" },
+                    carbs: { type: "INTEGER" },
+                    fats: { type: "INTEGER" },
+                    calories: { type: "INTEGER" },
+                  },
+                  required: ["protein", "carbs", "fats", "calories"],
+                },
+                ingredients: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      name: { type: "STRING" },
+                      original: { type: "STRING" },
+                      optimized: { type: "STRING" },
+                      factor: { type: "NUMBER" },
+                      changed: { type: "BOOLEAN" },
+                      increased: { type: "BOOLEAN" },
+                      decreased: { type: "BOOLEAN" },
+                    },
+                    required: ["name", "original", "optimized", "factor", "changed", "increased", "decreased"],
+                  },
+                },
+              },
+              required: ["scaleFactor", "reason", "daily", "original", "optimized", "targets", "ingredients"],
+            },
+          },
+        }),
+      });
+
+      if (res.ok) {
+        return await res.json();
+      }
+      lastErrText = await res.text();
+      console.warn(`Gemini model ${model} returned non-200:`, lastErrText);
+    } catch (e: any) {
+      console.warn(`Gemini model ${model} fetch failed:`, e?.message);
+    }
+  }
+  throw new Error(`AI service unavailable: ${lastErrText || "All models failed"}`);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: CORS_HEADERS });
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return jsonError("Supabase environment configuration missing", 500);
+    }
+    if (!geminiApiKey) {
+      return jsonError("GEMINI_API_KEY secret is not set", 500);
+    }
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return jsonError("Missing authorization header", 401);
     }
 
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
     const jwt = authHeader.replace("Bearer ", "");
     const { data: userData, error: userErr } = await supabase.auth.getUser(jwt);
     if (userErr || !userData?.user) {
@@ -218,89 +323,7 @@ Deno.serve(async (req) => {
     const fallbackScale = Math.max(0.5, Math.min(2.0, perMealKcal / Math.max(originalKcal, 1)));
 
     const prompt = buildPrompt(meal, profile || {}, totalMealsToday);
-
-    const geminiRes = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 500,
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "OBJECT",
-            properties: {
-              scaleFactor: { type: "NUMBER" },
-              reason: { type: "STRING" },
-              daily: {
-                type: "OBJECT",
-                properties: {
-                  calories: { type: "INTEGER" },
-                  protein: { type: "INTEGER" },
-                  carbs: { type: "INTEGER" },
-                  fats: { type: "INTEGER" },
-                },
-                required: ["calories", "protein", "carbs", "fats"],
-              },
-              original: {
-                type: "OBJECT",
-                properties: {
-                  protein: { type: "INTEGER" },
-                  carbs: { type: "INTEGER" },
-                  fats: { type: "INTEGER" },
-                },
-                required: ["protein", "carbs", "fats"],
-              },
-              optimized: {
-                type: "OBJECT",
-                properties: {
-                  protein: { type: "INTEGER" },
-                  carbs: { type: "INTEGER" },
-                  fats: { type: "INTEGER" },
-                },
-                required: ["protein", "carbs", "fats"],
-              },
-              targets: {
-                type: "OBJECT",
-                properties: {
-                  protein: { type: "INTEGER" },
-                  carbs: { type: "INTEGER" },
-                  fats: { type: "INTEGER" },
-                  calories: { type: "INTEGER" },
-                },
-                required: ["protein", "carbs", "fats", "calories"],
-              },
-              ingredients: {
-                type: "ARRAY",
-                items: {
-                  type: "OBJECT",
-                  properties: {
-                    name: { type: "STRING" },
-                    original: { type: "STRING" },
-                    optimized: { type: "STRING" },
-                    factor: { type: "NUMBER" },
-                    changed: { type: "BOOLEAN" },
-                    increased: { type: "BOOLEAN" },
-                    decreased: { type: "BOOLEAN" },
-                  },
-                  required: ["name", "original", "optimized", "factor", "changed", "increased", "decreased"],
-                },
-              },
-            },
-            required: ["scaleFactor", "reason", "daily", "original", "optimized", "targets", "ingredients"],
-          },
-        },
-      }),
-    });
-
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error("Gemini error:", errText);
-      throw new Error("AI service unavailable");
-    }
-
-    const geminiJson = await geminiRes.json();
+    const geminiJson = await callGemini(geminiApiKey, prompt);
     const text = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!text) {
@@ -309,9 +332,13 @@ Deno.serve(async (req) => {
 
     const data = JSON.parse(text);
     const scaleFactor = Math.max(0.5, Math.min(2.0, Number(data.scaleFactor) || fallbackScale));
+    const optimizedKcal = Math.round(originalKcal * scaleFactor);
 
     const normalized = {
       scaleFactor,
+      perMealKcal,
+      originalKcal,
+      optimizedKcal,
       reason: data.reason || "Adjusted to match your meal and macro target.",
       daily: {
         calories: Number(data.daily?.calories) || daily.calories,
@@ -336,7 +363,7 @@ Deno.serve(async (req) => {
         calories: Number(data.targets?.calories) || perMealKcal,
       },
       ingredients: Array.isArray(data.ingredients) && data.ingredients.length
-        ? data.ingredients.map((ing: any) => scaleIngredient({ name: ing.name, qty: ing.original }, Number(ing.factor) || scaleFactor))
+        ? data.ingredients.map((ing: any) => scaleIngredient({ name: ing.name, original: ing.original, optimized: ing.optimized }, Number(ing.factor) || scaleFactor))
         : (meal.ingredients || []).map((ing: any) => scaleIngredient(ing, scaleFactor)),
     };
 
@@ -348,3 +375,4 @@ Deno.serve(async (req) => {
     return jsonError(error?.message || "AI optimization failed", 500);
   }
 });
+

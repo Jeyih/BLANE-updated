@@ -142,24 +142,55 @@ export default function PortionOptimizerPanel({ meal, profile, totalMealsToday, 
   }
 
   return (
-    <div className="opt-panel open">
+    <div className={'opt-panel open' + (aiMode === 'ai' ? ' opt-panel-ai' : '')}>
       <div className="opt-inner">
         <div className="opt-header">
           <div className="opt-header-left">
-            <div className="opt-icon">⚖️</div>
+            <div className={'opt-icon' + (aiMode === 'ai' ? ' ai' : '')}>
+              {aiMode === 'ai' ? (
+                <svg viewBox="0 0 24 24" fill="currentColor" width="17" height="17">
+                  <path d="M12 2.5l1.8 5.2 5.2 1.8-5.2 1.8L12 17.5l-1.8-5.2-5.2-1.8 5.2-1.8L12 2.5z" />
+                </svg>
+              ) : '⚖️'}
+            </div>
             <div>
-              <div className="opt-title">Portion Optimizer — {meal.name}</div>
-              <div className="opt-sub">Adjusted for your calorie &amp; macro targets</div>
+              <div className="opt-title">AI Portion Optimizer — {meal.name}</div>
+              <div className="opt-sub">Powered by Gemini · adjusted for your calorie &amp; macro targets</div>
             </div>
           </div>
           <button className="opt-close-btn" onClick={onClose}>✕ Close</button>
         </div>
 
-        <div className="opt-header-strip">
-          <span className={'opt-mode-badge ' + aiMode}>{aiMode === 'ai' ? '✦ Gemini AI' : '⚙ Smart estimate'}</span>
-          {aiLoading && <span className="opt-loading-text">Calculating your ideal portions…</span>}
+        <div className={'opt-header-strip' + (aiLoading ? ' opt-header-strip-loading' : '')}>
+          <span className={'opt-mode-badge ' + aiMode}>
+            {aiMode === 'ai' ? (
+              <>
+                <svg viewBox="0 0 24 24" fill="currentColor" width="11" height="11" className="opt-mode-badge-spark">
+                  <path d="M12 2.5l1.8 5.2 5.2 1.8-5.2 1.8L12 17.5l-1.8-5.2-5.2-1.8 5.2-1.8L12 2.5z" />
+                </svg>
+                Gemini AI
+              </>
+            ) : '⚙ Local estimate'}
+          </span>
+          {aiLoading && (
+            <span className="opt-loading-text opt-loading-pulse">
+              <span className="opt-loading-dot"></span>
+              <span className="opt-loading-dot"></span>
+              <span className="opt-loading-dot"></span>
+              Gemini is analyzing this meal…
+            </span>
+          )}
           {!aiLoading && aiError && <span className="opt-warning-text">{aiError}</span>}
         </div>
+
+        {aiMode === 'ai' && (result.insight || result.explanation || result.reasoning) && (
+          <div className="opt-ai-insight">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" className="opt-ai-insight-spark">
+              <path d="M12 2.5l1.8 5.2 5.2 1.8-5.2 1.8L12 17.5l-1.8-5.2-5.2-1.8 5.2-1.8L12 2.5z" />
+            </svg>
+            <span>{result.insight || result.explanation || result.reasoning}</span>
+          </div>
+        )}
 
         <div className="opt-target-row">
           <div className="opt-target-chip">
@@ -182,12 +213,6 @@ export default function PortionOptimizerPanel({ meal, profile, totalMealsToday, 
             <div className="opt-target-chip-value green">{result.optimizedKcal} kcal</div>
           </div>
           <span className={'opt-scale-badge ' + scaleClass}>{scaleLabel}</span>
-        </div>
-
-        <div className="opt-macro-compare">
-          <MacroCol icon="🥩" label="Protein" original={result.original.protein} optimized={result.optimized.protein} target={result.targets.protein} color="#2ddc7a" pBar={pBar} />
-          <MacroCol icon="🍚" label="Carbs"   original={result.original.carbs}   optimized={result.optimized.carbs}   target={result.targets.carbs}   color="#60a5fa" pBar={pBar} />
-          <MacroCol icon="🥑" label="Fats"    original={result.original.fats}    optimized={result.optimized.fats}    target={result.targets.fats}    color="#fbbf24" pBar={pBar} />
         </div>
 
         <div className="opt-section-title">Ingredient Portions — Original vs Optimized</div>
@@ -226,23 +251,14 @@ export default function PortionOptimizerPanel({ meal, profile, totalMealsToday, 
           </button>
           <button className="opt-btn opt-btn-outline" onClick={onClose}>Keep Original</button>
           {applied && <span className="opt-applied-badge show">✓ Portions applied to today's plan</span>}
+          {!applied && aiMode === 'ai' && !aiLoading && (
+            <span className="opt-ai-footer-note">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="11" height="11"><path d="M12 2.5l1.8 5.2 5.2 1.8-5.2 1.8L12 17.5l-1.8-5.2-5.2-1.8 5.2-1.8L12 2.5z" /></svg>
+              Optimized with Gemini AI
+            </span>
+          )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function MacroCol({ icon, label, original, optimized, target, color, pBar }) {
-  return (
-    <div className="opt-macro-col">
-      <div className="opt-macro-col-label"><span>{icon}</span> {label}</div>
-      <div className="opt-macro-val-row">
-        <span className="opt-macro-original">{original}g</span>
-        <span className="opt-macro-optimized" style={{ color }}>{optimized}</span>
-        <span className="opt-macro-unit">g</span>
-      </div>
-      <div className="opt-macro-bar-bg"><div className="opt-macro-bar-fill" style={{ width: pBar(optimized, target) + '%', background: color }}></div></div>
-      <div className="opt-macro-target-label">Target: {target}g</div>
     </div>
   );
 }
