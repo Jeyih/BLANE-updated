@@ -124,6 +124,45 @@
   white-space: nowrap;
 }
 
+.po-ai-suggest-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 24px 18px;
+  padding: 14px 16px;
+  background: rgba(96, 165, 250, 0.06);
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  border-radius: 14px;
+}
+
+.po-ai-suggest-row > div:first-child { flex: 1; }
+.po-ai-suggest-title { color: #dbeafe; font-size: 13px; font-weight: 700; }
+.po-ai-suggest-sub { color: #6f8b9e; font-size: 11px; margin-top: 3px; }
+.po-ai-suggest-row select {
+  background: #111f16;
+  border: 1px solid rgba(96, 165, 250, 0.25);
+  border-radius: 9px;
+  color: #dbeafe;
+  padding: 9px 10px;
+  font: inherit;
+}
+.po-ai-suggest-row button:disabled { opacity: 0.6; cursor: wait; }
+.po-ai-suggest-error { margin: -8px 24px 18px; color: #fca5a5; font-size: 12px; }
+.po-ai-suggestion { margin: 0 24px 18px; padding: 16px; background: #13241a; border: 1px solid rgba(45, 220, 122, 0.25); border-radius: 14px; }
+.po-ai-suggestion-heading { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.po-ai-suggestion-heading strong { display: block; color: #e8f5ee; font-family: 'Syne', sans-serif; font-size: 16px; }
+.po-ai-suggestion-heading span:not(.po-ai-source) { display: block; color: #8aab96; font-size: 12px; margin-top: 4px; }
+.po-ai-source { color: #2ddc7a; font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; white-space: nowrap; }
+.po-ai-suggestion p { color: #b8d1c0; font-size: 12px; line-height: 1.5; margin: 12px 0 8px; }
+.po-ai-macros { color: #fbbf24; font-size: 12px; }
+.po-ai-ingredients { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.po-ai-ingredients span { background: rgba(45, 220, 122, 0.08); border: 1px solid rgba(45, 220, 122, 0.15); border-radius: 7px; color: #c8e4d0; font-size: 11px; padding: 5px 8px; }
+
+@media (max-width: 640px) {
+  .po-ai-suggest-row { align-items: stretch; flex-direction: column; }
+  .po-ai-suggest-row select, .po-ai-suggest-row button { width: 100%; }
+}
+
 /* Per-meal derived budget */
 .po-per-meal-chip {
   display: inline-flex;

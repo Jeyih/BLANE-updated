@@ -11,6 +11,24 @@ import { supabase } from './supabase';
 // Constraint definitions are now managed by the Admin panel and stored
 // in the database. Keep an empty placeholder so code reads gracefully.
 export const CB_CONSTRAINTS = {};
+const normalized = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+function asList(value) {
+  if (Array.isArray(value)) return value.flatMap((item) => asList(item));
+  if (typeof value !== 'string' || !value.trim()) return [];
+
+  const text = value.trim();
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed.flatMap((item) => asList(item));
+  } catch {}
+
+  const postgresArray = text.match(/^\{(.*)\}$/s);
+  const items = postgresArray ? postgresArray[1].split(',') : text.split(',');
+  return items
+    .map((item) => item.trim().replace(/^['"]|['"]$/g, ''))
+    .filter(Boolean);
+}
 
 export async function loadConstraintDefinitions() {
   const { data, error } = await supabase
@@ -23,52 +41,62 @@ export async function loadConstraintDefinitions() {
     return false;
   }
 
+  const definitions = {};
   Object.keys(CB_CONSTRAINTS).forEach((key) => delete CB_CONSTRAINTS[key]);
 
   (data || []).forEach((row) => {
     if (row.active === false || !row.key) return;
-    CB_CONSTRAINTS[row.key] = {
+    definitions[row.key] = {
       label: row.label || row.key,
       severity: row.severity || 'dietary',
       icon: row.icon || '⚠️',
       reason: row.reason || 'Contains ingredients that may conflict with your preferences or medical profile.',
-      blocked: Array.isArray(row.blocked)
-        ? row.blocked.map((item) => item.trim()).filter(Boolean)
-        : typeof row.blocked === 'string'
-          ? row.blocked.split(',').map((item) => item.trim()).filter(Boolean)
-          : [],
-      warnHighCarb: !!row.warn_high_carb,
-      carbThreshold: row.carb_threshold || 0,
-      warnHighFat: !!row.warn_high_fat,
-      fatThreshold: row.fat_threshold || 0,
-      warnHighProtein: !!row.warn_high_protein,
-      proteinThreshold: row.protein_threshold || 0,
+      blocked: asList(row.blocked),
     };
   });
 
-  return true;
+  Object.assign(CB_CONSTRAINTS, definitions);
+  return definitions;
 }
 
-export function getActiveConstraints(profile) {
-  const dietary = profile?.dietary_restrictions || [];
-  const medical = profile?.medical_conditions || [];
-  const allergies = profile?.allergies || [];
-  return [...dietary, ...medical, ...allergies].filter((key) => CB_CONSTRAINTS[key] !== undefined);
+export function getActiveConstraints(profile, definitions = CB_CONSTRAINTS) {
+  const dietary = asList(profile?.dietary_restrictions);
+  const medical = asList(profile?.medical_conditions);
+  const allergies = asList(profile?.allergies);
+  const definitionEntries = Object.entries(definitions);
+
+  return [...dietary, ...medical, ...allergies]
+    .map((value) => {
+      const selected = normalized(typeof value === 'object' ? value.key || value.label : value);
+      const match = definitionEntries.find(([key, definition]) =>
+        normalized(key) === selected || normalized(definition.label) === selected
+      );
+      return match?.[0];
+    })
+    .filter((key, index, values) => key && values.indexOf(key) === index);
 }
 
-export function checkRecipeViolations(recipe, activeConstraints, filterOn = true) {
+export function checkRecipeViolations(recipe, activeConstraints, filterOn = true, definitions = CB_CONSTRAINTS) {
   if (!filterOn || activeConstraints.length === 0) return [];
 
   const violations = [];
 
   activeConstraints.forEach((key) => {
-    const constraint = CB_CONSTRAINTS[key];
+    const constraint = definitions[key];
     if (!constraint) return;
 
-    recipe.ingredients.forEach((ing) => {
-      const ingName = ing.name.toLowerCase();
+    (recipe.ingredients || []).forEach((ing) => {
+      const ingName = normalized([
+        ing?.name,
+        ing?.ingredient_name,
+        ing?.food_name,
+      ].filter(Boolean).join(' '));
+      if (!ingName) return;
       const isBlocked = constraint.blocked.some(
-        (blocked) => ingName.includes(blocked.toLowerCase()) || blocked.toLowerCase().includes(ingName.split(' ')[0])
+        (blocked) => {
+          const blockedName = normalized(blocked);
+          return blockedName && (ingName.includes(blockedName) || blockedName.includes(ingName));
+        }
       );
       if (isBlocked) {
         const exists = violations.some((v) => v.ingredient === ing.name && v.constraintKey === key);

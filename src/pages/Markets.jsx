@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
 import '../styles/markets.css';
-import '../styles/geomarket.css';
 import 'leaflet/dist/leaflet.css';
 
 const FILTERS = ['All', 'Palengke', 'Supermarket', 'Talipapa', 'Grocery'];
@@ -289,8 +288,8 @@ export default function Markets() {
         <div className="mk-content">
           <div className="mk-page-header">
             <div>
-              <h1 className="mk-page-title">Nearby Markets</h1>
-              <p className="mk-page-sub">GeoMarket Ingredient Scanner — Tarlac City, Central Luzon</p>
+              <h1 className="mk-page-title">GeoMarket Scanner</h1>
+              <p className="mk-page-sub">Find local markets and ingredients — Tarlac City, Central Luzon</p>
             </div>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <span className="mk-live-badge">● Live data</span>
@@ -490,9 +489,6 @@ export default function Markets() {
             </div>
           </div>
 
-          <div className="mk-aux-panels">
-            <GeoMarketScanner markets={markets} userCoords={userCoords} onLocate={locateUser} />
-          </div>
         </div>
       </main>
     </>

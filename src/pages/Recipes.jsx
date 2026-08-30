@@ -14,7 +14,7 @@ import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
 import { scoreRecipe } from '../lib/seasonal';
 import { SeasonBadge, IngSeasonTag, SeasonalAltBanner, CurrentSeasonPill } from '../components/SeasonalBadges';
-import { getActiveConstraints, checkRecipeViolations } from '../lib/constraints';
+import { loadConstraintDefinitions, getActiveConstraints, checkRecipeViolations } from '../lib/constraints';
 import { ConstraintActiveBar, ViolationBadge, ViolationDetail } from '../components/ConstraintWarnings';
 import '../styles/recipes.css';
 
@@ -29,6 +29,10 @@ export default function Recipes() {
   const [profile, setProfile]   = useState(null);
   const [recipes, setRecipes]   = useState([]);
   const [loading, setLoading]   = useState(true);
+  const [constraintsReady, setConstraintsReady] = useState(false);
+    const [constraintDefinitions, setConstraintDefinitions] = useState({});
+  const [constraintError, setConstraintError] = useState('');
+  const [ingredientError, setIngredientError] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [dietFilter, setDietFilter] = useState('');
   const [search, setSearch]     = useState('');
@@ -39,6 +43,13 @@ export default function Recipes() {
   async function loadAll() {
     if (!user) return;
     setLoading(true);
+    setConstraintsReady(false);
+    setConstraintError('');
+    setIngredientError('');
+    const definitionsLoaded = await loadConstraintDefinitions();
+    if (!definitionsLoaded) setConstraintError('Constraint rules could not be loaded. Recipes cannot be checked safely.');
+    else setConstraintDefinitions(definitionsLoaded);
+    setConstraintsReady(true);
 
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
     setProfile(profileData);
@@ -51,10 +62,21 @@ export default function Recipes() {
       supabase.from('recipe_steps').select('*').order('step_order'),
     ]);
 
+    if (ingRes.error) {
+      console.error(ingRes.error.message);
+      setIngredientError('Recipe ingredients could not be loaded. Recipes cannot be checked safely.');
+    }
+
     const ingByRecipe = {};
     (ingRes.data || []).forEach((ing) => {
       if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
-      ingByRecipe[ing.recipe_id].push({ name: ing.name, qty: ing.qty, status: ing.status });
+      ingByRecipe[ing.recipe_id].push({
+        name: ing.name || ing.ingredient_name || ing.food_name,
+        ingredient_name: ing.ingredient_name,
+        food_name: ing.food_name,
+        qty: ing.qty || ing.grams,
+        status: ing.status,
+      });
     });
 
     const stepsByRecipe = {};
@@ -74,11 +96,9 @@ export default function Recipes() {
     setLoading(false);
   }
 
-  const activeConstraints = getActiveConstraints(profile);
+  const activeConstraints = getActiveConstraints(profile, constraintDefinitions);
 
-  const hasActiveSelection = Boolean(typeFilter || dietFilter || search.trim());
-  const filtered = hasActiveSelection
-    ? recipes.filter((r) => {
+  const filtered = recipes.filter((r) => {
         const matchType = !typeFilter || r.type === typeFilter;
         const dietKey = dietFilter ? dietFilter.toLowerCase().replace('-', '_').replace(' ', '_') : '';
         const matchDiet = !dietFilter || r.diet.includes(dietKey);
@@ -86,8 +106,7 @@ export default function Recipes() {
         const matchSearch = !q || r.name.toLowerCase().includes(q) || r.type.toLowerCase().includes(q) ||
           r.ingredients.some((i) => i.name.toLowerCase().includes(q));
         return matchType && matchDiet && matchSearch;
-      })
-    : [];
+      });
 
   const openRecipe = recipes.find((r) => r.id === openRecipeId);
 
@@ -109,6 +128,11 @@ export default function Recipes() {
           </div>
 
           <ConstraintActiveBar activeConstraints={activeConstraints} />
+          {(constraintError || ingredientError) && (
+            <div className="rp-empty-state">
+              <p className="rp-empty-text">{constraintError || ingredientError}</p>
+            </div>
+          )}
 
           <div className="rp-toolbar">
             <div className="rp-search-wrap">
@@ -145,9 +169,10 @@ export default function Recipes() {
           </div>
 
           <div className="rp-grid">
-            {loading ? (
+            {loading || !constraintsReady ? (
               <div className="rp-empty-state"><p className="rp-empty-text">Loading recipes…</p></div>
-            ) : filtered.length === 0 ? (
+            ) : constraintError || ingredientError ? null
+            : filtered.length === 0 ? (
               <div className="rp-empty-state">
                 <span className="rp-empty-icon">🔍</span>
                 <p className="rp-empty-text">No recipes match your search or filters.<br />Try adjusting the filters above.</p>
@@ -158,6 +183,7 @@ export default function Recipes() {
                   key={recipe.id}
                   recipe={recipe}
                   activeConstraints={activeConstraints}
+                  constraintDefinitions={constraintDefinitions}
                   onClick={() => setOpenRecipeId(recipe.id)}
                 />
               ))
@@ -171,6 +197,7 @@ export default function Recipes() {
         <RecipeModal
           recipe={openRecipe}
           activeConstraints={activeConstraints}
+          constraintDefinitions={constraintDefinitions}
           onClose={() => setOpenRecipeId(null)}
           onAddToMealPlan={() => { setOpenRecipeId(null); navigate('/mealplan'); }}
         />
@@ -179,9 +206,9 @@ export default function Recipes() {
   );
 }
 
-function RecipeCard({ recipe, activeConstraints, onClick }) {
+function RecipeCard({ recipe, activeConstraints, constraintDefinitions, onClick }) {
   const seasonScore = scoreRecipe(recipe.ingredients);
-  const violations = checkRecipeViolations(recipe, activeConstraints);
+  const violations = checkRecipeViolations(recipe, activeConstraints, true, constraintDefinitions);
   const bannerGlow = seasonScore.cssClass === 'in-season' ? ' in-season-glow' : '';
   const stripeClass = violations.some((v) => v.severity === 'allergy') ? ' violation-stripe' : '';
   const hasViolation = violations.length > 0;
@@ -216,9 +243,9 @@ function RecipeCard({ recipe, activeConstraints, onClick }) {
   );
 }
 
-function RecipeModal({ recipe, activeConstraints, onClose, onAddToMealPlan }) {
+function RecipeModal({ recipe, activeConstraints, constraintDefinitions, onClose, onAddToMealPlan }) {
   const macroMax = Math.max(recipe.protein, recipe.carbs, recipe.fats);
-  const violations = checkRecipeViolations(recipe, activeConstraints);
+  const violations = checkRecipeViolations(recipe, activeConstraints, true, constraintDefinitions);
   const dc = DIFF_COLORS[recipe.difficulty] || '#2ddc7a';
 
   useEffect(() => {

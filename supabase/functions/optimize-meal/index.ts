@@ -189,7 +189,53 @@ Important rules:
 `;
 }
 
-async function callGemini(apiKey: string, prompt: string) {
+function buildSuggestionPrompt(profile: any, budget: number, mealType: string, fnriFoods: any[], constraints: any[]) {
+  const daily = computeDailyTargets(profile);
+  const conditionList = [
+    ...(profile?.dietary_restrictions || []),
+    ...(profile?.medical_conditions || []),
+    ...(profile?.allergies || []),
+  ];
+
+  return `
+You are BLANE AI, a Filipino nutrition assistant. Suggest one affordable ${mealType || 'meal'} using ONLY foods from the FNRI food reference below.
+
+User profile:
+- goal: ${profile?.goal || 'maintain'}
+- dietary restrictions: ${JSON.stringify(conditionList)}
+- medical conditions: ${JSON.stringify(profile?.medical_conditions || [])}
+- daily calorie target: ${daily.calories} kcal
+- budget for this meal: PHP ${Math.max(0, Number(budget) || 0)}
+
+Constraint guidance from BLANE:
+${JSON.stringify(constraints)}
+
+FNRI foods (nutrition values are per 100g; use these names and values as the source of truth):
+${JSON.stringify(fnriFoods)}
+
+Return ONLY valid JSON:
+{
+  "name": string,
+  "reason": string,
+  "estimatedCost": number,
+  "kcal": number,
+  "protein": number,
+  "carbs": number,
+  "fats": number,
+  "ingredients": [{ "name": string, "quantity": string, "fct_id": string }],
+  "fnriBasis": [{ "name": string, "fct_id": string, "energy_kcal": number, "protein_g": number, "available_carbohydrate_g": number, "total_fat_g": number }]
+}
+
+Rules:
+1. Prefer foods that fit the budget and the user's conditions; explain tradeoffs briefly.
+2. Use the constraint guidance as health guidance, but do not claim to diagnose or treat disease.
+3. Do not invent FNRI food names or fct_id values. Every ingredient must appear in the FNRI list.
+4. Keep estimatedCost at or below the budget when possible and use realistic Filipino portions.
+5. Return a practical meal, not a list of raw foods.
+`;
+}
+
+async function callGemini(apiKey: string, prompt: string, responseSchema?: any) {
   let lastErrText = "";
   for (const model of GEMINI_MODELS) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -203,7 +249,7 @@ async function callGemini(apiKey: string, prompt: string) {
             temperature: 0.2,
             maxOutputTokens: 500,
             responseMimeType: "application/json",
-            responseSchema: {
+            responseSchema: responseSchema || {
               type: "OBJECT",
               properties: {
                 scaleFactor: { type: "NUMBER" },
@@ -281,6 +327,47 @@ async function callGemini(apiKey: string, prompt: string) {
   throw new Error(`AI service unavailable: ${lastErrText || "All models failed"}`);
 }
 
+const SUGGESTION_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    name: { type: "STRING" },
+    reason: { type: "STRING" },
+    estimatedCost: { type: "NUMBER" },
+    kcal: { type: "INTEGER" },
+    protein: { type: "INTEGER" },
+    carbs: { type: "INTEGER" },
+    fats: { type: "INTEGER" },
+    ingredients: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          name: { type: "STRING" },
+          quantity: { type: "STRING" },
+          fct_id: { type: "STRING" },
+        },
+        required: ["name", "quantity", "fct_id"],
+      },
+    },
+    fnriBasis: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          name: { type: "STRING" },
+          fct_id: { type: "STRING" },
+          energy_kcal: { type: "NUMBER" },
+          protein_g: { type: "NUMBER" },
+          available_carbohydrate_g: { type: "NUMBER" },
+          total_fat_g: { type: "NUMBER" },
+        },
+        required: ["name", "fct_id"],
+      },
+    },
+  },
+  required: ["name", "reason", "estimatedCost", "kcal", "protein", "carbs", "fats", "ingredients", "fnriBasis"],
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -311,18 +398,54 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { meal, profile, totalMealsToday = 3 } = body;
+    const { mode = "optimize", meal, profile, totalMealsToday = 3, budget = 200, mealType = "Lunch" } = body;
+
+    const { data: storedProfile } = await supabase
+      .from("profiles")
+      .select("goal, dietary_restrictions, medical_conditions, allergies, height_cm, weight_kg, age, sex, activity_level")
+      .eq("id", userData.user.id)
+      .maybeSingle();
+    const userProfile = storedProfile || profile || {};
+
+    if (mode === "suggest") {
+      const [{ data: fnriFoods, error: fnriError }, { data: constraints, error: constraintsError }] = await Promise.all([
+        supabase
+          .from("fnri_food_composition")
+          .select("fct_id, food_name, alternate_name, base_weight_g, energy_kcal, protein_g, total_fat_g, available_carbohydrate_g, dietary_fiber_g")
+          .order("food_name")
+          .limit(200),
+        supabase
+          .from("constraint_definitions")
+          .select("key, label, reason, blocked")
+          .eq("active", true),
+      ]);
+
+      if (fnriError) return jsonError("FNRI food data is unavailable", 503);
+      if (constraintsError) return jsonError("Health constraint data is unavailable", 503);
+
+      const prompt = buildSuggestionPrompt(userProfile, budget, mealType, fnriFoods || [], constraints || []);
+      const geminiJson = await callGemini(geminiApiKey, prompt, SUGGESTION_SCHEMA);
+      const text = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error("AI returned no meal suggestion");
+
+      return new Response(JSON.stringify({
+        ...JSON.parse(text),
+        source: "DOST-FNRI",
+        budget: Number(budget) || 0,
+        mealType,
+      }), { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+    }
 
     if (!meal || !meal.name) {
       return jsonError("Missing meal data", 400);
     }
 
-    const daily = computeDailyTargets(profile || {});
+    const daily = computeDailyTargets(userProfile);
     const perMealKcal = Math.round(daily.calories / totalMealsToday);
     const originalKcal = Number(meal.kcal) || 0;
     const fallbackScale = Math.max(0.5, Math.min(2.0, perMealKcal / Math.max(originalKcal, 1)));
 
-    const prompt = buildPrompt(meal, profile || {}, totalMealsToday);
+    const prompt = buildPrompt(meal, userProfile, totalMealsToday);
     const geminiJson = await callGemini(geminiApiKey, prompt);
     const text = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text;
 

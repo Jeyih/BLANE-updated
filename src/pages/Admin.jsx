@@ -42,6 +42,7 @@ const OPTION_GROUPS = [
   { key: 'goals', label: 'Goals' },
   { key: 'dietary', label: 'Dietary' },
   { key: 'medical', label: 'Medical' },
+  { key: 'allergy', label: 'Allergy' },
 ];
 
 const SEASONS = [
@@ -99,7 +100,6 @@ const EMPTY_FNRI = {
   protein_g: '',
   total_fat_g: '',
   available_carbohydrate_g: '',
-  dietary_fiber_g: '',
 };
 
 export default function Admin() {
@@ -147,8 +147,7 @@ export default function Admin() {
   const [constraintModalMode, setConstraintModalMode] = useState('add');
   const [constraintForm, setConstraintForm] = useState({
     id: '', key: '', label: '', severity: 'dietary', reason: '', blocked: '',
-    warn_high_carb: false, carb_threshold: 0, warn_high_fat: false, fat_threshold: 0,
-    warn_high_protein: false, protein_threshold: 0, sort_order: 0, active: true,
+    sort_order: 0, active: true,
   });
 
   const [seasonRecords, setSeasonRecords] = useState([]);
@@ -299,7 +298,7 @@ export default function Admin() {
   }
 
   async function loadFnri() {
-    const { data, error } = await supabase.from('fnri_food_composition').select('*').order('food_name').limit(200);
+    const { data, error } = await supabase.from('fnri_food_composition').select('*').order('food_name');
     if (error) {
       showToast('Error loading FNRI items: ' + error.message, true);
       return;
@@ -314,7 +313,34 @@ export default function Admin() {
       setOptionLists([]);
       return;
     }
-    setOptionLists(data || []);
+
+    const optionRows = data || [];
+    let goalRows = optionRows.filter((row) => row.group === 'goals');
+
+    try {
+      const { data: goalIdealsData, error: goalIdealsError } = await supabase.from('goal_ideals').select('*').order('goal_key');
+      if (!goalIdealsError && goalIdealsData) {
+        const goalMap = new Map(goalRows.map((row) => [row.key, row]));
+        const missingGoalRows = (goalIdealsData || [])
+          .filter((row) => row.goal_key && !goalMap.has(row.goal_key))
+          .map((row) => ({
+            id: row.id,
+            group: 'goals',
+            key: row.goal_key,
+            label: GOAL_OPTIONS.find((opt) => opt.value === row.goal_key)?.label || row.goal_key,
+            description: '',
+            sort_order: 0,
+            active: true,
+          }));
+
+        goalRows = [...goalRows, ...missingGoalRows];
+      }
+    } catch (syncErr) {
+      console.warn('Goal option sync warning:', syncErr);
+    }
+
+    const merged = [...optionRows.filter((row) => row.group !== 'goals'), ...goalRows];
+    setOptionLists(merged);
   }
 
   async function loadConstraintDefs() {
@@ -413,6 +439,30 @@ export default function Admin() {
       return;
     }
 
+    if (optionForm.group === 'goals') {
+      const { data: existingGoal } = await supabase
+        .from('goal_ideals')
+        .select('*')
+        .eq('goal_key', payload.key)
+        .maybeSingle();
+
+      const goalIdealPayload = {
+        id: existingGoal?.id || crypto.randomUUID?.() || 'goal-' + Date.now(),
+        goal_key: payload.key,
+        min_protein: existingGoal?.min_protein ?? 0,
+        max_kcal: existingGoal?.max_kcal ?? 9999,
+        max_fats: existingGoal?.max_fats ?? 9999,
+        min_carbs: existingGoal?.min_carbs ?? 0,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error: goalError } = await supabase.from('goal_ideals').upsert(goalIdealPayload, { onConflict: 'goal_key' });
+      if (goalError) {
+        showToast('Option saved, but goal ideal sync failed: ' + goalError.message, true);
+        return;
+      }
+    }
+
     showToast('✓ Option saved successfully');
     closeOptionModal();
     await loadOptionLists();
@@ -435,8 +485,7 @@ export default function Admin() {
       setConstraintModalMode('add');
       setConstraintForm({
         id: '', key: '', label: '', severity: 'dietary', reason: '', blocked: '',
-        warn_high_carb: false, carb_threshold: 0, warn_high_fat: false, fat_threshold: 0,
-        warn_high_protein: false, protein_threshold: 0, sort_order: 0, active: true,
+        sort_order: 0, active: true,
       });
       setConstraintModalOpen(true);
       return;
@@ -450,12 +499,6 @@ export default function Admin() {
       severity: item.severity || 'dietary',
       reason: item.reason || '',
       blocked: Array.isArray(item.blocked) ? item.blocked.join(', ') : item.blocked || '',
-      warn_high_carb: item.warn_high_carb || false,
-      carb_threshold: item.carb_threshold || 0,
-      warn_high_fat: item.warn_high_fat || false,
-      fat_threshold: item.fat_threshold || 0,
-      warn_high_protein: item.warn_high_protein || false,
-      protein_threshold: item.protein_threshold || 0,
       sort_order: item.sort_order ?? 0,
       active: item.active ?? true,
     });
@@ -482,12 +525,6 @@ export default function Admin() {
       blocked: constraintForm.blocked
         ? constraintForm.blocked.split(',').map((s) => s.trim()).filter(Boolean)
         : [],
-      warn_high_carb: (parseInt(constraintForm.carb_threshold, 10) || 0) > 0,
-      carb_threshold: parseInt(constraintForm.carb_threshold, 10) || 0,
-      warn_high_fat: (parseInt(constraintForm.fat_threshold, 10) || 0) > 0,
-      fat_threshold: parseInt(constraintForm.fat_threshold, 10) || 0,
-      warn_high_protein: (parseInt(constraintForm.protein_threshold, 10) || 0) > 0,
-      protein_threshold: parseInt(constraintForm.protein_threshold, 10) || 0,
       sort_order: parseInt(constraintForm.sort_order, 10) || 0,
       active: !!constraintForm.active,
     };
@@ -502,18 +539,62 @@ export default function Admin() {
     setConstraintModalOpen(false);
     await loadConstraintDefs();
     await loadConstraintDefinitions();
+
+    // Auto-sync: upsert a matching onboarding option so the constraint
+    // appears in the Onboarding Options tab (dietary / allergy / medical).
+    const syncGroup = payload.severity; // 'dietary' | 'allergy' | 'medical'
+    if (['dietary', 'allergy', 'medical'].includes(syncGroup)) {
+      // Find existing option with same key+group to preserve its id
+      const { data: existing } = await supabase
+        .from('option_lists')
+        .select('id')
+        .eq('key', payload.key)
+        .eq('group', syncGroup)
+        .maybeSingle();
+
+      const optionId = existing?.id || crypto.randomUUID?.() || 'opt-' + Date.now();
+      const { error: syncError } = await supabase.from('option_lists').upsert({
+        id: optionId,
+        group: syncGroup,
+        key: payload.key,
+        label: payload.label,
+        description: payload.reason || '',
+        sort_order: payload.sort_order,
+        active: payload.active,
+      }, { onConflict: 'id' });
+
+      if (syncError) {
+        showToast('Constraint saved but failed to sync onboarding option: ' + syncError.message, true);
+      }
+      await loadOptionLists();
+    }
   }
 
   async function deleteConstraint(id) {
     if (!window.confirm('Delete this constraint definition? This cannot be undone.')) return;
+
+    // Look up the constraint before deleting so we can sync the option_lists removal
+    const item = constraintDefs.find((row) => row.id === id);
+
     const { error } = await supabase.from('constraint_definitions').delete().eq('id', id);
     if (error) {
       showToast('Error deleting constraint: ' + error.message, true);
       return;
     }
+
+    // Auto-sync: also remove the matching onboarding option
+    if (item && ['dietary', 'allergy', 'medical'].includes(item.severity)) {
+      await supabase
+        .from('option_lists')
+        .delete()
+        .eq('key', item.key)
+        .eq('group', item.severity);
+    }
+
     showToast('✓ Constraint deleted');
     await loadConstraintDefs();
     await loadConstraintDefinitions();
+    await loadOptionLists();
   }
 
   function openSeasonModal(id) {
@@ -983,7 +1064,6 @@ export default function Admin() {
       protein_g: item.protein_g?.toString() || '',
       total_fat_g: item.total_fat_g?.toString() || '',
       available_carbohydrate_g: item.available_carbohydrate_g?.toString() || '',
-      dietary_fiber_g: item.dietary_fiber_g?.toString() || '',
     });
     setFnriModalOpen(true);
   }
@@ -1002,7 +1082,6 @@ export default function Admin() {
       protein_g: fnriForm.protein_g ? parseFloat(fnriForm.protein_g) : null,
       total_fat_g: fnriForm.total_fat_g ? parseFloat(fnriForm.total_fat_g) : null,
       available_carbohydrate_g: fnriForm.available_carbohydrate_g ? parseFloat(fnriForm.available_carbohydrate_g) : null,
-      dietary_fiber_g: fnriForm.dietary_fiber_g ? parseFloat(fnriForm.dietary_fiber_g) : null,
     };
 
     const { error } = await supabase.from('fnri_food_composition').upsert(payload, { onConflict: 'fct_id' });
@@ -1371,14 +1450,13 @@ export default function Admin() {
                     <th>Label</th>
                     <th>Severity</th>
                     <th>Blocked</th>
-                    <th>Warning Rules</th>
                     <th>Active</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredConstraintDefs.length === 0 ? (
-                    <tr className="ad-empty-row"><td colSpan="7">No constraint definitions found.</td></tr>
+                    <tr className="ad-empty-row"><td colSpan="6">No constraint definitions found.</td></tr>
                   ) : (
                     filteredConstraintDefs.map((item) => (
                       <tr key={item.id}>
@@ -1386,7 +1464,6 @@ export default function Admin() {
                         <td>{item.label}</td>
                         <td>{item.severity}</td>
                         <td>{Array.isArray(item.blocked) ? item.blocked.join(', ') : item.blocked}</td>
-                        <td>{item.warn_high_carb ? `High carb > ${item.carb_threshold}` : ''}{item.warn_high_fat ? ` ${item.warn_high_fat ? `High fat > ${item.fat_threshold}` : ''}` : ''}{item.warn_high_protein ? ` ${item.warn_high_protein ? `High protein > ${item.protein_threshold}` : ''}` : ''}</td>
                         <td>
                           <span className={`ad-status-pill ${item.active ? 'open' : 'closed'}`}>
                             {item.active ? 'Yes' : 'No'}
@@ -1784,13 +1861,9 @@ export default function Admin() {
               <label className="ad-field-label">Total Fat (g)</label>
               <input className="ad-input" type="number" value={fnriForm.total_fat_g} onChange={(e) => setFnriForm((prev) => ({ ...prev, total_fat_g: e.target.value }))} placeholder="0.2" />
             </div>
-            <div className="ad-field">
+            <div className="ad-field ad-field-full">
               <label className="ad-field-label">Available Carbs (g)</label>
               <input className="ad-input" type="number" value={fnriForm.available_carbohydrate_g} onChange={(e) => setFnriForm((prev) => ({ ...prev, available_carbohydrate_g: e.target.value }))} placeholder="28.7" />
-            </div>
-            <div className="ad-field ad-field-full">
-              <label className="ad-field-label">Dietary Fiber (g)</label>
-              <input className="ad-input" type="number" value={fnriForm.dietary_fiber_g} onChange={(e) => setFnriForm((prev) => ({ ...prev, dietary_fiber_g: e.target.value }))} placeholder="0.4" />
             </div>
           </div>
           <div className="ad-modal-actions">
@@ -1870,18 +1943,6 @@ export default function Admin() {
             <div className="ad-field ad-field-full">
               <label className="ad-field-label">Reason</label>
               <input className="ad-input" value={constraintForm.reason} onChange={(e) => handleConstraintFormChange('reason', e.target.value)} placeholder="Why this constraint applies" />
-            </div>
-            <div className="ad-field">
-              <label className="ad-field-label">Warn if carbs above</label>
-              <input className="ad-input" type="number" value={constraintForm.carb_threshold} onChange={(e) => handleConstraintFormChange('carb_threshold', e.target.value)} placeholder="0" />
-            </div>
-            <div className="ad-field">
-              <label className="ad-field-label">Warn if fats above</label>
-              <input className="ad-input" type="number" value={constraintForm.fat_threshold} onChange={(e) => handleConstraintFormChange('fat_threshold', e.target.value)} placeholder="0" />
-            </div>
-            <div className="ad-field">
-              <label className="ad-field-label">Warn if protein above</label>
-              <input className="ad-input" type="number" value={constraintForm.protein_threshold} onChange={(e) => handleConstraintFormChange('protein_threshold', e.target.value)} placeholder="0" />
             </div>
             <div className="ad-field">
               <label className="ad-field-label">Sort Order</label>
