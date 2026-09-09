@@ -32,7 +32,10 @@ export function AuthProvider({ children }) {
     });
 
     /* Keep session in sync on login/logout/token refresh, in any tab */
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
+      // Skip token refreshes — they create a new session object but the user hasn't changed.
+      // Without this, switching windows triggers a re-render cascade that re-fetches all data.
+      if (event === 'TOKEN_REFRESHED') return;
       setSession(newSession);
     });
 

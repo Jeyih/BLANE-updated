@@ -14,48 +14,55 @@
   left: 0;
   right: 0;
   z-index: 100;
-  height: 64px;
-  background: rgba(6, 13, 10, 0.95);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border-bottom: 1px solid rgba(45, 220, 122, 0.12);
+  height: 68px;
+  background: rgba(10, 22, 16, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(45, 220, 122, 0.22);
   display: flex;
   align-items: center;
   padding: 0 32px;
   gap: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 }
 
 /* ---- Logo ---- */
 .dash-navbar-logo {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   text-decoration: none;
   flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.dash-navbar-logo:hover {
+  transform: scale(1.02);
 }
 
 .dash-navbar-logo-icon {
-  width: 34px;
-  height: 34px;
-  background: #2ddc7a;
-  border-radius: 6px;
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(135deg, #2ddc7a 0%, #16a34a 100%);
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 0 16px rgba(45, 220, 122, 0.35);
 }
 
 .dash-navbar-logo-icon svg {
-  width: 18px;
-  height: 18px;
-  fill: #060d0a;
+  width: 20px;
+  height: 20px;
+  fill: #061109;
 }
 
 .dash-navbar-logo-text {
-  font-family: 'Syne', sans-serif;
-  font-size: 18px;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 20px;
   font-weight: 800;
-  color: #e8f5ee;
+  color: #ffffff;
   letter-spacing: -0.5px;
 }
 
@@ -67,40 +74,45 @@
 .dash-nav-links {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   margin-left: 16px;
 }
 
 .dash-nav-link {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 7px 14px;
-  border-radius: 10px;
-  font-size: 14px;
-  color: #8aab96;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #d1fae5;
   text-decoration: none;
-  transition: background 0.2s, color 0.2s;
+  transition: all 0.2s ease;
   white-space: nowrap;
   font-family: 'DM Sans', sans-serif;
   cursor: pointer;
   background: none;
-  border: none;
+  border: 1px solid transparent;
 }
 
 .dash-nav-link:hover {
-  background: rgba(45, 220, 122, 0.08);
-  color: #e8f5ee;
+  background: rgba(45, 220, 122, 0.12);
+  color: #ffffff;
+  border-color: rgba(45, 220, 122, 0.2);
 }
 
 .dash-nav-link.active {
-  background: rgba(45, 220, 122, 0.12);
+  background: rgba(45, 220, 122, 0.18);
   color: #2ddc7a;
+  border-color: rgba(45, 220, 122, 0.35);
+  font-weight: 600;
+  box-shadow: 0 0 14px rgba(45, 220, 122, 0.15);
 }
 
 .dash-nav-link svg {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   flex-shrink: 0;
 }
 
@@ -118,101 +130,106 @@
 }
 
 .dash-greeting {
-  font-size: 13px;
-  color: #8aab96;
+  font-size: 14px;
+  color: #d1fae5;
   font-family: 'DM Sans', sans-serif;
 }
 
 .dash-greeting strong {
-  color: #e8f5ee;
-  font-weight: 500;
+  color: #ffffff;
+  font-weight: 700;
 }
 
 /* ---- Avatar button ---- */
 .dash-avatar-btn {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: rgba(45, 220, 122, 0.15);
-  border: 1px solid rgba(45, 220, 122, 0.35);
+  background: linear-gradient(135deg, rgba(45, 220, 122, 0.25) 0%, rgba(22, 163, 74, 0.2) 100%);
+  border: 2px solid rgba(45, 220, 122, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  font-weight: 600;
-  color: #2ddc7a;
   cursor: pointer;
-  transition: background 0.2s;
-  font-family: 'Syne', sans-serif;
-  text-transform: uppercase;
-  position: relative;
-  flex-shrink: 0;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 10px rgba(45, 220, 122, 0.15);
 }
 
 .dash-avatar-btn:hover {
-  background: rgba(45, 220, 122, 0.25);
+  transform: scale(1.05);
+  border-color: #2ddc7a;
+  box-shadow: 0 0 16px rgba(45, 220, 122, 0.3);
+}
+
+.dash-avatar-btn span {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #2ddc7a;
 }
 
 /* ---- Dropdown ---- */
 .dash-dropdown {
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + 12px);
   right: 0;
-  background: #0d1a12;
-  border: 1px solid rgba(45, 220, 122, 0.18);
-  border-radius: 14px;
+  width: 230px;
+  background: #12261b;
+  border: 1px solid rgba(45, 220, 122, 0.25);
+  border-radius: 16px;
   padding: 8px;
-  min-width: 180px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
   display: none;
-  z-index: 200;
+  flex-direction: column;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 16px rgba(45, 220, 122, 0.1);
+  z-index: 101;
 }
 
 .dash-dropdown.open {
-  display: block;
+  display: flex;
 }
 
 .dash-dropdown-header {
-  padding: 8px 12px 10px;
-  border-bottom: 1px solid rgba(45, 220, 122, 0.1);
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid rgba(45, 220, 122, 0.12);
   margin-bottom: 6px;
 }
 
 .dash-dropdown-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #e8f5ee;
-  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
 }
 
 .dash-dropdown-email {
-  font-size: 11px;
-  color: #4d6e5a;
+  font-size: 12px;
+  color: #94a3b8;
   margin-top: 2px;
-  font-family: 'DM Sans', sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dash-dropdown-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #8aab96;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #d1fae5;
   text-decoration: none;
-  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
   background: none;
+  border: none;
+  font-family: 'DM Sans', sans-serif;
   width: 100%;
   text-align: left;
-  font-family: 'DM Sans', sans-serif;
 }
 
 .dash-dropdown-item:hover {
-  background: rgba(45, 220, 122, 0.08);
-  color: #e8f5ee;
+  background: rgba(45, 220, 122, 0.15);
+  color: #ffffff;
 }
 
 .dash-dropdown-item.danger:hover {

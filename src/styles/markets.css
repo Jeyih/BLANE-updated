@@ -18,7 +18,7 @@
 }
 
 .mk-page-title {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 26px;
   font-weight: 700;
   color: #e8f5ee;
@@ -61,7 +61,7 @@
 }
 
 .mk-location-name {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   font-weight: 600;
   color: #e8f5ee;
@@ -310,7 +310,7 @@
 .mk-card-info { flex: 1; min-width: 0; }
 
 .mk-card-name {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   font-weight: 700;
   color: #e8f5ee;
@@ -465,7 +465,7 @@
 }
 
 .mk-detail-name {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 20px;
   font-weight: 700;
   color: #e8f5ee;
@@ -528,7 +528,7 @@
 }
 
 .mk-detail-section-title {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 13px;
   font-weight: 600;
   color: #8aab96;

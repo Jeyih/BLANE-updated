@@ -244,8 +244,20 @@ function Sparkline({ label, values, color }) {
   const W = 120, H = 32;
 
   let content;
-  if (valid.length < 2) {
-    content = <text x="0" y="20" fill="#4d6e5a" fontSize="9" fontFamily="DM Sans,sans-serif">Not enough data yet</text>;
+  let isEmpty = valid.length < 2;
+
+  if (isEmpty) {
+    content = (
+      <text
+        x="60" y="20"
+        fill="#4d6e5a"
+        fontSize="9"
+        fontFamily="DM Sans,sans-serif"
+        textAnchor="middle"
+      >
+        Not enough data yet
+      </text>
+    );
   } else {
     const min = Math.min(...valid);
     const max = Math.max(...valid);
@@ -268,7 +280,13 @@ function Sparkline({ label, values, color }) {
   return (
     <div className="fb-sparkline-wrap">
       <div className="fb-sparkline-label">{label}</div>
-      <svg className="fb-sparkline-svg" viewBox="0 0 120 32" preserveAspectRatio="none">{content}</svg>
+      <svg
+        className="fb-sparkline-svg"
+        viewBox="0 0 120 32"
+        preserveAspectRatio={isEmpty ? 'xMidYMid meet' : 'none'}
+      >
+        {content}
+      </svg>
     </div>
   );
 }

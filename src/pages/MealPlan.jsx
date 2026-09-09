@@ -87,12 +87,13 @@ export default function MealPlan() {
   const [swapChoice, setSwapChoice] = useState(null);
 
   useEffect(() => {
+    if (!user?.id) return;
     loadProfile();
-    loadRecipes();
+    if (recipes.length === 0) loadRecipes();
     loadConstraintDefinitions().then((definitions) => {
       if (definitions) setConstraintDefinitions(definitions);
     });
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     sessionStorage.setItem('blane_grocery', JSON.stringify(groceryList));
@@ -254,8 +255,8 @@ export default function MealPlan() {
   const weekLabel = months[base.getMonth()] + ' ' + base.getDate() + ' – ' + months[weekEnd.getMonth()] + ' ' + weekEnd.getDate() + ', ' + weekEnd.getFullYear();
 
   const totalKcal = slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.kcal || 0), 0);
-  const totalCost = slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.cost || 0), 0);
-  const totalProtein = slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.protein || 0), 0);
+  const totalCost = Math.round(slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.cost || 0), 0));
+  const totalProtein = Math.round(slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.protein || 0), 0));
   const calGoal = getCalorieGoal(profile);
   const dayPct = Math.min(Math.round((totalKcal / calGoal) * 100), 100);
 
@@ -906,8 +907,8 @@ function SlotCard({ slot, idx, profile, activeConstraints, constraintDefinitions
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div className="meal-kcal-badge">{meal.kcal}<small>kcal</small></div>
-                <div className="meal-cost-badge">₱{meal.cost}</div>
+                <div className="meal-kcal-badge"><span>{meal.kcal}</span><small>kcal</small></div>
+                <div className={`meal-cost-badge${!meal.cost ? ' meal-cost-badge--zero' : ''}`}>₱{meal.cost}</div>
               </div>
             </div>
 

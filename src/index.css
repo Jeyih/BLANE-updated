@@ -16,28 +16,34 @@
    ============================================================ */
 
 /* ---- Google Fonts Import ---- */
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
-/* ---- CSS Variables ---- */
+/* ---- CSS Variables (Enhanced for Multi-Generational Appeal & Accessibility) ---- */
 :root {
-  --color-bg:           #060d0a;
-  --color-bg-card:      #0d1a12;
-  --color-bg-surface:   #111f16;
+  --color-bg:           #0a1610;
+  --color-bg-card:      #12261b;
+  --color-bg-surface:   #173023;
+  --color-bg-elevated:  #1d3d2c;
   --color-primary:      #2ddc7a;
-  --color-primary-dim:  #1a8c4e;
-  --color-primary-glow: rgba(45, 220, 122, 0.15);
-  --color-accent:       #a8f5c8;
-  --color-text-1:       #e8f5ee;
-  --color-text-2:       #8aab96;
-  --color-text-3:       #4d6e5a;
-  --color-border:       rgba(45, 220, 122, 0.12);
-  --color-border-hover: rgba(45, 220, 122, 0.35);
-  --font-display:       'Syne', sans-serif;
-  --font-body:          'DM Sans', sans-serif;
-  --radius-sm:          6px;
-  --radius-md:          12px;
-  --radius-lg:          20px;
-  --radius-xl:          32px;
+  --color-primary-light:#4ade80;
+  --color-primary-dim:  #168a4b;
+  --color-primary-glow: rgba(45, 220, 122, 0.22);
+  --color-accent:       #f59e0b;
+  --color-accent-blue:  #38bdf8;
+  --color-accent-coral: #f87171;
+  --color-text-1:       #ffffff;
+  --color-text-2:       #d1fae5;
+  --color-text-3:       #94a3b8;
+  --color-border:       rgba(45, 220, 122, 0.18);
+  --color-border-hover: rgba(45, 220, 122, 0.45);
+  --font-display:       'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body:          'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --radius-sm:          8px;
+  --radius-md:          14px;
+  --radius-lg:          22px;
+  --radius-xl:          36px;
+  --shadow-card:        0 8px 24px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(45, 220, 122, 0.08);
+  --shadow-glow:        0 0 24px rgba(45, 220, 122, 0.25);
 }
 
 /* ---- Reset ---- */

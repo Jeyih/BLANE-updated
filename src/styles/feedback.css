@@ -56,7 +56,7 @@
 }
 
 .fb-widget-title {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 15px;
   font-weight: 600;
   color: #e8f5ee;
@@ -130,7 +130,7 @@
   background: none;
   border: none;
   outline: none;
-  font-family: 'Syne', sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 22px;
   font-weight: 700;
   color: #e8f5ee;
@@ -188,7 +188,7 @@
   border: none;
   border-radius: 12px;
   padding: 12px;
-  font-family: 'Syne', sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -331,6 +331,24 @@
   width: 100%;
   height: 32px;
   display: block;
+}
+
+.fb-sparkline-empty {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #4d6e5a;
+  font-style: italic;
+  letter-spacing: 0.3px;
+}
+
+.fb-sparkline-empty-dot {
+  font-size: 20px;
+  line-height: 1;
+  color: #2d5a3d;
+  margin-bottom: 2px;
 }
 
 /* ============================================================

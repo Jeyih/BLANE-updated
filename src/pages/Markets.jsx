@@ -22,6 +22,14 @@ const initialLocationState = {
   sub: 'Showing markets within 3 km radius · Last updated just now',
 };
 
+const TARLAC_LOCATIONS = [
+  { name: 'Tarlac City Public Market', sub: 'Poblacion, Central Tarlac City', lat: 15.4858, lng: 120.5970 },
+  { name: 'San Roque', sub: 'Commercial center district', lat: 15.4720, lng: 120.6050 },
+  { name: 'Capas Hub', sub: 'Southern market corridor', lat: 15.3333, lng: 120.5894 },
+  { name: 'Paniqui Hub', sub: 'Northern trading hub', lat: 15.6667, lng: 120.5833 },
+  { name: 'Concepcion', sub: 'East agri-commercial zone', lat: 15.3244, lng: 120.6558 },
+];
+
 export default function Markets() {
   const { user } = useAuth();
   const [markets, setMarkets] = useState([]);
@@ -40,6 +48,16 @@ export default function Markets() {
     if (!user) return;
     loadMarkets();
   }, [user]);
+
+  // Clean up Leaflet map instance on component unmount
+  useEffect(() => {
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!loading) {
@@ -113,7 +131,24 @@ export default function Markets() {
     setLoading(false);
   }
 
+  function selectPresetLocation(loc) {
+    const coords = { lat: loc.lat, lng: loc.lng, accuracy: 50 };
+    setUserCoords(coords);
+    placeUserMarker(coords, 50);
+    updateDistances(coords);
+    setLocationText({
+      name: loc.name,
+      sub: `${loc.sub} · Live distances updated`,
+    });
+    if (mapRef.current) {
+      mapRef.current.setView([loc.lat, loc.lng], 14, { animate: true });
+    }
+  }
+
   function initMap() {
+    const container = document.getElementById('map');
+    if (!container || container._leaflet_id) return;
+
     mapRef.current = L.map('map', { zoomControl: false }).setView([
       DEFAULT_CENTER.lat,
       DEFAULT_CENTER.lng,
@@ -316,6 +351,44 @@ export default function Markets() {
               </svg>
               Update Location
             </button>
+          </div>
+
+          {/* Quick Location Preset Chips for Ages 8-60 / Defense Demo */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            flexWrap: 'wrap',
+            marginBottom: '20px',
+            background: '#12261b',
+            border: '1px solid rgba(45, 220, 122, 0.22)',
+            borderRadius: '16px',
+            padding: '12px 16px',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+          }}>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: '#2ddc7a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>📍 Quick Hub:</span>
+            </span>
+            {TARLAC_LOCATIONS.map((loc) => (
+              <button
+                key={loc.name}
+                type="button"
+                onClick={() => selectPresetLocation(loc)}
+                style={{
+                  background: locationText.name === loc.name ? '#2ddc7a' : 'rgba(255, 255, 255, 0.06)',
+                  color: locationText.name === loc.name ? '#0a1610' : '#d1fae5',
+                  border: locationText.name === loc.name ? '1px solid #ffffff' : '1px solid rgba(45, 220, 122, 0.25)',
+                  borderRadius: '100px',
+                  padding: '7px 14px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.18s ease',
+                }}
+              >
+                {loc.name}
+              </button>
+            ))}
           </div>
 
           <div className="mk-filter-row">

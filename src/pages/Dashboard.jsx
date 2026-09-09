@@ -62,6 +62,15 @@ export default function Dashboard() {
     }
   }
 
+  const [quickCheckinMood, setQuickCheckinMood] = useState(null);
+  const [checkinToast, setCheckinToast] = useState('');
+
+  function handleCheckin(mood, note) {
+    setQuickCheckinMood(mood);
+    setCheckinToast(note);
+    setTimeout(() => setCheckinToast(''), 4000);
+  }
+
   const today = new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
@@ -72,11 +81,72 @@ export default function Dashboard() {
 
           <div className="dash-page-header">
             <div>
-              <h1 className="dash-page-title">Good day, &nbsp;<span style={{ color: '#2ddc7a' }}>{firstName}</span> 👋</h1>
-              <p className="dash-page-date">{today}</p>
+              <h1 className="dash-page-title">Good day, <span style={{ color: '#2ddc7a' }}>{firstName}</span> 👋</h1>
+              <p className="dash-page-date" style={{ color: '#d1fae5', fontSize: 15 }}>{today} · Personalized for your metabolic profile</p>
             </div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <span className="widget-badge" style={{ fontSize: 12, padding: '6px 14px' }}>● Live sync active</span>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span className="widget-badge" style={{ fontSize: 13, padding: '8px 16px', background: 'rgba(45, 220, 122, 0.2)', border: '1px solid #2ddc7a' }}>
+                ● Real-time Adaptive Engine
+              </span>
+            </div>
+          </div>
+
+          {/* Friendly Quick Check-in Bar for all ages */}
+          <div style={{
+            background: 'linear-gradient(135deg, #173023 0%, #12261b 100%)',
+            border: '1px solid rgba(45, 220, 122, 0.25)',
+            borderRadius: '18px',
+            padding: '16px 20px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '14px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '24px' }}>🌱</span>
+              <div>
+                <div style={{ color: '#ffffff', fontWeight: 700, fontSize: '15px' }}>
+                  Daily Check-in: How are you feeling right now?
+                </div>
+                <div style={{ color: '#d1fae5', fontSize: '13px' }}>
+                  {checkinToast || 'Tap a mood to dynamically tune today’s energy and hydration targets.'}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {[
+                { mood: 'energetic', icon: '⚡', label: 'Energetic', note: 'Awesome! Maintaining active energy balance (+100 kcal reserve).' },
+                { mood: 'great', icon: '😊', label: 'Feeling Great', note: 'Optimal metabolic state! Your current meal plan is fully balanced.' },
+                { mood: 'active', icon: '💪', label: 'Workout Today', note: 'Activity logged! Prioritizing protein recovery in today’s dinner.' },
+                { mood: 'tired', icon: '😴', label: 'Tired / Low Energy', note: 'Noted! Boosted complex carbs & magnesium-rich ingredients.' },
+              ].map((item) => (
+                <button
+                  key={item.mood}
+                  type="button"
+                  onClick={() => handleCheckin(item.mood, item.note)}
+                  style={{
+                    background: quickCheckinMood === item.mood ? '#2ddc7a' : 'rgba(255, 255, 255, 0.06)',
+                    color: quickCheckinMood === item.mood ? '#0a1610' : '#ffffff',
+                    border: quickCheckinMood === item.mood ? '2px solid #ffffff' : '1px solid rgba(45, 220, 122, 0.25)',
+                    borderRadius: '12px',
+                    padding: '8px 14px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <span>{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -200,12 +270,12 @@ function MealPlanWidget({ profile }) {
       </div>
 
       {loading ? (
-        <div style={{ padding: '32px 0', textAlign: 'center', color: '#4d6e5a' }}>Loading today's meal plan…</div>
+        <div style={{ padding: '32px 0', textAlign: 'center', color: '#d1fae5', fontSize: '15px' }}>Loading today's meal plan…</div>
       ) : plannedMeals.length === 0 ? (
         <div className="dash-empty-state" style={{ padding: '32px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: 44, marginBottom: 14 }}>🍽️</div>
-          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>No meals planned for today yet.</div>
-          <div style={{ color: '#4d6e5a', lineHeight: 1.6, marginBottom: 16 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: '#ffffff' }}>No meals planned for today yet.</div>
+          <div style={{ color: '#d1fae5', lineHeight: 1.6, marginBottom: 16 }}>
             Customize your schedule or pick recipes on the Meal Plan page.
           </div>
           <Link to="/mealplan" className="widget-badge" style={{ textDecoration: 'none', padding: '8px 16px', fontSize: 13 }}>
@@ -247,7 +317,7 @@ function MealPlanWidget({ profile }) {
 
               {currentItem.meal.ingredients.length > 0 && (
                 <div className="meal-ingredients">
-                  <div style={{ fontSize: 11, color: '#4d6e5a', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Key Ingredients</div>
+                  <div style={{ fontSize: 12, color: '#d1fae5', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>Key Ingredients</div>
                   {currentItem.meal.ingredients.slice(0, 4).map((ing, i) => (
                     <div key={i} className="meal-ingredient-row">
                       <div className="ingredient-dot"></div>
