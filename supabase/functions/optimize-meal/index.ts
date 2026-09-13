@@ -30,7 +30,7 @@ const GOAL_ADJUST: Record<string, number> = {
 };
 
 const MACRO_TARGETS = { protein: 0.3, carbs: 0.45, fats: 0.25 };
-const GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash"];
+const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-2.5-flash-lite"];
 
 function jsonError(message: string, status = 400) {
   return new Response(JSON.stringify({ error: message }), {
@@ -222,8 +222,7 @@ Return ONLY valid JSON:
   "protein": number,
   "carbs": number,
   "fats": number,
-  "ingredients": [{ "name": string, "quantity": string, "fct_id": string }],
-  "fnriBasis": [{ "name": string, "fct_id": string, "energy_kcal": number, "protein_g": number, "available_carbohydrate_g": number, "total_fat_g": number }]
+  "ingredients": [{ "name": string, "quantity": string, "fct_id": string }]
 }
 
 Rules:
@@ -232,6 +231,7 @@ Rules:
 3. Do not invent FNRI food names or fct_id values. Every ingredient must appear in the FNRI list.
 4. Keep estimatedCost at or below the budget when possible and use realistic Filipino portions.
 5. Return a practical meal, not a list of raw foods.
+6. Use 2 to 5 ingredients and keep the JSON compact.
 `;
 }
 
@@ -247,7 +247,7 @@ async function callGemini(apiKey: string, prompt: string, responseSchema?: any) 
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.2,
-            maxOutputTokens: 500,
+            maxOutputTokens: 4096,
             responseMimeType: "application/json",
             responseSchema: responseSchema || {
               type: "OBJECT",
@@ -349,23 +349,8 @@ const SUGGESTION_SCHEMA = {
         required: ["name", "quantity", "fct_id"],
       },
     },
-    fnriBasis: {
-      type: "ARRAY",
-      items: {
-        type: "OBJECT",
-        properties: {
-          name: { type: "STRING" },
-          fct_id: { type: "STRING" },
-          energy_kcal: { type: "NUMBER" },
-          protein_g: { type: "NUMBER" },
-          available_carbohydrate_g: { type: "NUMBER" },
-          total_fat_g: { type: "NUMBER" },
-        },
-        required: ["name", "fct_id"],
-      },
-    },
   },
-  required: ["name", "reason", "estimatedCost", "kcal", "protein", "carbs", "fats", "ingredients", "fnriBasis"],
+  required: ["name", "reason", "estimatedCost", "kcal", "protein", "carbs", "fats", "ingredients"],
 };
 
 Deno.serve(async (req) => {
@@ -411,7 +396,7 @@ Deno.serve(async (req) => {
       const [{ data: fnriFoods, error: fnriError }, { data: constraints, error: constraintsError }] = await Promise.all([
         supabase
           .from("fnri_food_composition")
-          .select("fct_id, food_name, alternate_name, base_weight_g, energy_kcal, protein_g, total_fat_g, available_carbohydrate_g, dietary_fiber_g")
+          .select("fct_id, food_name, energy_kcal, protein_g, total_fat_g, available_carbohydrate_g")
           .order("food_name")
           .limit(200),
         supabase

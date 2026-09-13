@@ -599,6 +599,7 @@ export default function MealPlan() {
 
 function PriceOptimizerPanel({ meals = [], profile }) {
   const [dailyBudget, setDailyBudget] = useState(200);
+  const [appliedBudget, setAppliedBudget] = useState(200);
   const [sortMode, setSortMode] = useState('cost');
   const [filterOver, setFilterOver] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
@@ -607,7 +608,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
   const [suggestionLoading, setSuggestionLoading] = useState(false);
   const [suggestionError, setSuggestionError] = useState('');
 
-  const perMeal = Math.round(dailyBudget / 4);
+  const perMeal = Math.round(appliedBudget / 4);
 
   const sortedMeals = useMemo(() => {
     const list = [...meals];
@@ -631,7 +632,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
       const response = await fetch(functionUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ mode: 'suggest', profile, budget: dailyBudget, mealType: suggestionType }),
+        body: JSON.stringify({ mode: 'suggest', profile, budget: appliedBudget, mealType: suggestionType }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Could not generate a meal suggestion.');
@@ -641,6 +642,14 @@ function PriceOptimizerPanel({ meals = [], profile }) {
     } finally {
       setSuggestionLoading(false);
     }
+  }
+
+  function applyBudget() {
+    const nextBudget = Math.max(50, Math.min(2000, Number(dailyBudget) || 200));
+    setDailyBudget(nextBudget);
+    setAppliedBudget(nextBudget);
+    setSuggestion(null);
+    setSuggestionError('');
   }
 
   function toggleExpand(id) {
@@ -706,7 +715,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
         </div>
         <span className="po-budget-label">Budget</span>
         <div className="po-per-meal-chip">≈ <strong>₱{perMeal}</strong> / meal</div>
-        <button className="po-apply-btn" type="button" onClick={() => setDailyBudget(dailyBudget)}>
+        <button className="po-apply-btn" type="button" onClick={applyBudget}>
           Apply Budget
         </button>
       </div>
@@ -739,7 +748,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
       <div className="po-summary-bar">
         <div className="po-summary-item">
           <div className="po-summary-label">Daily Budget</div>
-          <div className="po-summary-value yellow">₱{dailyBudget}</div>
+          <div className="po-summary-value yellow">₱{appliedBudget}</div>
         </div>
         <div className="po-summary-divider" />
         <div className="po-summary-item">
@@ -754,17 +763,17 @@ function PriceOptimizerPanel({ meals = [], profile }) {
         <div className="po-summary-divider" />
         <div className="po-summary-item">
           <div className="po-summary-label">Cheapest Full Day</div>
-          <div className={`po-summary-value ${cheapestDay <= dailyBudget ? 'green' : 'red'}`}>₱{cheapestDay}</div>
+          <div className={`po-summary-value ${cheapestDay <= appliedBudget ? 'green' : 'red'}`}>₱{cheapestDay}</div>
         </div>
         <div className="po-summary-divider" />
         <div className="po-budget-progress">
-          <div className="po-budget-bar-labels"><span>Cheapest day cost</span><span>{Math.min(Math.round((cheapestDay / dailyBudget) * 100), 120)}%</span></div>
+          <div className="po-budget-bar-labels"><span>Cheapest day cost</span><span>{Math.min(Math.round((cheapestDay / appliedBudget) * 100), 120)}%</span></div>
           <div className="po-budget-bar-bg">
             <div
               className="po-budget-bar-fill"
               style={{
-                width: `${Math.min(Math.round((cheapestDay / dailyBudget) * 100), 100)}%`,
-                background: cheapestDay <= dailyBudget ? '#2ddc7a' : '#f87171',
+                width: `${Math.min(Math.round((cheapestDay / appliedBudget) * 100), 100)}%`,
+                background: cheapestDay <= appliedBudget ? '#2ddc7a' : '#f87171',
               }}
             />
           </div>

@@ -93,22 +93,36 @@ export default function Markets() {
       return;
     }
 
-    const { data: ingredientsData, error: ingErr } = await supabase
-      .from('market_ingredients')
-      .select('*');
+    const ingredientResults = await Promise.all(
+      (marketsData || []).map(async (market) => {
+        const { data, error } = await supabase
+          .from('market_ingredients')
+          .select('*')
+          .eq('market_id', market.id)
+          .order('name');
 
-    if (ingErr) {
-      console.error('Failed to load market ingredients:', ingErr.message);
-    }
+        if (error) {
+          console.error(`Failed to load ingredients for ${market.name}:`, error.message);
+        }
+
+        return { marketId: market.id, ingredients: data || [] };
+      })
+    );
 
     const ingredientsByMarket = {};
-    (ingredientsData || []).forEach((ing) => {
-      if (!ingredientsByMarket[ing.market_id]) ingredientsByMarket[ing.market_id] = [];
-      ingredientsByMarket[ing.market_id].push({
-        name: ing.name,
-        qty: ing.qty,
-        price: '₱' + ing.price,
-        status: ing.status,
+    const ingredientCatalog = new Map();
+    ingredientResults.forEach(({ marketId, ingredients }) => {
+      ingredientsByMarket[marketId] = ingredients.map((ing) => {
+        const ingredient = {
+          name: ing.name,
+          qty: ing.qty,
+          price: ing.price == null ? '—' : '₱' + ing.price,
+          status: ing.status,
+        };
+
+        const key = String(ing.name || '').trim().toLowerCase();
+        if (key && !ingredientCatalog.has(key)) ingredientCatalog.set(key, ingredient.name);
+        return ingredient;
       });
     });
 
@@ -124,7 +138,7 @@ export default function Markets() {
       lat: market.lat || DEFAULT_CENTER.lat,
       lng: market.lng || DEFAULT_CENTER.lng,
       availableTags: (ingredientsByMarket[market.id] || []).slice(0, 6).map((i) => i.name),
-      ingredients: ingredientsByMarket[market.id] || [],
+      ingredients: completeMarketIngredients(ingredientsByMarket[market.id] || [], ingredientCatalog),
     }));
 
     setMarkets(loaded);
@@ -566,6 +580,19 @@ export default function Markets() {
       </main>
     </>
   );
+}
+
+function completeMarketIngredients(existingIngredients, ingredientCatalog) {
+  const existingByName = new Map(
+    existingIngredients.map((ingredient) => [ingredient.name.trim().toLowerCase(), ingredient])
+  );
+
+  return [...ingredientCatalog].map(([key, name]) => existingByName.get(key) || {
+    name,
+    qty: '—',
+    price: '—',
+    status: 'unavail',
+  });
 }
 
 function GeoMarketScanner({ markets, userCoords, onLocate }) {
