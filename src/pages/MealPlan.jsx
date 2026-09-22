@@ -96,6 +96,11 @@ export default function MealPlan() {
   }, [user?.id]);
 
   useEffect(() => {
+    localStorage.setItem('blane_meal_plan_day', String(selectedDayIndex));
+    window.dispatchEvent(new Event('blane-meal-plan-updated'));
+  }, [selectedDayIndex]);
+
+  useEffect(() => {
     sessionStorage.setItem('blane_grocery', JSON.stringify(groceryList));
   }, [groceryList]);
 
@@ -176,6 +181,7 @@ export default function MealPlan() {
   useEffect(() => {
     if (Object.keys(daySlots).length > 0) {
       localStorage.setItem('blane_meal_plan', JSON.stringify(daySlots));
+      window.dispatchEvent(new Event('blane-meal-plan-updated'));
     }
   }, [daySlots]);
 

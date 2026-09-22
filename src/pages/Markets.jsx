@@ -30,6 +30,29 @@ const TARLAC_LOCATIONS = [
   { name: 'Concepcion', sub: 'East agri-commercial zone', lat: 15.3244, lng: 120.6558 },
 ];
 
+function normalizeIngredientName(name) {
+  return String(name || '').trim().toLowerCase();
+}
+
+function getSavedMealIds() {
+  try {
+    const savedPlan = JSON.parse(localStorage.getItem('blane_meal_plan') || '{}');
+    const selectedDay = Number(localStorage.getItem('blane_meal_plan_day'));
+    const daySlots = Number.isInteger(selectedDay) && Array.isArray(savedPlan[selectedDay])
+      ? savedPlan[selectedDay]
+      : Object.values(savedPlan).flat();
+    return [...new Set(
+      daySlots
+        .map((slot) => slot?.mealId)
+        .filter(Boolean)
+        .map((id) => String(id))
+    )];
+  } catch (error) {
+    console.error('Failed to read saved meal plan:', error);
+    return [];
+  }
+}
+
 export default function Markets() {
   const { user } = useAuth();
   const [markets, setMarkets] = useState([]);
@@ -43,10 +66,30 @@ export default function Markets() {
   const markersLayerRef = useRef(null);
   const userMarkerRef = useRef(null);
   const userCircleRef = useRef(null);
+  const marketRequestRef = useRef(0);
 
   useEffect(() => {
     if (!user) return;
     loadMarkets();
+  }, [user]);
+
+  useEffect(() => {
+    function refreshMealPlanIngredients() {
+      if (user) loadMarkets();
+    }
+
+    window.addEventListener('blane-meal-plan-updated', refreshMealPlanIngredients);
+    function handleMealPlanStorage(event) {
+      if (event.key === 'blane_meal_plan' || event.key === 'blane_meal_plan_day') {
+        refreshMealPlanIngredients();
+      }
+    }
+
+    window.addEventListener('storage', handleMealPlanStorage);
+    return () => {
+      window.removeEventListener('blane-meal-plan-updated', refreshMealPlanIngredients);
+      window.removeEventListener('storage', handleMealPlanStorage);
+    };
   }, [user]);
 
   // Clean up Leaflet map instance on component unmount
@@ -80,18 +123,40 @@ export default function Markets() {
   }, [markets, selectedMarketId]);
 
   async function loadMarkets() {
+    const requestId = ++marketRequestRef.current;
     setLoading(true);
     const { data: marketsData, error: marketsErr } = await supabase
       .from('markets')
       .select('*')
       .order('name');
 
+    if (requestId !== marketRequestRef.current) return;
     if (marketsErr) {
       console.error('Failed to load markets:', marketsErr.message);
       setMarkets([]);
       setLoading(false);
       return;
     }
+
+    const savedMealIds = getSavedMealIds();
+    const { data: mealIngredients, error: mealIngredientsError } = savedMealIds.length
+      ? await supabase
+        .from('recipe_ingredients')
+        .select('*')
+        .in('recipe_id', savedMealIds)
+      : { data: [], error: null };
+
+    if (requestId !== marketRequestRef.current) return;
+    if (mealIngredientsError) {
+      console.error('Failed to load meal plan ingredients:', mealIngredientsError.message);
+    }
+
+    const mealPlanIngredientNames = new Set(
+      (mealIngredients || [])
+        .map((ingredient) => ingredient.name || ingredient.ingredient_name || ingredient.food_name)
+        .map(normalizeIngredientName)
+        .filter(Boolean)
+    );
 
     const ingredientResults = await Promise.all(
       (marketsData || []).map(async (market) => {
@@ -109,6 +174,8 @@ export default function Markets() {
       })
     );
 
+    if (requestId !== marketRequestRef.current) return;
+
     const ingredientsByMarket = {};
     const ingredientCatalog = new Map();
     ingredientResults.forEach(({ marketId, ingredients }) => {
@@ -120,7 +187,7 @@ export default function Markets() {
           status: ing.status,
         };
 
-        const key = String(ing.name || '').trim().toLowerCase();
+        const key = normalizeIngredientName(ing.name);
         if (key && !ingredientCatalog.has(key)) ingredientCatalog.set(key, ingredient.name);
         return ingredient;
       });
@@ -137,8 +204,9 @@ export default function Markets() {
       address: market.address || 'Address unavailable',
       lat: market.lat || DEFAULT_CENTER.lat,
       lng: market.lng || DEFAULT_CENTER.lng,
-      availableTags: (ingredientsByMarket[market.id] || []).slice(0, 6).map((i) => i.name),
-      ingredients: completeMarketIngredients(ingredientsByMarket[market.id] || [], ingredientCatalog),
+      availableTags: completeMarketIngredients(ingredientsByMarket[market.id] || [], ingredientCatalog, mealPlanIngredientNames)
+        .map((i) => i.name),
+      ingredients: completeMarketIngredients(ingredientsByMarket[market.id] || [], ingredientCatalog, mealPlanIngredientNames),
     }));
 
     setMarkets(loaded);
@@ -481,14 +549,11 @@ export default function Markets() {
                         </span>
                       </div>
                       <div className="mk-card-ingredients">
-                        {market.availableTags.slice(0, 5).map((tag) => (
+                        {market.availableTags.map((tag) => (
                           <span key={tag} className="mk-ing-tag found">
                             {tag}
                           </span>
                         ))}
-                        {market.availableTags.length > 5 && (
-                          <span className="mk-ing-tag">+{market.availableTags.length - 5}</span>
-                        )}
                       </div>
                     </button>
                   );
@@ -582,17 +647,14 @@ export default function Markets() {
   );
 }
 
-function completeMarketIngredients(existingIngredients, ingredientCatalog) {
+function completeMarketIngredients(existingIngredients, ingredientCatalog, mealPlanIngredientNames) {
   const existingByName = new Map(
-    existingIngredients.map((ingredient) => [ingredient.name.trim().toLowerCase(), ingredient])
+    existingIngredients.map((ingredient) => [normalizeIngredientName(ingredient.name), ingredient])
   );
 
-  return [...ingredientCatalog].map(([key, name]) => existingByName.get(key) || {
-    name,
-    qty: '—',
-    price: '—',
-    status: 'unavail',
-  });
+  return [...mealPlanIngredientNames]
+    .map((key) => existingByName.get(key))
+    .filter(Boolean);
 }
 
 function GeoMarketScanner({ markets, userCoords, onLocate }) {

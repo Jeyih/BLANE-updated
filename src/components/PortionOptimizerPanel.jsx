@@ -323,7 +323,8 @@ function scaleIngredient(ing, factor) {
 
 function scaleQtyString(qtyStr, factor) {
   if (!qtyStr || qtyStr === 'to taste') return qtyStr;
-  const match = qtyStr.match(/^([\d./½¼¾⅓⅔]+)\s*(.*)/);
+  const normalizedQty = String(qtyStr).trim();
+  const match = normalizedQty.match(/^([\d./½¼¾⅓⅔]+)\s*(.*)/);
   if (!match) return qtyStr;
 
   let num = parseFraction(match[1]);
