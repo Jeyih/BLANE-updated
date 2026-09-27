@@ -6,7 +6,7 @@
    and manages weekly meal slots, calorie goals, swap options,
    and grocery list generation.
    ============================================================ */
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
@@ -39,6 +39,16 @@ function getCalorieGoal(profile) {
   const tdee = bmr * 1.55;
   const adj = { lose_weight: 0.85, gain_muscle: 1.1, maintain: 1.0, improve_health: 1.0, boost_energy: 1.0, manage_condition: 0.9 };
   return Math.round(tdee * (adj[profile.goal] || 1.0)) || 1840;
+}
+
+function getIngredientQuantityLabel(ingredient, optimizedQuantity) {
+  const hasQuantity = ingredient.quantity != null && ingredient.quantity !== '';
+  if (!hasQuantity) return '—';
+
+  const quantity = optimizedQuantity != null && optimizedQuantity !== ''
+    ? optimizedQuantity
+    : ingredient.quantity;
+  return String(quantity);
 }
 
 function generateDefaultPlan(recipeList) {
@@ -77,6 +87,13 @@ export default function MealPlan() {
   const [daySlots, setDaySlots]                = useState({});
   const [groceryList, setGroceryList]          = useState(() => JSON.parse(sessionStorage.getItem('blane_grocery') || '[]'));
   const [openOptimizerId, setOpenOptimizerId] = useState(null);
+  const [appliedOptimizations, setAppliedOptimizations] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('blane_optimized') || '{}');
+    } catch {
+      return {};
+    }
+  });
 
   const [addSlotOpen, setAddSlotOpen]             = useState(false);
   const [slotTypeChoice, setSlotTypeChoice]       = useState(null);
@@ -121,14 +138,32 @@ export default function MealPlan() {
     }
 
     const { data: ingData } = await supabase.from('recipe_ingredients').select('*').order('sort_order');
+    const linkedFctIds = [...new Set((ingData || []).map((ing) => ing.fct_id).filter(Boolean))];
+    let nutrientByFctId = {};
+    if (linkedFctIds.length > 0) {
+      const { data: nutrientRows, error: nutrientError } = await supabase
+        .from('fnri_food_composition')
+        .select('fct_id, energy_kcal')
+        .in('fct_id', linkedFctIds);
+      if (!nutrientError && nutrientRows) {
+        nutrientByFctId = Object.fromEntries(nutrientRows.map((row) => [row.fct_id, row]));
+      }
+    }
+
     const ingByRecipe = {};
     (ingData || []).forEach((ing) => {
       if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
+      const quantity = ing.quantity != null && ing.quantity !== '' ? ing.quantity : ing.qty ?? '';
       ingByRecipe[ing.recipe_id].push({
         name: ing.name || ing.ingredient_name || ing.food_name,
         ingredient_name: ing.ingredient_name,
         food_name: ing.food_name,
-        qty: ing.qty || ing.grams,
+        qty: quantity || ing.grams,
+        quantity,
+        grams: ing.grams,
+        calories: nutrientByFctId[ing.fct_id]
+          ? Math.round((Number(nutrientByFctId[ing.fct_id].energy_kcal) || 0) * (Number(ing.grams) || 0) / 100)
+          : null,
         status: ing.status || 'avail',
       });
     });
@@ -429,6 +464,15 @@ export default function MealPlan() {
                     slot={slot}
                     idx={idx}
                     profile={profile}
+                    appliedOptimization={appliedOptimizations[slot.mealId]}
+                    onPortionApplied={(mealId, result) => setAppliedOptimizations((prev) => ({
+                      ...prev,
+                      [mealId]: {
+                        scaleFactor: result.scaleFactor,
+                        ingredients: result.ingredients,
+                        optimizedKcal: result.optimizedKcal,
+                      },
+                    }))}
                     activeConstraints={activeConstraints}
                     constraintDefinitions={constraintDefinitions}
                     getMeal={getMeal}
@@ -820,6 +864,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
             : meal.cost <= perMeal * 1.3 ? 'pricey'
             : 'over';
           const valueScore = Math.round((meal.kcal / meal.cost) * 10) / 10;
+          const maxIngredientCost = Math.max(...(meal.ingredients || []).map((ingredient) => ingredient.cost || 0), 0);
 
           return (
             <div key={meal.id} className={`po-meal-row ${isOver ? 'over-budget' : ''}`}>
@@ -847,19 +892,37 @@ function PriceOptimizerPanel({ meals = [], profile }) {
                   <div style={{ fontSize: 11, color: '#4d6e5a', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 8 }}>
                     Ingredient Cost Breakdown
                   </div>
-                  <div className="po-ing-cost-table">
-                    {(meal.ingredients || []).map((ing) => {
-                      const ingredientValues = (meal.ingredients || []).map((item) => item.cost || 0);
-                      const maxCost = Math.max(...ingredientValues, 0);
-                      const barPct = maxCost > 0 ? Math.round(((ing.cost || 0) / maxCost) * 100) : 0;
-                      return (
-                        <div key={ing.name} className="po-ing-cost-row">
-                          <div className="po-ing-cost-name"><div className="po-ing-dot" />{ing.name} <span style={{ color: '#4d6e5a' }}>({ing.qty})</span></div>
-                          <div className="po-cost-bar-wrap"><div className="po-cost-bar-bg"><div className="po-cost-bar-fill" style={{ width: `${barPct}%` }} /></div></div>
-                          <div className="po-ing-cost-price">₱{ing.cost || 0}</div>
-                        </div>
-                      );
-                    })}
+                  <div className="po-ing-cost-table-wrap">
+                    <table className="po-ing-cost-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Ingredient</th>
+                          <th scope="col">Quantity</th>
+                          <th scope="col">Grams</th>
+                          <th scope="col">Calories</th>
+                          <th scope="col">Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(meal.ingredients || []).map((ing) => {
+                          const barPct = maxIngredientCost > 0 ? Math.round(((ing.cost || 0) / maxIngredientCost) * 100) : 0;
+                          return (
+                            <tr key={ing.name}>
+                              <td><span className="po-ing-cost-name"><span className="po-ing-dot" />{ing.name}</span></td>
+                              <td>{ing.quantity || '—'}</td>
+                              <td>{ing.grams ? `${ing.grams} g` : '—'}</td>
+                              <td>{ing.calories == null ? '—' : `${ing.calories} kcal`}</td>
+                              <td>
+                                <div className="po-ing-cost-cell">
+                                  <span className="po-cost-bar-bg"><span className="po-cost-bar-fill" style={{ width: `${barPct}%` }} /></span>
+                                  <span className="po-ing-cost-price">₱{ing.cost || 0}</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                   {buildSubSuggestion(meal)}
                 </div>
@@ -882,7 +945,7 @@ function computeCheapestDay(meals = [], perMeal) {
   }, 0);
 }
 
-function SlotCard({ slot, idx, profile, activeConstraints, constraintDefinitions, getMeal, totalMealsToday, groceryList, openOptimizerId, onSetOpenOptimizer, onRemove, onSwap, onAddGrocery }) {
+function SlotCard({ slot, idx, profile, appliedOptimization, onPortionApplied, activeConstraints, constraintDefinitions, getMeal, totalMealsToday, groceryList, openOptimizerId, onSetOpenOptimizer, onRemove, onSwap, onAddGrocery }) {
   const meal = getMeal(slot.mealId);
   const [ingredientsOpen, setIngredientsOpen] = useState(false);
   const alreadyAdded = meal && groceryList.some((g) => g.mealId === meal.id);
@@ -930,19 +993,48 @@ function SlotCard({ slot, idx, profile, activeConstraints, constraintDefinitions
             <ViolationDetail violations={violations} />
 
             <div className={'meal-card-ingredients' + (ingredientsOpen ? ' open' : '')}>
-              <div className="ingredients-title">Ingredients</div>
-              {meal.ingredients.map((ing) => (
-                <div key={ing.name}>
-                  <div className="ingredient-row">
-                    <div className="ingredient-dot"></div>
-                    <span className="ingredient-name">{ing.name}</span>
-                    <span className="ingredient-qty">{ing.qty}</span>
-                    <IngSeasonTag ingredientName={ing.name} />
-                    <span className={'ingredient-status ' + ing.status}>{ing.status === 'avail' ? '✓ Available' : '⚠ Check market'}</span>
-                  </div>
-                  <SeasonalAltBanner ingredientName={ing.name} />
-                </div>
-              ))}
+              <div className="ingredient-table-wrap">
+                <table className="ingredient-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Ingredient</th>
+                      <th scope="col">Quantity</th>
+                      <th scope="col">Optimized</th>
+                      <th scope="col">Grams</th>
+                      <th scope="col">Calories</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {meal.ingredients.map((ing) => {
+                      const optimizedIngredient = appliedOptimization?.ingredients?.find((item) => item.name === ing.name);
+                      const scaleFactor = appliedOptimization?.scaleFactor ?? 1;
+                      const grams = Number(ing.grams) || 0;
+                      const displayedGrams = grams ? Math.round(grams * scaleFactor) : null;
+                      const quantityLabel = getIngredientQuantityLabel(ing, optimizedIngredient?.optimized);
+                      const calories = ing.calories == null ? null : Math.round(ing.calories * scaleFactor);
+                      return (
+                      <Fragment key={ing.name}>
+                        <tr>
+                          <td>
+                            <div className="ingredient-table-name">
+                              <div className="ingredient-dot"></div>
+                              <span className="ingredient-name">{ing.name}</span>
+                            </div>
+                          </td>
+                          <td>{quantityLabel}</td>
+                          <td>{optimizedIngredient?.optimized || '—'}</td>
+                          <td>{displayedGrams == null ? '—' : `${displayedGrams} g`}</td>
+                          <td>{calories == null ? '—' : `${calories} kcal`}</td>
+                        </tr>
+                        <tr className="ingredient-seasonal-row">
+                          <td colSpan="5"><SeasonalAltBanner ingredientName={ing.name} /></td>
+                        </tr>
+                      </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <div className="meal-card-actions">
@@ -968,6 +1060,7 @@ function SlotCard({ slot, idx, profile, activeConstraints, constraintDefinitions
             totalMealsToday={totalMealsToday}
             open={openOptimizerId === meal.id}
             onClose={() => onSetOpenOptimizer(null)}
+            onApplied={onPortionApplied}
           />
         </>
       )}

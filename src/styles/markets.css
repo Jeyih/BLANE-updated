@@ -566,7 +566,7 @@
 
 .mk-ing-row {
   display: grid;
-  grid-template-columns: 1fr 80px 80px 100px;
+  grid-template-columns: minmax(140px, 1fr) 64px 72px 88px 110px;
   align-items: center;
   gap: 10px;
   padding: 9px 12px;
@@ -645,6 +645,17 @@
   border: 1px solid rgba(248, 113, 113, 0.15);
 }
 
+.mk-ing-row-season {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+.mk-ing-row-season .ing-season-tag {
+  font-size: 9px;
+  padding: 2px 5px;
+}
+
 .mk-empty {
   text-align: center;
   padding: 40px 20px;
@@ -682,10 +693,12 @@
   }
 
   .mk-ing-row {
-    grid-template-columns: 1fr 70px 80px;
+    grid-template-columns: minmax(110px, 1fr) 72px 82px 96px;
   }
 
   .mk-ing-row-qty { display: none; }
+
+  .mk-ing-row-header span:nth-child(2) { display: none; }
 
   .mk-info-chips {
     gap: 6px;

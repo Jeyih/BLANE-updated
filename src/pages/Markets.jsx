@@ -3,6 +3,7 @@ import L from 'leaflet';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
+import { IngSeasonTag } from '../components/SeasonalBadges';
 import '../styles/markets.css';
 import 'leaflet/dist/leaflet.css';
 
@@ -617,6 +618,7 @@ export default function Markets() {
                       <span style={{ textAlign: 'center' }}>Qty</span>
                       <span style={{ textAlign: 'center' }}>Price</span>
                       <span style={{ textAlign: 'center' }}>Status</span>
+                      <span style={{ textAlign: 'center' }}>Season</span>
                     </div>
                     {selectedMarket.ingredients.map((ing) => (
                       <div key={ing.name} className="mk-ing-row">
@@ -632,6 +634,9 @@ export default function Markets() {
                             : ing.status === 'limited'
                             ? '⚠ Limited'
                             : '✕ Unavailable'}
+                        </div>
+                        <div className="mk-ing-row-season">
+                          <IngSeasonTag ingredientName={ing.name} />
                         </div>
                       </div>
                     ))}

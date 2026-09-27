@@ -539,17 +539,46 @@
   border-top: 1px solid rgba(45, 220, 122, 0.08);
 }
 
-.po-ing-cost-table {
-  display: grid;
-  gap: 8px;
+.po-ing-cost-table-wrap {
+  overflow-x: auto;
   margin-bottom: 12px;
 }
 
-.po-ing-cost-row {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr auto;
-  gap: 10px;
-  align-items: center;
+.po-ing-cost-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 11px;
+}
+
+.po-ing-cost-table th {
+  padding: 7px 8px;
+  color: #4d6e5a;
+  border-bottom: 1px solid rgba(45, 220, 122, 0.12);
+  font-size: 10px;
+  font-weight: 600;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.po-ing-cost-table td {
+  padding: 8px;
+  color: #8aab96;
+  border-bottom: 1px solid rgba(45, 220, 122, 0.06);
+  vertical-align: middle;
+}
+
+.po-ing-cost-table th:first-child,
+.po-ing-cost-table td:first-child {
+  width: 32%;
+}
+
+.po-ing-cost-table th:not(:first-child),
+.po-ing-cost-table td:not(:first-child) {
+  text-align: right;
+  white-space: nowrap;
 }
 
 .po-ing-cost-name {
@@ -557,7 +586,9 @@
   color: #8aab96;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
+  text-align: left;
+  white-space: normal;
 }
 
 .po-ing-dot {
@@ -568,6 +599,13 @@
   flex-shrink: 0;
 }
 
+.po-ing-cost-cell {
+  display: grid;
+  grid-template-columns: minmax(28px, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+}
+
 .po-cost-bar-wrap {
   display: flex;
   align-items: center;
@@ -575,6 +613,7 @@
 
 .po-cost-bar-bg {
   width: 100%;
+  display: block;
   height: 8px;
   background: rgba(45, 220, 122, 0.08);
   border-radius: 999px;
@@ -582,6 +621,7 @@
 }
 
 .po-cost-bar-fill {
+  display: block;
   height: 8px;
   background: #2ddc7a;
 }

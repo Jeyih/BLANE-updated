@@ -473,18 +473,113 @@
 }
 
 .meal-card-ingredients.open {
-  max-height: 300px;
+  max-height: 420px;
   padding-bottom: 14px;
 }
 
-.ingredients-title {
-  font-size: 11px;
+.ingredient-table-wrap {
+  max-height: 370px;
+  overflow: auto;
+}
+
+.ingredient-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 12px;
+}
+
+.ingredient-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 10px;
   color: #4d6e5a;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  margin-bottom: 10px;
-  padding-top: 4px;
+  background: #0d1a12;
   border-top: 1px solid rgba(45, 220, 122, 0.07);
+  border-bottom: 1px solid rgba(45, 220, 122, 0.1);
+  font-size: 10px;
+  font-weight: 600;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ingredient-table th:first-child,
+.ingredient-table td:first-child {
+  width: 35%;
+}
+
+.ingredient-table th:not(:first-child),
+.ingredient-table td:not(:first-child) {
+  text-align: right;
+}
+
+.ingredient-table td {
+  padding: 9px 10px;
+  color: #8aab96;
+  border-bottom: 1px solid rgba(45, 220, 122, 0.06);
+  vertical-align: middle;
+}
+
+.ingredient-table-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.ingredient-table-name .ingredient-name {
+  min-width: 90px;
+}
+
+.ingredient-table .ingredient-status {
+  flex-shrink: 0;
+}
+
+.ingredient-table .ingredient-seasonal-row td {
+  padding: 0 10px 8px 22px;
+  border-bottom: 0;
+  text-align: left;
+}
+
+.ingredient-seasonal-row:empty {
+  display: none;
+}
+
+.ingredient-table td:nth-child(3),
+.ingredient-table td:nth-child(4),
+.ingredient-table td:nth-child(5) {
+  white-space: nowrap;
+}
+
+.ingredient-table td:nth-child(2) {
+  overflow-wrap: anywhere;
+}
+
+.ingredient-table td[colspan] {
+  font-size: 11px;
+}
+
+.ingredient-table th:not(:first-child),
+.ingredient-table td:not(:first-child) {
+  width: 16.25%;
+}
+
+.ingredient-table .ingredient-qty {
+  font-size: 12px;
+  color: #4d6e5a;
+}
+
+.ingredient-table th:last-child {
+  text-align: right;
+}
+
+.ingredient-table th:nth-child(2),
+.ingredient-table th:nth-child(3) {
+  text-align: right;
 }
 
 .ingredient-row {

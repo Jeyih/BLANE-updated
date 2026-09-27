@@ -79,6 +79,10 @@ export default function PortionOptimizerPanel({ meal, profile, totalMealsToday, 
         });
 
         const payload = await res.json().catch(() => ({}));
+          const sourceQuantity = meal.ingredients.find((item) => item.name === ing.name)?.quantity;
+          const quantityValue = sourceQuantity == null || sourceQuantity === ''
+            ? '—'
+            : applied ? ing.optimized || sourceQuantity : sourceQuantity;
         if (!res.ok) {
           throw new Error(payload.error || 'BLANE AI could not optimize this meal.');
         }
@@ -217,11 +221,16 @@ export default function PortionOptimizerPanel({ meal, profile, totalMealsToday, 
 
         <div className="opt-section-title">Ingredient Portions — Original vs Optimized</div>
         <div className="opt-table-header">
-          <span>Ingredient</span><span style={{ textAlign: 'center' }}>Original</span>
-          <span style={{ textAlign: 'center' }}>Optimized</span><span style={{ textAlign: 'right' }}>Macros</span>
+          <span>Ingredient</span><span style={{ textAlign: 'center' }}>Quantity</span>
+          <span style={{ textAlign: 'center' }}>Original</span><span style={{ textAlign: 'center' }}>Optimized</span>
+          <span style={{ textAlign: 'right' }}>Macros</span>
         </div>
         {result.ingredients.map((ing) => {
           const changeClass = ing.increased ? 'more' : ing.decreased ? 'less' : 'same';
+          const sourceQuantity = meal.ingredients.find((item) => item.name === ing.name)?.quantity;
+          const quantityValue = sourceQuantity == null || sourceQuantity === ''
+            ? '—'
+            : applied ? ing.optimized || sourceQuantity : sourceQuantity;
           const changeTxt = ing.increased
             ? '+' + ((result.scaleFactor - 1) * 100).toFixed(0) + '%'
             : ing.decreased
@@ -230,6 +239,7 @@ export default function PortionOptimizerPanel({ meal, profile, totalMealsToday, 
           return (
             <div key={ing.name} className="opt-ing-row">
               <div className="opt-ing-name"><div className="opt-ing-dot"></div>{ing.name}</div>
+              <div className="opt-ing-quantity">{quantityValue}</div>
               <div className="opt-ing-original">{ing.original}</div>
               <div className="opt-ing-optimized">
                 <div className="opt-ing-opt-val">{ing.optimized}</div>
@@ -249,7 +259,6 @@ export default function PortionOptimizerPanel({ meal, profile, totalMealsToday, 
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
             Apply to Meal Plan
           </button>
-          <button className="opt-btn opt-btn-outline" onClick={onClose}>Keep Original</button>
           {applied && <span className="opt-applied-badge show">✓ Portions applied to today's plan</span>}
           {!applied && aiMode === 'ai' && !aiLoading && (
             <span className="opt-ai-footer-note">
