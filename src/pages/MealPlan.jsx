@@ -15,6 +15,7 @@ import PortionOptimizerPanel, { OptimizeButton } from '../components/PortionOpti
 import { scoreRecipe } from '../lib/seasonal';
 import { SeasonBadge, IngSeasonTag, SeasonalAltBanner } from '../components/SeasonalBadges';
 import { loadConstraintDefinitions, getActiveConstraints, checkRecipeViolations } from '../lib/constraints';
+import { applyDynamicRecipePrices, loadMarketIngredientPrices } from '../lib/pricing';
 import { ViolationBadge, ViolationDetail } from '../components/ConstraintWarnings';
 import '../styles/mealplan.css';
 import '../styles/priceopt.css';
@@ -44,7 +45,6 @@ function getCalorieGoal(profile) {
 function getIngredientQuantityLabel(ingredient, optimizedQuantity) {
   const hasQuantity = ingredient.quantity != null && ingredient.quantity !== '';
   if (!hasQuantity) return '—';
-
   const quantity = optimizedQuantity != null && optimizedQuantity !== ''
     ? optimizedQuantity
     : ingredient.quantity;
@@ -89,7 +89,7 @@ export default function MealPlan() {
   const [openOptimizerId, setOpenOptimizerId] = useState(null);
   const [appliedOptimizations, setAppliedOptimizations] = useState(() => {
     try {
-      return JSON.parse(sessionStorage.getItem('blane_optimized') || '{}');
+      return JSON.parse(sessionStorage.getItem('blane_optimized_v2') || '{}');
     } catch {
       return {};
     }
@@ -138,12 +138,13 @@ export default function MealPlan() {
     }
 
     const { data: ingData } = await supabase.from('recipe_ingredients').select('*').order('sort_order');
+    const marketPrices = await loadMarketIngredientPrices(supabase);
     const linkedFctIds = [...new Set((ingData || []).map((ing) => ing.fct_id).filter(Boolean))];
     let nutrientByFctId = {};
     if (linkedFctIds.length > 0) {
       const { data: nutrientRows, error: nutrientError } = await supabase
         .from('fnri_food_composition')
-        .select('fct_id, energy_kcal')
+        .select('fct_id, energy_kcal, protein_g, total_fat_g, available_carbohydrate_g')
         .in('fct_id', linkedFctIds);
       if (!nutrientError && nutrientRows) {
         nutrientByFctId = Object.fromEntries(nutrientRows.map((row) => [row.fct_id, row]));
@@ -153,12 +154,13 @@ export default function MealPlan() {
     const ingByRecipe = {};
     (ingData || []).forEach((ing) => {
       if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
-      const quantity = ing.quantity != null && ing.quantity !== '' ? ing.quantity : ing.qty ?? '';
+      const quantity = ing.quantity ?? '';
       ingByRecipe[ing.recipe_id].push({
         name: ing.name || ing.ingredient_name || ing.food_name,
+        fct_id: ing.fct_id,
         ingredient_name: ing.ingredient_name,
         food_name: ing.food_name,
-        qty: quantity || ing.grams,
+        qty: quantity,
         quantity,
         grams: ing.grams,
         calories: nutrientByFctId[ing.fct_id]
@@ -169,10 +171,18 @@ export default function MealPlan() {
     });
 
     const formatted = (recipesData || []).map((r) => {
-      const recipeIngredients = (ingByRecipe[r.id] || []).map((ing) => ({
-        ...ing,
-        cost: Number(((r.cost || 0) / Math.max((ingByRecipe[r.id] || []).length, 1)).toFixed(2)),
-      }));
+      const servings = Number(r.servings) || 1;
+      const recipeIngredients = (ingByRecipe[r.id] || []).map((ing) => {
+        const nutrient = nutrientByFctId[ing.fct_id];
+        const servingFactor = (Number(ing.grams) || 0) / (100 * servings);
+        return {
+          ...ing,
+          protein: nutrient?.protein_g == null ? null : Number(nutrient.protein_g) * servingFactor,
+          carbs: nutrient?.available_carbohydrate_g == null ? null : Number(nutrient.available_carbohydrate_g) * servingFactor,
+          fats: nutrient?.total_fat_g == null ? null : Number(nutrient.total_fat_g) * servingFactor,
+          cost: Number(((r.cost || 0) / Math.max((ingByRecipe[r.id] || []).length, 1)).toFixed(2)),
+        };
+      });
 
       return {
         id: r.id,
@@ -194,7 +204,8 @@ export default function MealPlan() {
       };
     });
 
-    setRecipes(formatted);
+    const dynamicallyPricedRecipes = applyDynamicRecipePrices(formatted, marketPrices);
+    setRecipes(dynamicallyPricedRecipes);
     setLoadingRecipes(false);
 
     // Initialize daySlots if empty
@@ -210,7 +221,7 @@ export default function MealPlan() {
         console.error('Error parsing stored meal plan:', e);
       }
     }
-    setDaySlots(generateDefaultPlan(formatted));
+    setDaySlots(generateDefaultPlan(dynamicallyPricedRecipes));
   }
 
   useEffect(() => {
@@ -473,6 +484,11 @@ export default function MealPlan() {
                         optimizedKcal: result.optimizedKcal,
                       },
                     }))}
+                    onOriginalMeal={(mealId) => setAppliedOptimizations((prev) => {
+                      const next = { ...prev };
+                      delete next[mealId];
+                      return next;
+                    })}
                     activeConstraints={activeConstraints}
                     constraintDefinitions={constraintDefinitions}
                     getMeal={getMeal}
@@ -745,7 +761,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
           <div className="po-header-icon">💸</div>
           <div>
             <div className="po-title">Price-Aware Meal Optimizer</div>
-            <div className="po-sub">Rank and filter meals by your daily budget</div>
+            <div className="po-sub">Costs use current market averages (₱/kg); unmatched ingredients use recipe estimates.</div>
           </div>
         </div>
       </div>
@@ -881,6 +897,9 @@ function PriceOptimizerPanel({ meals = [], profile }) {
                 </div>
                 <div className="po-meal-cost-wrap">
                   <div className="po-meal-cost">₱{meal.cost}</div>
+                  <span className={`po-price-source ${meal.pricingSource === 'market' ? 'market' : ''}`}>
+                    {meal.pricingSource === 'market' ? 'Market estimate' : 'Recipe estimate'}
+                  </span>
                   <span className={`po-afford-badge ${affordClass}`}>{affordClass === 'cheap' ? 'Budget-Friendly' : affordClass === 'okay' ? 'Affordable' : affordClass === 'pricey' ? 'Slightly Over' : 'Over Budget'}</span>
                 </div>
                 <button className={`po-expand-btn ${expandedId === meal.id ? 'open' : ''}`} type="button" onClick={(event) => { event.stopPropagation(); toggleExpand(meal.id); }}>
@@ -945,7 +964,7 @@ function computeCheapestDay(meals = [], perMeal) {
   }, 0);
 }
 
-function SlotCard({ slot, idx, profile, appliedOptimization, onPortionApplied, activeConstraints, constraintDefinitions, getMeal, totalMealsToday, groceryList, openOptimizerId, onSetOpenOptimizer, onRemove, onSwap, onAddGrocery }) {
+function SlotCard({ slot, idx, profile, appliedOptimization, onPortionApplied, onOriginalMeal, activeConstraints, constraintDefinitions, getMeal, totalMealsToday, groceryList, openOptimizerId, onSetOpenOptimizer, onRemove, onSwap, onAddGrocery }) {
   const meal = getMeal(slot.mealId);
   const [ingredientsOpen, setIngredientsOpen] = useState(false);
   const alreadyAdded = meal && groceryList.some((g) => g.mealId === meal.id);
@@ -974,7 +993,10 @@ function SlotCard({ slot, idx, profile, appliedOptimization, onPortionApplied, a
             <div className="meal-card-top">
               <div className="meal-card-emoji">{meal.emoji}</div>
               <div className="meal-card-info">
-                <div className="meal-card-name">{meal.name}</div>
+                <div className="meal-card-name-row">
+                  <div className="meal-card-name">{meal.name}</div>
+                  {appliedOptimization && <span className="meal-optimized-badge">Optimized meal</span>}
+                </div>
                 <div className="meal-card-meta">{slot.time || 'Meal'} &nbsp;·&nbsp; {meal.prep} prep</div>
                 <div className="meal-macro-chips">
                   <div className="macro-chip"><b>{meal.protein}g</b> Protein</div>
@@ -999,7 +1021,6 @@ function SlotCard({ slot, idx, profile, appliedOptimization, onPortionApplied, a
                     <tr>
                       <th scope="col">Ingredient</th>
                       <th scope="col">Quantity</th>
-                      <th scope="col">Optimized</th>
                       <th scope="col">Grams</th>
                       <th scope="col">Calories</th>
                     </tr>
@@ -1022,12 +1043,11 @@ function SlotCard({ slot, idx, profile, appliedOptimization, onPortionApplied, a
                             </div>
                           </td>
                           <td>{quantityLabel}</td>
-                          <td>{optimizedIngredient?.optimized || '—'}</td>
                           <td>{displayedGrams == null ? '—' : `${displayedGrams} g`}</td>
                           <td>{calories == null ? '—' : `${calories} kcal`}</td>
                         </tr>
                         <tr className="ingredient-seasonal-row">
-                          <td colSpan="5"><SeasonalAltBanner ingredientName={ing.name} /></td>
+                          <td colSpan="4"><SeasonalAltBanner ingredientName={ing.name} /></td>
                         </tr>
                       </Fragment>
                       );
@@ -1061,6 +1081,7 @@ function SlotCard({ slot, idx, profile, appliedOptimization, onPortionApplied, a
             open={openOptimizerId === meal.id}
             onClose={() => onSetOpenOptimizer(null)}
             onApplied={onPortionApplied}
+            onOriginalMeal={onOriginalMeal}
           />
         </>
       )}

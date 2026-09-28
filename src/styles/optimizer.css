@@ -362,7 +362,7 @@
 /* Table header */
 .opt-table-header {
   display: grid;
-  grid-template-columns: minmax(130px, 1fr) 80px 75px 90px 105px;
+  grid-template-columns: minmax(130px, 1fr) 100px 100px 80px 90px 115px;
   gap: 8px;
   padding: 0 10px 8px;
   font-size: 10px;
@@ -371,10 +371,18 @@
   letter-spacing: 0.6px;
 }
 
+.opt-table-header > :nth-child(n + 2):nth-child(-n + 5) {
+  text-align: center;
+}
+
+.opt-table-header > :last-child {
+  text-align: right;
+}
+
 /* Ingredient row */
 .opt-ing-row {
   display: grid;
-  grid-template-columns: minmax(130px, 1fr) 80px 75px 90px 105px;
+  grid-template-columns: minmax(130px, 1fr) 100px 100px 80px 90px 115px;
   gap: 8px;
   align-items: center;
   padding: 10px 10px;
@@ -387,6 +395,41 @@
 
 .opt-ing-row:hover {
   border-color: rgba(45, 220, 122, 0.18);
+}
+
+.opt-ingredient-table-wrap {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(45, 220, 122, 0.3) transparent;
+}
+
+.opt-ing-grams {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: #8aab96;
+  white-space: nowrap;
+}
+
+.opt-ing-quantity {
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.opt-ing-quantity-original {
+  font-family: inherit;
+  font-size: 12px;
+  color: #8aab96;
+  white-space: nowrap;
+}
+
+.opt-ing-quantity-optimized {
+  font-family: inherit;
+  font-size: 12px;
+  color: #8aab96;
+  white-space: nowrap;
 }
 
 .opt-ing-name {
@@ -594,15 +637,14 @@
    RESPONSIVE
    ============================================================ */
 @media (max-width: 640px) {
-  .opt-table-header,
-  .opt-ing-row {
-    grid-template-columns: minmax(110px, 1fr) 55px 60px 65px 75px;
+  .opt-ingredient-table-wrap {
+    padding-bottom: 6px;
   }
 
-  /* Hide macro column on mobile */
-  .opt-table-header > :last-child,
-  .opt-ing-row > .opt-ing-macro {
-    display: none;
+  .opt-table-header,
+  .opt-ing-row {
+    min-width: 680px;
+    grid-template-columns: minmax(130px, 1fr) 100px 100px 80px 90px 115px;
   }
 
   .opt-macro-compare {
@@ -921,7 +963,7 @@
 /* Table header */
 .opt-table-header {
   display: grid;
-  grid-template-columns: minmax(130px, 1fr) 80px 75px 90px 105px;
+  grid-template-columns: minmax(130px, 1fr) 100px 100px 80px 90px 115px;
   gap: 8px;
   padding: 0 10px 8px;
   font-size: 10px;
@@ -933,7 +975,7 @@
 /* Ingredient row */
 .opt-ing-row {
   display: grid;
-  grid-template-columns: minmax(130px, 1fr) 80px 75px 90px 105px;
+  grid-template-columns: minmax(130px, 1fr) 100px 100px 80px 90px 115px;
   gap: 8px;
   align-items: center;
   padding: 10px 10px;
@@ -1090,15 +1132,14 @@
    RESPONSIVE
    ============================================================ */
 @media (max-width: 640px) {
-  .opt-table-header,
-  .opt-ing-row {
-    grid-template-columns: minmax(110px, 1fr) 55px 60px 65px 75px;
+  .opt-ingredient-table-wrap {
+    padding-bottom: 6px;
   }
 
-  /* Hide macro column on mobile */
-  .opt-table-header > :last-child,
-  .opt-ing-row > .opt-ing-macro {
-    display: none;
+  .opt-table-header,
+  .opt-ing-row {
+    min-width: 680px;
+    grid-template-columns: minmax(130px, 1fr) 100px 100px 80px 90px 115px;
   }
 
   .opt-macro-compare {

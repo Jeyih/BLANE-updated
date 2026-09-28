@@ -35,8 +35,9 @@ function getOptimizeMealUrl() {
   return SUPABASE_URL.replace('.supabase.co', '.functions.supabase.co') + '/optimize-meal';
 }
 
-export default function PortionOptimizerPanel({ meal, profile, totalMealsToday, open, onClose, onApplied }) {
+export default function PortionOptimizerPanel({ meal, profile, totalMealsToday, open, onClose, onApplied, onOriginalMeal }) {
   const [applied, setApplied] = useState(false);
+  const [originalRestored, setOriginalRestored] = useState(false);
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
@@ -79,10 +80,6 @@ export default function PortionOptimizerPanel({ meal, profile, totalMealsToday, 
         });
 
         const payload = await res.json().catch(() => ({}));
-          const sourceQuantity = meal.ingredients.find((item) => item.name === ing.name)?.quantity;
-          const quantityValue = sourceQuantity == null || sourceQuantity === ''
-            ? '—'
-            : applied ? ing.optimized || sourceQuantity : sourceQuantity;
         if (!res.ok) {
           throw new Error(payload.error || 'BLANE AI could not optimize this meal.');
         }
@@ -133,16 +130,31 @@ export default function PortionOptimizerPanel({ meal, profile, totalMealsToday, 
   const pBar = (val, target) => Math.min(Math.round((val / target) * 100), 120);
 
   function handleApply() {
-    const saved = JSON.parse(sessionStorage.getItem('blane_optimized') || '{}');
+    const saved = JSON.parse(sessionStorage.getItem('blane_optimized_v2') || '{}');
     saved[meal.id] = {
       scaleFactor: result.scaleFactor,
       ingredients: result.ingredients,
       optimizedKcal: result.optimizedKcal,
       appliedAt: new Date().toISOString(),
     };
-    sessionStorage.setItem('blane_optimized', JSON.stringify(saved));
+    sessionStorage.setItem('blane_optimized_v2', JSON.stringify(saved));
     setApplied(true);
+    setOriginalRestored(false);
     onApplied?.(meal.id, result);
+  }
+
+  function handleOriginalMeal() {
+    let saved = {};
+    try {
+      saved = JSON.parse(sessionStorage.getItem('blane_optimized_v2') || '{}');
+    } catch {
+      saved = {};
+    }
+    delete saved[meal.id];
+    sessionStorage.setItem('blane_optimized_v2', JSON.stringify(saved));
+    setApplied(false);
+    setOriginalRestored(true);
+    onOriginalMeal?.(meal.id);
   }
 
   return (
@@ -220,46 +232,62 @@ export default function PortionOptimizerPanel({ meal, profile, totalMealsToday, 
         </div>
 
         <div className="opt-section-title">Ingredient Portions — Original vs Optimized</div>
-        <div className="opt-table-header">
-          <span>Ingredient</span><span style={{ textAlign: 'center' }}>Quantity</span>
-          <span style={{ textAlign: 'center' }}>Original</span><span style={{ textAlign: 'center' }}>Optimized</span>
-          <span style={{ textAlign: 'right' }}>Macros</span>
+        <div className="opt-ingredient-table-wrap">
+          <div className="opt-table-header">
+            <span>Ingredient</span>
+            <span>Orig Quantity</span>
+            <span>Opti Quantity</span>
+            <span>Original (g)</span>
+            <span>Optimized (g)</span>
+            <span>Macros</span>
+          </div>
+          {result.ingredients.map((ing) => {
+            const sourceIngredient = meal.ingredients.find((item) => item.name === ing.name);
+            const sourceQuantity = sourceIngredient?.quantity;
+            const originalGrams = Number(sourceIngredient?.grams) || 0;
+            const optimizedGrams = originalGrams ? Math.round(originalGrams * result.scaleFactor) : null;
+            const macroValue = (key) => {
+              const ingredientMacro = sourceIngredient?.[key];
+              if (ingredientMacro != null && Number.isFinite(Number(ingredientMacro))) {
+                return Math.round(Number(ingredientMacro) * result.scaleFactor);
+              }
+              return Math.round((Number(meal[key]) || 0) / Math.max(meal.ingredients.length, 1) * result.scaleFactor);
+            };
+            const changeClass = ing.increased ? 'more' : ing.decreased ? 'less' : 'same';
+            const changeTxt = ing.increased
+              ? '+' + ((result.scaleFactor - 1) * 100).toFixed(0) + '%'
+              : ing.decreased
+              ? '-' + ((1 - result.scaleFactor) * 100).toFixed(0) + '%'
+              : 'same';
+            return (
+              <div key={ing.name} className="opt-ing-row">
+                <div className="opt-ing-name"><div className="opt-ing-dot"></div>{ing.name}</div>
+                <div className="opt-ing-quantity opt-ing-quantity-original">{sourceQuantity == null || sourceQuantity === '' ? '—' : sourceQuantity}</div>
+                <div className="opt-ing-quantity opt-ing-quantity-optimized">{ing.optimized || '—'}</div>
+                <div className="opt-ing-grams">{originalGrams ? `${originalGrams} g` : '—'}</div>
+                <div className="opt-ing-grams">
+                  {optimizedGrams == null ? '—' : <><span>{optimizedGrams} g</span><small className={'opt-ing-opt-change ' + changeClass}>{changeTxt}</small></>}
+                </div>
+                <div className="opt-ing-macro">
+                  <div className="opt-ing-macro-line">P <b>~{macroValue('protein')}g</b></div>
+                  <div className="opt-ing-macro-line">C <b>~{macroValue('carbs')}g</b></div>
+                  <div className="opt-ing-macro-line">F <b>~{macroValue('fats')}g</b></div>
+                </div>
+              </div>
+            );
+          })}
         </div>
-        {result.ingredients.map((ing) => {
-          const changeClass = ing.increased ? 'more' : ing.decreased ? 'less' : 'same';
-          const sourceQuantity = meal.ingredients.find((item) => item.name === ing.name)?.quantity;
-          const quantityValue = sourceQuantity == null || sourceQuantity === ''
-            ? '—'
-            : applied ? ing.optimized || sourceQuantity : sourceQuantity;
-          const changeTxt = ing.increased
-            ? '+' + ((result.scaleFactor - 1) * 100).toFixed(0) + '%'
-            : ing.decreased
-            ? '-' + ((1 - result.scaleFactor) * 100).toFixed(0) + '%'
-            : 'same';
-          return (
-            <div key={ing.name} className="opt-ing-row">
-              <div className="opt-ing-name"><div className="opt-ing-dot"></div>{ing.name}</div>
-              <div className="opt-ing-quantity">{quantityValue}</div>
-              <div className="opt-ing-original">{ing.original}</div>
-              <div className="opt-ing-optimized">
-                <div className="opt-ing-opt-val">{ing.optimized}</div>
-                <div className={'opt-ing-opt-change ' + changeClass}>{changeTxt}</div>
-              </div>
-              <div className="opt-ing-macro">
-                <div className="opt-ing-macro-line">P <b>~{Math.round(meal.protein / meal.ingredients.length * result.scaleFactor)}g</b></div>
-                <div className="opt-ing-macro-line">C <b>~{Math.round(meal.carbs / meal.ingredients.length * result.scaleFactor)}g</b></div>
-                <div className="opt-ing-macro-line">F <b>~{Math.round(meal.fats / meal.ingredients.length * result.scaleFactor)}g</b></div>
-              </div>
-            </div>
-          );
-        })}
 
         <div className="opt-apply-row">
           <button className="opt-btn opt-btn-primary" onClick={handleApply}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
             Apply to Meal Plan
           </button>
+          <button className="opt-btn opt-btn-outline" onClick={handleOriginalMeal}>
+            Original Meal
+          </button>
           {applied && <span className="opt-applied-badge show">✓ Portions applied to today's plan</span>}
+          {originalRestored && <span className="opt-applied-badge show">✓ Original meal restored</span>}
           {!applied && aiMode === 'ai' && !aiLoading && (
             <span className="opt-ai-footer-note">
               <svg viewBox="0 0 24 24" fill="currentColor" width="11" height="11"><path d="M12 2.5l1.8 5.2 5.2 1.8-5.2 1.8L12 17.5l-1.8-5.2-5.2-1.8 5.2-1.8L12 2.5z" /></svg>
@@ -333,33 +361,28 @@ function scaleIngredient(ing, factor) {
 function scaleQtyString(qtyStr, factor) {
   if (!qtyStr || qtyStr === 'to taste') return qtyStr;
   const normalizedQty = String(qtyStr).trim();
-  const match = normalizedQty.match(/^([\d./½¼¾⅓⅔]+)\s*(.*)/);
+  const match = normalizedQty.match(/^(\s*~?\s*)(?:scant\s+)?(\d+(?:\s+\d+\/\d+|\/\d+)?|[½¼¾⅓⅔])\s*(.*)$/i);
   if (!match) return qtyStr;
 
-  let num = parseFraction(match[1]);
-  const unit = match[2].trim();
+  const [, estimatePrefix, amount, unit] = match;
+  const num = parseFraction(amount);
   if (isNaN(num) || num === 0) return qtyStr;
 
-  const scaled = num * factor;
-  let formatted;
-  if (['pcs', 'pc', 'cloves', 'slices', 'stalks'].includes(unit)) {
-    const rounded = Math.round(scaled * 2) / 2;
-    formatted = rounded % 1 === 0.5 ? rounded.toFixed(1) : Math.round(rounded).toString();
-  } else if (unit === 'cup' || unit === 'cups') {
-    formatted = formatCup(scaled);
-  } else if (unit === 'tbsp' || unit === 'tsp') {
-    const rounded = Math.round(scaled * 4) / 4;
-    formatted = rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1);
-  } else {
-    const rounded = Math.round(scaled / 5) * 5 || Math.round(scaled);
-    formatted = rounded.toString();
-  }
-  return formatted + (unit ? ' ' + unit : '');
+  if (factor === 1) return qtyStr;
+  const countUnit = /\b(?:pc|pcs|piece|pieces|clove|cloves|slice|slices|stalk|stalks|pod|pods|link|links|egg|eggs|banana|tomato|onion|carrot|potato|shrimp|sachet|sachets|can|cans|disc|discs|portion|serving|breast|gourd|fish|squid|puto|saba)\b/i.test(unit);
+  const denominator = countUnit ? 2 : 4;
+  const scaled = Math.max(1 / denominator, Math.round((num * factor) * denominator) / denominator);
+  const formatted = formatQuantityNumber(scaled, denominator);
+  return estimatePrefix + formatted + (unit ? ' ' + unit : '');
 }
 
 function parseFraction(str) {
   const fracts = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 0.333, '⅔': 0.667 };
   if (fracts[str]) return fracts[str];
+  if (str.includes(' ')) {
+    const [whole, fraction] = str.split(/\s+/, 2);
+    return parseFloat(whole) + parseFraction(fraction);
+  }
   if (str.includes('/')) {
     const parts = str.split('/');
     return parseFloat(parts[0]) / parseFloat(parts[1]);
@@ -367,10 +390,13 @@ function parseFraction(str) {
   return parseFloat(str);
 }
 
-function formatCup(val) {
-  if (val >= 0.875) return Math.round(val).toString();
-  if (val >= 0.625) return '¾';
-  if (val >= 0.375) return '½';
-  if (val >= 0.175) return '¼';
-  return val.toFixed(2);
+function formatQuantityNumber(value, denominator) {
+  const rounded = Math.round(value * denominator) / denominator;
+  const whole = Math.floor(rounded);
+  const numerator = Math.round((rounded - whole) * denominator);
+  const fraction = denominator === 2
+    ? { 1: '1/2' }
+    : { 1: '1/4', 2: '1/2', 3: '3/4' };
+  if (!numerator) return String(whole);
+  return whole ? `${whole} ${fraction[numerator]}` : fraction[numerator];
 }

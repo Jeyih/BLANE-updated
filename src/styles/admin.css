@@ -366,7 +366,7 @@
 
 .ad-sub-row {
   display: grid;
-  grid-template-columns: 1fr 90px 90px 90px 32px;
+  grid-template-columns: minmax(120px, 1fr) 70px 70px 90px 90px 32px;
   gap: 6px;
   align-items: center;
   margin-bottom: 6px;

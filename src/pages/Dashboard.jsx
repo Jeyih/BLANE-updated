@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { applyDynamicRecipePrices, loadMarketIngredientPrices } from '../lib/pricing';
 import Navbar from '../components/Navbar';
 import FeedbackWidget from '../components/FeedbackWidget';
 import DriftWidget from '../components/DriftWidget';
@@ -187,14 +188,15 @@ function MealPlanWidget({ profile }) {
       setLoading(true);
       const { data: recipesData } = await supabase.from('recipes').select('*').order('name');
       const { data: ingData } = await supabase.from('recipe_ingredients').select('*').order('sort_order');
+      const marketPrices = await loadMarketIngredientPrices(supabase);
 
       const ingByRecipe = {};
       (ingData || []).forEach((ing) => {
         if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
-        ingByRecipe[ing.recipe_id].push({ name: ing.name, qty: ing.qty, status: ing.status || 'avail' });
+        ingByRecipe[ing.recipe_id].push({ name: ing.name || ing.ingredient_name || ing.food_name, qty: ing.quantity ?? ing.qty, grams: ing.grams, status: ing.status || 'avail' });
       });
 
-      const formattedRecipes = (recipesData || []).map((r) => ({
+      const formattedRecipes = applyDynamicRecipePrices((recipesData || []).map((r) => ({
         id: r.id,
         emoji: r.emoji || '🍲',
         name: r.name,
@@ -208,7 +210,7 @@ function MealPlanWidget({ profile }) {
         carbs: r.carbs_g || 0,
         fats: r.fats_g || 0,
         ingredients: ingByRecipe[r.id] || [],
-      }));
+      })), marketPrices);
 
       setRecipes(formattedRecipes);
 
