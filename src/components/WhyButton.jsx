@@ -19,7 +19,7 @@ function getExplainMealUrl() {
 
 const VERDICT_ICONS = { safe: '✅', caution: '⚠️', avoid: '🚫' };
 
-export default function WhyButton({ meal, profile }) {
+export default function WhyButton({ meal, profile, violations = [] }) {
   const [open, setOpen]           = useState(false);
   const [verdict, setVerdict]     = useState(null);
   const [text, setText]           = useState('');
@@ -29,7 +29,13 @@ export default function WhyButton({ meal, profile }) {
 
   const btnRef     = useRef(null);
   const popoverRef = useRef(null);
+  const contentRef = useRef(null);
   const abortRef   = useRef(null);
+  const severityOrder = { allergy: 0, medical: 1, dietary: 2 };
+  const primaryViolation = [...violations].sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity])[0];
+  const mealStatus = primaryViolation?.severity === 'allergy'
+    ? 'Avoid'
+    : primaryViolation ? 'Caution' : 'Safe';
 
   function toggle() {
     if (open) { close(); return; }
@@ -62,7 +68,12 @@ export default function WhyButton({ meal, profile }) {
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + session.access_token,
         },
-        body: JSON.stringify({ mealId: meal.id, meal, profile }),
+        body: JSON.stringify({
+          mealId: meal.id,
+          meal: { ...meal, constraintWarnings: violations },
+          profile,
+          constraintWarnings: violations,
+        }),
       });
 
       if (!res.ok || !res.body) throw new Error('AI service returned an error.');
@@ -115,9 +126,9 @@ export default function WhyButton({ meal, profile }) {
   function positionPopover() {
     if (!btnRef.current) return;
     const btnRect = btnRef.current.getBoundingClientRect();
-    const popW = 320;
-    const popH = popoverRef.current?.offsetHeight || 220;
     const vpW = window.innerWidth;
+    const popW = popoverRef.current?.offsetWidth || Math.min(420, vpW - 16);
+    const popH = popoverRef.current?.offsetHeight || 220;
     const vpH = window.innerHeight;
     const margin = 8;
 
@@ -140,6 +151,14 @@ export default function WhyButton({ meal, profile }) {
     if (open) positionPopover();
   }, [text, verdict, open]);
 
+  useEffect(() => {
+    if (open && contentRef.current) contentRef.current.scrollTop = 0;
+  }, [open]);
+
+  useEffect(() => {
+    if (open && !streaming && contentRef.current) contentRef.current.scrollTop = 0;
+  }, [open, streaming]);
+
   /* Close on outside click / ESC */
   useEffect(() => {
     if (!open) return;
@@ -150,11 +169,16 @@ export default function WhyButton({ meal, profile }) {
 
   return (
     <>
-      <button ref={btnRef} className="xai-why-btn" onClick={(e) => { e.stopPropagation(); toggle(); }}>
+      <button
+        ref={btnRef}
+        className={`xai-why-btn status-${mealStatus.toLowerCase()}` + (primaryViolation ? ` warning warning-${primaryViolation.severity}` : '')}
+        title={primaryViolation ? `Explain ${violations.length} meal warning${violations.length === 1 ? '' : 's'}` : 'Explain this meal'}
+        onClick={(e) => { e.stopPropagation(); toggle(); }}
+      >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
-        {' Why?'}
+        {` ${mealStatus}, See why?`}
       </button>
 
       {open && createPortal(
@@ -169,39 +193,53 @@ export default function WhyButton({ meal, profile }) {
               <div className="xai-pop-header-left">
                 <div className="xai-pop-icon">✨</div>
                 <div>
-                  <div className="xai-pop-title">Why Recommended?</div>
+                  <div className="xai-pop-title">{violations.length ? 'Why This Meal Has Warnings' : 'Why Recommended?'}</div>
                   <div className="xai-pop-meal">{meal.name}</div>
                 </div>
               </div>
               <button className="xai-pop-close" onClick={close}>✕</button>
             </div>
 
-            {verdict && (
-              <div>
-                <div className={'xai-verdict-badge xai-verdict-' + verdict.verdict}>
-                  <span className="xai-verdict-icon">{VERDICT_ICONS[verdict.verdict] || '✅'}</span>
-                  <span className="xai-verdict-label">{verdict.label}</span>
+            <div ref={contentRef} className="xai-pop-content">
+              {violations.length > 0 && (
+                <div className="xai-warning-context">
+                  <strong>Detected meal warnings</strong>
+                  {violations.map((violation, index) => (
+                    <div className={'xai-warning-item warning-' + violation.severity} key={`${violation.severity}-${violation.ingredient}-${index}`}>
+                      <span>{violation.icon} {violation.constraintLabel}</span>
+                      <span>{violation.ingredient}: {violation.reason}</span>
+                    </div>
+                  ))}
                 </div>
-                {verdict.verdict === 'avoid' && verdict.flagged && (
-                  <div className="xai-flagged-note">{verdict.flagged}</div>
+              )}
+
+              {verdict && (
+                <div>
+                  <div className={'xai-verdict-badge xai-verdict-' + verdict.verdict}>
+                    <span className="xai-verdict-icon">{VERDICT_ICONS[verdict.verdict] || '✅'}</span>
+                    <span className="xai-verdict-label">{verdict.label}</span>
+                  </div>
+                  {verdict.verdict === 'avoid' && verdict.flagged && (
+                    <div className="xai-flagged-note">{verdict.flagged}</div>
+                  )}
+                </div>
+              )}
+
+              <div className="xai-explanation">
+                {error ? (
+                  <div className="xai-error">{error}</div>
+                ) : !text && streaming ? (
+                  <div className="xai-thinking">
+                    <span className="xai-dot"></span><span className="xai-dot"></span><span className="xai-dot"></span>
+                    {' Asking BLANE AI…'}
+                  </div>
+                ) : (
+                  <>
+                    <span className="xai-stream-text">{text}</span>
+                    {streaming && <span className="xai-cursor"></span>}
+                  </>
                 )}
               </div>
-            )}
-
-            <div className="xai-explanation">
-              {error ? (
-                <div className="xai-error">{error}</div>
-              ) : !text && streaming ? (
-                <div className="xai-thinking">
-                  <span className="xai-dot"></span><span className="xai-dot"></span><span className="xai-dot"></span>
-                  {' Asking BLANE AI…'}
-                </div>
-              ) : (
-                <>
-                  <span className="xai-stream-text">{text}</span>
-                  {streaming && <span className="xai-cursor"></span>}
-                </>
-              )}
             </div>
 
             <div className="xai-pop-footer">

@@ -175,6 +175,12 @@
   opacity: 1;
 }
 
+.week-day-btn.has-completed .day-dot {
+  width: 6px;
+  height: 6px;
+  background: #fbbf24;
+}
+
 /* ============================================================
    DAY VIEW LAYOUT
    ============================================================ */
@@ -395,6 +401,19 @@
   border-radius: 999px;
   background: rgba(45, 220, 122, 0.1);
   color: #2ddc7a;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.meal-completed-badge {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
   font-size: 10px;
   font-weight: 600;
   line-height: 1.2;
@@ -694,6 +713,13 @@
   background: rgba(45, 220, 122, 0.1);
 }
 
+.meal-action-btn.complete:hover,
+.meal-action-btn.complete.completed {
+  border-color: #fbbf24;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+}
+
 .meal-action-btn svg {
   width: 13px;
   height: 13px;
@@ -965,6 +991,77 @@
 
 .swap-close:hover {
   color: #e8f5ee;
+}
+
+.completion-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.completion-modal {
+  width: 100%;
+  max-width: 400px;
+  padding: 28px;
+  border: 1px solid rgba(45, 220, 122, 0.2);
+  border-radius: 20px;
+  background: #0d1a12;
+  text-align: center;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+.completion-modal-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 14px;
+  place-items: center;
+  border: 1px solid rgba(45, 220, 122, 0.3);
+  border-radius: 50%;
+  background: rgba(45, 220, 122, 0.1);
+  color: #2ddc7a;
+}
+
+.completion-modal-icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.completion-modal-title {
+  color: #e8f5ee;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.completion-modal-copy {
+  margin: 10px 0 22px;
+  color: #8aab96;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.completion-modal-copy strong {
+  color: #e8f5ee;
+}
+
+.completion-modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+@media (max-width: 420px) {
+  .completion-modal-actions {
+    flex-direction: column-reverse;
+  }
 }
 
 .swap-options {

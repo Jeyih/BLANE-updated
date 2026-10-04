@@ -51,6 +51,11 @@ function getIngredientQuantityLabel(ingredient, optimizedQuantity) {
   return String(quantity);
 }
 
+function getMealCompletionKey(date, slot, index) {
+  const dateKey = [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+  return `${dateKey}:${index}:${slot.type}:${slot.mealId || 'empty'}`;
+}
+
 function generateDefaultPlan(recipeList) {
   if (!recipeList || recipeList.length === 0) return {};
   const breakfasts = recipeList.filter((r) => r.type === 'Breakfast');
@@ -85,6 +90,13 @@ export default function MealPlan() {
   const [currentWeekOffset, setWeekOffset]     = useState(0);
   const [selectedDayIndex, setSelectedDay]     = useState(new Date().getDay());
   const [daySlots, setDaySlots]                = useState({});
+  const [completedMeals, setCompletedMeals]    = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('blane_completed_meals') || '{}');
+    } catch {
+      return {};
+    }
+  });
   const [groceryList, setGroceryList]          = useState(() => JSON.parse(sessionStorage.getItem('blane_grocery') || '[]'));
   const [openOptimizerId, setOpenOptimizerId] = useState(null);
   const [appliedOptimizations, setAppliedOptimizations] = useState(() => {
@@ -102,6 +114,7 @@ export default function MealPlan() {
 
   const [swapTarget, setSwapTarget] = useState(null);
   const [swapChoice, setSwapChoice] = useState(null);
+  const [completionTarget, setCompletionTarget] = useState(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -120,6 +133,10 @@ export default function MealPlan() {
   useEffect(() => {
     sessionStorage.setItem('blane_grocery', JSON.stringify(groceryList));
   }, [groceryList]);
+
+  useEffect(() => {
+    localStorage.setItem('blane_completed_meals', JSON.stringify(completedMeals));
+  }, [completedMeals]);
 
   async function loadProfile() {
     if (!user) return;
@@ -305,6 +322,8 @@ export default function MealPlan() {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const weekEnd = new Date(base); weekEnd.setDate(base.getDate() + 6);
   const weekLabel = months[base.getMonth()] + ' ' + base.getDate() + ' – ' + months[weekEnd.getMonth()] + ' ' + weekEnd.getDate() + ', ' + weekEnd.getFullYear();
+  const selectedDate = new Date(base);
+  selectedDate.setDate(base.getDate() + ((selectedDayIndex + 6) % 7));
 
   const totalKcal = slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.kcal || 0), 0);
   const totalCost = Math.round(slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.cost || 0), 0));
@@ -360,6 +379,17 @@ export default function MealPlan() {
       return next;
     });
     setSwapTarget(null);
+  }
+
+  function confirmMealCompletion() {
+    if (!completionTarget) return;
+    setCompletedMeals((previous) => {
+      const next = { ...previous };
+      if (completionTarget.action === 'undo') delete next[completionTarget.key];
+      else next[completionTarget.key] = true;
+      return next;
+    });
+    setCompletionTarget(null);
   }
 
   function addMealToGrocery(meal) {
@@ -423,11 +453,13 @@ export default function MealPlan() {
                 const jsDay = d.getDay();
                 const isToday = d.toDateString() === today.toDateString();
                 const isActive = jsDay === selectedDayIndex;
-                const hasMeals = (daySlots[jsDay] || []).some((s) => s.mealId);
+                const dayMeals = daySlots[jsDay] || [];
+                const hasMeals = dayMeals.some((s) => s.mealId);
+                const hasCompletedMeals = dayMeals.some((slot, slotIdx) => completedMeals[getMealCompletionKey(d, slot, slotIdx)]);
                 return (
                   <button
                     key={i}
-                    className={'week-day-btn' + (isActive ? ' active' : '') + (isToday ? ' today' : '') + (hasMeals ? ' has-meals' : '')}
+                    className={'week-day-btn' + (isActive ? ' active' : '') + (isToday ? ' today' : '') + (hasMeals ? ' has-meals' : '') + (hasCompletedMeals ? ' has-completed' : '')}
                     onClick={() => setSelectedDay(jsDay)}
                   >
                     <span className="day-name">{days[i]}</span>
@@ -474,6 +506,15 @@ export default function MealPlan() {
                     key={idx}
                     slot={slot}
                     idx={idx}
+                    completed={Boolean(completedMeals[getMealCompletionKey(selectedDate, slot, idx)])}
+                    onToggleComplete={() => {
+                      const key = getMealCompletionKey(selectedDate, slot, idx);
+                      setCompletionTarget({
+                        key,
+                        action: completedMeals[key] ? 'undo' : 'complete',
+                        mealName: getMeal(slot.mealId)?.name || slot.type,
+                      });
+                    }}
                     profile={profile}
                     appliedOptimization={appliedOptimizations[slot.mealId]}
                     onPortionApplied={(mealId, result) => setAppliedOptimizations((prev) => ({
@@ -656,6 +697,28 @@ export default function MealPlan() {
             <button className="mp-btn mp-btn-primary swap-confirm-btn" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }} onClick={confirmSwap}>
               Confirm Selection
             </button>
+          </div>
+        </div>
+      )}
+
+      {completionTarget && (
+        <div className="completion-modal-overlay" onClick={(event) => { if (event.target === event.currentTarget) setCompletionTarget(null); }}>
+          <div className="completion-modal" role="dialog" aria-modal="true" aria-labelledby="completion-modal-title">
+            <div className="completion-modal-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l4 4L19 6" /></svg>
+            </div>
+            <div className="completion-modal-title" id="completion-modal-title">
+              {completionTarget.action === 'undo' ? 'Undo finished meal?' : 'Mark meal as finished?'}
+            </div>
+            <p className="completion-modal-copy">
+              {completionTarget.action === 'undo' ? 'Remove the finished status from' : 'Did you finish eating'} <strong>{completionTarget.mealName}</strong>?
+            </p>
+            <div className="completion-modal-actions">
+              <button className="mp-btn mp-btn-outline" type="button" onClick={() => setCompletionTarget(null)}>Cancel</button>
+              <button className="mp-btn mp-btn-primary" type="button" onClick={confirmMealCompletion}>
+                {completionTarget.action === 'undo' ? 'Yes, undo' : 'Yes, I finished'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -964,7 +1027,7 @@ function computeCheapestDay(meals = [], perMeal) {
   }, 0);
 }
 
-function SlotCard({ slot, idx, profile, appliedOptimization, onPortionApplied, onOriginalMeal, activeConstraints, constraintDefinitions, getMeal, totalMealsToday, groceryList, openOptimizerId, onSetOpenOptimizer, onRemove, onSwap, onAddGrocery }) {
+function SlotCard({ slot, idx, completed, onToggleComplete, profile, appliedOptimization, onPortionApplied, onOriginalMeal, activeConstraints, constraintDefinitions, getMeal, totalMealsToday, groceryList, openOptimizerId, onSetOpenOptimizer, onRemove, onSwap, onAddGrocery }) {
   const meal = getMeal(slot.mealId);
   const [ingredientsOpen, setIngredientsOpen] = useState(false);
   const alreadyAdded = meal && groceryList.some((g) => g.mealId === meal.id);
@@ -996,6 +1059,7 @@ function SlotCard({ slot, idx, profile, appliedOptimization, onPortionApplied, o
                 <div className="meal-card-name-row">
                   <div className="meal-card-name">{meal.name}</div>
                   {appliedOptimization && <span className="meal-optimized-badge">Optimized meal</span>}
+                  {completed && <span className="meal-completed-badge">Finished</span>}
                 </div>
                 <div className="meal-card-meta">{slot.time || 'Meal'} &nbsp;·&nbsp; {meal.prep} prep</div>
                 <div className="meal-macro-chips">
@@ -1058,6 +1122,10 @@ function SlotCard({ slot, idx, profile, appliedOptimization, onPortionApplied, o
             </div>
 
             <div className="meal-card-actions">
+              <button className={'meal-action-btn complete' + (completed ? ' completed' : '')} aria-pressed={completed} onClick={onToggleComplete}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l4 4L19 6" /></svg>
+                {completed ? 'Undo finished' : 'Mark as eaten'}
+              </button>
               <button className="meal-action-btn swap" onClick={() => onSwap(meal, idx)}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3L4 7l4 4" /><path d="M4 7h16" /><path d="M16 21l4-4-4-4" /><path d="M20 17H4" /></svg>
                 Swap meal
@@ -1067,7 +1135,7 @@ function SlotCard({ slot, idx, profile, appliedOptimization, onPortionApplied, o
                 {alreadyAdded ? 'Added ✓' : 'Add to grocery'}
               </button>
               <OptimizeButton onToggle={() => onSetOpenOptimizer(openOptimizerId === meal.id ? null : meal.id)} />
-              <WhyButton meal={meal} profile={profile} />
+              <WhyButton meal={meal} profile={profile} violations={violations} />
               <button className={'toggle-ingredients-btn' + (ingredientsOpen ? ' open' : '')} onClick={() => setIngredientsOpen((v) => !v)}>
                 Ingredients <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6" /></svg>
               </button>

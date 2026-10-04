@@ -65,8 +65,10 @@ export default function Markets() {
 
   const mapRef = useRef(null);
   const markersLayerRef = useRef(null);
+  const selectedGuideLineRef = useRef(null);
   const userMarkerRef = useRef(null);
   const userCircleRef = useRef(null);
+  const routeRequestRef = useRef(0);
   const marketRequestRef = useRef(0);
 
   useEffect(() => {
@@ -249,7 +251,41 @@ export default function Markets() {
   function updateMap() {
     if (!mapRef.current || !markersLayerRef.current) return;
 
+    const routeRequestId = ++routeRequestRef.current;
     markersLayerRef.current.clearLayers();
+    if (selectedGuideLineRef.current) {
+      selectedGuideLineRef.current.remove();
+      selectedGuideLineRef.current = null;
+    }
+
+    const selectedMarket = filteredMarkets.find((market) => market.id === selectedMarketId);
+    if (selectedMarket) {
+      const origin = userCoords || DEFAULT_CENTER;
+      const routeUrl = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${selectedMarket.lng},${selectedMarket.lat}?overview=full&geometries=geojson`;
+
+      fetch(routeUrl)
+        .then((response) => {
+          if (!response.ok) throw new Error(`Routing request failed: ${response.status}`);
+          return response.json();
+        })
+        .then((routeData) => {
+          if (routeRequestId !== routeRequestRef.current || !mapRef.current) return;
+
+          const coordinates = routeData.routes?.[0]?.geometry?.coordinates;
+          if (!coordinates || coordinates.length < 2) throw new Error('No driving route found.');
+
+          const routePoints = coordinates.map(([lng, lat]) => [lat, lng]);
+          selectedGuideLineRef.current = L.layerGroup([
+            L.polyline(routePoints, { color: '#ffffff', weight: 8, opacity: 0.9, lineCap: 'round' }),
+            L.polyline(routePoints, { color: '#f97316', weight: 5, opacity: 1, lineCap: 'round' }),
+          ]).addTo(mapRef.current);
+          mapRef.current.fitBounds(L.latLngBounds(routePoints), { padding: [36, 36], maxZoom: 15, animate: true });
+        })
+        .catch((error) => {
+          if (routeRequestId !== routeRequestRef.current) return;
+          console.error('Failed to load driving route:', error.message);
+        });
+    }
 
     filteredMarkets.forEach((market) => {
       const meta = TYPE_META[market.type] || TYPE_META.grocery;
@@ -278,11 +314,12 @@ export default function Markets() {
 
   function buildMarketDivIcon(market, meta) {
     const isSelected = market.id === selectedMarketId;
+    const opacity = selectedMarketId && !isSelected ? 0.35 : 1;
     const color = market.open ? meta.color : '#9ca3af';
     return L.divIcon({
       className: 'mk-leaflet-pin',
       html:
-        `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;` +
+        `<div style="width:30px;height:30px;opacity:${opacity};border-radius:50% 50% 50% 0;` +
         `background:${color};transform:rotate(-45deg);` +
         `border:2px solid ${isSelected ? '#ffffff' : 'rgba(0,0,0,0.25)'};` +
         `box-shadow:0 2px 6px rgba(0,0,0,0.4);` +

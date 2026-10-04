@@ -24,14 +24,42 @@
 }
 
 .xai-why-btn:hover {
-  background: rgba(167, 139, 250, 0.18);
-  border-color: rgba(167, 139, 250, 0.4);
-  color: #c4b5fd;
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
 }
 
 .xai-why-btn.active {
   background: rgba(167, 139, 250, 0.2);
   border-color: #a78bfa;
+}
+
+.xai-why-btn.status-safe {
+  background: rgba(45, 220, 122, 0.1);
+  border-color: rgba(45, 220, 122, 0.3);
+  color: #2ddc7a;
+}
+
+.xai-why-btn.warning-allergy {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #f87171;
+}
+
+.xai-why-btn.warning-medical {
+  background: rgba(251, 146, 60, 0.12);
+  border-color: rgba(251, 146, 60, 0.35);
+  color: #fb923c;
+}
+
+.xai-why-btn.warning-dietary {
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fbbf24;
+}
+
+.xai-why-btn.warning:hover {
+  filter: brightness(1.2);
 }
 
 .xai-why-btn svg {
@@ -52,7 +80,12 @@
 .xai-popover {
   position: fixed;
   z-index: 500;
-  width: 320px;
+  width: min(420px, calc(100vw - 16px));
+  box-sizing: border-box;
+  max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
+  display: flex;
+  flex-direction: column;
   background: #0d1a12;
   border: 1px solid rgba(167, 139, 250, 0.28);
   border-radius: 16px;
@@ -96,11 +129,23 @@
 
 /* ---- Header ---- */
 .xai-pop-header {
+  flex-shrink: 0;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 14px 16px 0;
+  padding: 14px 16px 10px;
   gap: 8px;
+  background: #0d1a12;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.08);
+}
+
+.xai-pop-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
 }
 
 .xai-pop-header-left {
@@ -240,6 +285,7 @@
   color: #c9d8cf;
   line-height: 1.65;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* Blinking typing cursor at the end of the streamed text */
@@ -267,6 +313,7 @@
 
 /* ---- Footer ---- */
 .xai-pop-footer {
+  flex-shrink: 0;
   padding: 10px 16px 14px;
   border-top: 1px solid rgba(167, 139, 250, 0.08);
   margin-top: 8px;
@@ -274,7 +321,9 @@
   color: #4d6e5a;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
+  line-height: 1.4;
 }
 
 .xai-model-badge {
@@ -292,3 +341,29 @@
 @media (max-width: 400px) {
   .xai-popover { width: 280px; }
 }
+
+.xai-warning-context {
+  display: grid;
+  gap: 6px;
+  margin: 10px 16px 0;
+  color: #e8f5ee;
+  font-size: 11px;
+}
+
+.xai-warning-context > strong {
+  color: #fbbf24;
+  font-size: 12px;
+}
+
+.xai-warning-item {
+  display: grid;
+  gap: 2px;
+  padding: 7px 9px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  line-height: 1.4;
+}
+
+.xai-warning-item.warning-allergy { color: #f87171; background: rgba(248, 113, 113, 0.06); }
+.xai-warning-item.warning-medical { color: #fb923c; background: rgba(251, 146, 60, 0.06); }
+.xai-warning-item.warning-dietary { color: #fbbf24; background: rgba(251, 191, 36, 0.06); }
