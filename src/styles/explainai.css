@@ -40,26 +40,22 @@
   color: #2ddc7a;
 }
 
-.xai-why-btn.warning-allergy {
-  background: rgba(248, 113, 113, 0.12);
-  border-color: rgba(248, 113, 113, 0.35);
-  color: #f87171;
-}
-
-.xai-why-btn.warning-medical {
-  background: rgba(251, 146, 60, 0.12);
-  border-color: rgba(251, 146, 60, 0.35);
-  color: #fb923c;
-}
-
-.xai-why-btn.warning-dietary {
+.xai-why-btn.status-caution {
   background: rgba(251, 191, 36, 0.12);
   border-color: rgba(251, 191, 36, 0.35);
   color: #fbbf24;
 }
 
-.xai-why-btn.warning:hover {
-  filter: brightness(1.2);
+.xai-why-btn.status-avoid {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #f87171;
+}
+
+.xai-why-btn.status-pending {
+  background: rgba(167, 139, 250, 0.1);
+  border-color: rgba(167, 139, 250, 0.22);
+  color: #a78bfa;
 }
 
 .xai-why-btn svg {

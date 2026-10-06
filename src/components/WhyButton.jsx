@@ -18,110 +18,130 @@ function getExplainMealUrl() {
 }
 
 const VERDICT_ICONS = { safe: '✅', caution: '⚠️', avoid: '🚫' };
+const explanationCache = new Map();
+
+async function requestMealExplanation(meal, profile, violations) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not signed in');
+
+  const res = await fetch(getExplainMealUrl(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + session.access_token,
+    },
+    body: JSON.stringify({
+      mealId: meal.id,
+      meal: { ...meal, constraintWarnings: violations },
+      profile,
+      constraintWarnings: violations,
+    }),
+  });
+
+  if (!res.ok || !res.body) throw new Error('AI service returned an error.');
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let text = '';
+  let verdict = null;
+
+  function readEvent(line) {
+    if (!line.startsWith('data: ')) return;
+    const json = line.slice(6).trim();
+    if (!json) return;
+
+    let parsed;
+    try { parsed = JSON.parse(json); } catch { return; }
+    if (parsed.error) throw new Error(parsed.error);
+
+    if (parsed.verdict) {
+      const status = String(parsed.verdict).toLowerCase();
+      if (['safe', 'caution', 'avoid'].includes(status)) {
+        verdict = { verdict: status, label: parsed.verdict_label, flagged: parsed.flagged_condition };
+      }
+    }
+    if (parsed.text) text += parsed.text;
+  }
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    lines.forEach(readEvent);
+  }
+
+  if (buffer) readEvent(buffer);
+  if (!verdict) throw new Error('AI response did not include a safety verdict.');
+  if (!text) throw new Error('BLANE AI could not generate an explanation right now. Please try again.');
+  return { verdict, text };
+}
+
+function getMealExplanation(meal, profile, violations) {
+  const key = JSON.stringify({ meal, profile, violations });
+  if (!explanationCache.has(key)) {
+    const request = requestMealExplanation(meal, profile, violations).catch((error) => {
+      explanationCache.delete(key);
+      throw error;
+    });
+    explanationCache.set(key, request);
+  }
+  return explanationCache.get(key);
+}
 
 export default function WhyButton({ meal, profile, violations = [] }) {
   const [open, setOpen]           = useState(false);
   const [verdict, setVerdict]     = useState(null);
   const [text, setText]           = useState('');
-  const [streaming, setStreaming] = useState(false);
+  const [streaming, setStreaming] = useState(true);
   const [error, setError]         = useState('');
+  const [retryCount, setRetryCount] = useState(0);
   const [position, setPosition]   = useState({ left: 0, top: 0, arrowBottom: false });
 
   const btnRef     = useRef(null);
   const popoverRef = useRef(null);
   const contentRef = useRef(null);
-  const abortRef   = useRef(null);
-  const severityOrder = { allergy: 0, medical: 1, dietary: 2 };
-  const primaryViolation = [...violations].sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity])[0];
-  const mealStatus = primaryViolation?.severity === 'allergy'
-    ? 'Avoid'
-    : primaryViolation ? 'Caution' : 'Safe';
+  const aiStatus = ['safe', 'caution', 'avoid'].includes(verdict?.verdict)
+    ? verdict.verdict
+    : null;
+  const requestKey = JSON.stringify({ meal, profile, violations });
 
   function toggle() {
-    if (open) { close(); return; }
-    openAndStream();
+    if (error) setRetryCount((count) => count + 1);
+    setOpen((wasOpen) => !wasOpen);
   }
 
   function close() {
-    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
     setOpen(false);
   }
 
-  async function openAndStream() {
-    setOpen(true);
+  useEffect(() => {
+    let active = true;
     setVerdict(null);
     setText('');
     setError('');
     setStreaming(true);
-    positionPopover();
 
-    abortRef.current = new AbortController();
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not signed in');
-
-      const res = await fetch(getExplainMealUrl(), {
-        method: 'POST',
-        signal: abortRef.current.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer ' + session.access_token,
-        },
-        body: JSON.stringify({
-          mealId: meal.id,
-          meal: { ...meal, constraintWarnings: violations },
-          profile,
-          constraintWarnings: violations,
-        }),
+    getMealExplanation(meal, profile, violations)
+      .then((result) => {
+        if (!active) return;
+        setVerdict(result.verdict);
+        setText(result.text);
+      })
+      .catch((err) => {
+        if (!active) return;
+        console.error('Explain AI error:', err);
+        setError(err.message || 'Could not reach BLANE AI. Check your connection and try again.');
+      })
+      .finally(() => {
+        if (active) setStreaming(false);
       });
 
-      if (!res.ok || !res.body) throw new Error('AI service returned an error.');
-
-      const reader  = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let gotAnyText = false;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const jsonStr = line.slice(6).trim();
-          if (!jsonStr) continue;
-
-          let parsed;
-          try { parsed = JSON.parse(jsonStr); } catch { continue; }
-
-          if (parsed.error) { setError(parsed.error); setStreaming(false); return; }
-          if (parsed.verdict) {
-            setVerdict({ verdict: parsed.verdict, label: parsed.verdict_label, flagged: parsed.flagged_condition });
-          }
-          if (parsed.text) {
-            gotAnyText = true;
-            setText((t) => t + parsed.text);
-          }
-          if (parsed.done) setStreaming(false);
-        }
-      }
-
-      if (!gotAnyText) {
-        setError('BLANE AI could not generate an explanation right now. Please try again.');
-      }
-      setStreaming(false);
-    } catch (err) {
-      if (err.name === 'AbortError') return;
-      console.error('Explain AI error:', err);
-      setError('⚠️ Could not reach BLANE AI. Check your connection and try again.');
-      setStreaming(false);
-    }
-  }
+    return () => { active = false; };
+  }, [requestKey, retryCount]);
 
   function positionPopover() {
     if (!btnRef.current) return;
@@ -171,14 +191,14 @@ export default function WhyButton({ meal, profile, violations = [] }) {
     <>
       <button
         ref={btnRef}
-        className={`xai-why-btn status-${mealStatus.toLowerCase()}` + (primaryViolation ? ` warning warning-${primaryViolation.severity}` : '')}
-        title={primaryViolation ? `Explain ${violations.length} meal warning${violations.length === 1 ? '' : 's'}` : 'Explain this meal'}
+        className={`xai-why-btn${aiStatus ? ` status-${aiStatus}` : ' status-pending'}`}
+        title={aiStatus ? `AI verdict: ${aiStatus}` : 'Click to get the AI verdict'}
         onClick={(e) => { e.stopPropagation(); toggle(); }}
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
-        {` ${mealStatus}, See why?`}
+        {aiStatus ? ` ${aiStatus.toUpperCase()}, See why?` : ' See why?'}
       </button>
 
       {open && createPortal(
