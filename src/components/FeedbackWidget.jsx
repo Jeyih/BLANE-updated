@@ -124,7 +124,7 @@ export default function FeedbackWidget({ profile, onProfileUpdate, onLogsChange 
   const todayLog = logs.find((l) => l.logged_at === new Date().toISOString().split('T')[0]);
 
   return (
-    <div className="fb-widget col-12">
+    <div className="fb-widget col-12" data-dashboard-tour="feedback">
       <div className="fb-widget-header">
         <div className="fb-widget-title-row">
           <div className="fb-widget-icon">🔄</div>

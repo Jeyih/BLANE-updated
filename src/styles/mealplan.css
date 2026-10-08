@@ -49,6 +49,25 @@
   flex-wrap: wrap;
 }
 
+.mp-tour-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(45, 220, 122, 0.45);
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: rgba(45, 220, 122, 0.08);
+  color: #d1fae5;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mp-tour-trigger:hover {
+  background: rgba(45, 220, 122, 0.18);
+}
+
 /* ============================================================
    WEEK NAVIGATOR
    ============================================================ */
@@ -195,6 +214,12 @@
    MEAL SLOTS COLUMN
    ============================================================ */
 .meal-slots-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.meal-slots-list {
   display: flex;
   flex-direction: column;
   gap: 16px;

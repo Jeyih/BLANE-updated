@@ -20,7 +20,7 @@ export default function DriftWidget({ logs, profile }) {
 
   if (!analysis) {
     return (
-      <div className="drift-section col-12">
+      <div className="drift-section col-12" data-dashboard-tour="drift">
         <Header />
         <div className="drift-no-data">
           <span className="drift-no-data-icon">📋</span>
@@ -40,7 +40,7 @@ export default function DriftWidget({ logs, profile }) {
   const arcFill = healthScore != null ? (healthScore / 100) * circumf : 0;
 
   return (
-    <div className="drift-section col-12">
+    <div className="drift-section col-12" data-dashboard-tour="drift">
       <Header />
 
       <div className="drift-score-row">

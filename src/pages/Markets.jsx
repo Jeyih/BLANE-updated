@@ -3,6 +3,7 @@ import L from 'leaflet';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
+import MarketsTour from '../components/MarketsTour';
 import { IngSeasonTag } from '../components/SeasonalBadges';
 import '../styles/markets.css';
 import 'leaflet/dist/leaflet.css';
@@ -57,6 +58,7 @@ function getSavedMealIds() {
 export default function Markets() {
   const { user } = useAuth();
   const [markets, setMarkets] = useState([]);
+  const [tourOpen, setTourOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState('All');
   const [selectedMarketId, setSelectedMarketId] = useState(null);
   const [locationText, setLocationText] = useState(initialLocationState);
@@ -75,6 +77,11 @@ export default function Markets() {
     if (!user) return;
     loadMarkets();
   }, [user]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setTourOpen(localStorage.getItem(`blane_markets_tour_completed_${user.id}`) !== 'true');
+  }, [user?.id]);
 
   useEffect(() => {
     function refreshMealPlanIngredients() {
@@ -436,22 +443,33 @@ export default function Markets() {
     return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
   }
 
+  function closeTour() {
+    if (user?.id) {
+      localStorage.setItem(`blane_markets_tour_completed_${user.id}`, 'true');
+    }
+    setTourOpen(false);
+  }
+
   return (
     <>
       <Navbar />
+      <MarketsTour isOpen={tourOpen} onClose={closeTour} hasSelectedMarket={Boolean(selectedMarket)} />
       <main className="mk-main">
         <div className="mk-content">
-          <div className="mk-page-header">
+          <div className="mk-page-header" data-markets-tour="header">
             <div>
               <h1 className="mk-page-title">GeoMarket Scanner</h1>
               <p className="mk-page-sub">Find local markets and ingredients — Tarlac City, Central Luzon</p>
             </div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="mk-header-actions">
+              <button className="mk-tour-trigger" type="button" onClick={() => setTourOpen(true)}>
+                <span aria-hidden="true">ⓘ</span> Take a tour
+              </button>
               <span className="mk-live-badge">● Live data</span>
             </div>
           </div>
 
-          <div className="mk-location-bar">
+          <div className="mk-location-bar" data-markets-tour="location">
             <div className="mk-location-icon">📍</div>
             <div className="mk-location-text">
               <div className="mk-location-name">{locationText.name}</div>
@@ -474,7 +492,7 @@ export default function Markets() {
           </div>
 
           {/* Quick Location Preset Chips for Ages 8-60 / Defense Demo */}
-          <div style={{
+          <div data-markets-tour="hubs" style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
@@ -511,7 +529,7 @@ export default function Markets() {
             ))}
           </div>
 
-          <div className="mk-filter-row">
+          <div className="mk-filter-row" data-markets-tour="filters">
             {FILTERS.map((filter) => (
               <button
                 key={filter}
@@ -528,7 +546,7 @@ export default function Markets() {
           </div>
 
           <div className="mk-layout">
-            <div className="mk-map-wrap">
+            <div className="mk-map-wrap" data-markets-tour="map">
               <div id="map"></div>
               <div className="mk-map-controls">
                 <button className="mk-map-ctrl-btn" type="button" title="Zoom in" onClick={() => mapRef.current?.zoomIn()}>
@@ -552,7 +570,7 @@ export default function Markets() {
               </div>
             </div>
 
-            <div className="mk-list-col">
+            <div className="mk-list-col" data-markets-tour="list">
               {loading ? (
                 <div className="mk-empty">
                   <span className="mk-empty-icon">⏳</span>
@@ -600,7 +618,7 @@ export default function Markets() {
             </div>
           </div>
 
-          <div className={`mk-detail-panel ${selectedMarket ? 'open' : ''}`}>
+          <div className={`mk-detail-panel ${selectedMarket ? 'open' : ''}`} data-markets-tour="details">
             <div className="mk-detail-inner">
               {selectedMarket ? (
                 <>
@@ -991,4 +1009,3 @@ function GeoMarketScanner({ markets, userCoords, onLocate }) {
     </div>
   );
 }
-

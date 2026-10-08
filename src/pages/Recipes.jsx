@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
+import RecipesTour from '../components/RecipesTour';
 import { scoreRecipe } from '../lib/seasonal';
 import { SeasonBadge, IngSeasonTag, SeasonalAltBanner, CurrentSeasonPill } from '../components/SeasonalBadges';
 import { loadConstraintDefinitions, getActiveConstraints, checkRecipeViolations } from '../lib/constraints';
@@ -27,6 +28,7 @@ export default function Recipes() {
   const navigate = useNavigate();
 
   const [profile, setProfile]   = useState(null);
+  const [tourOpen, setTourOpen] = useState(false);
   const [recipes, setRecipes]   = useState([]);
   const [loading, setLoading]   = useState(true);
   const [constraintsReady, setConstraintsReady] = useState(false);
@@ -39,6 +41,18 @@ export default function Recipes() {
   const [openRecipeId, setOpenRecipeId] = useState(null);
 
   useEffect(() => { loadAll(); }, [user]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setTourOpen(localStorage.getItem(`blane_recipes_tour_completed_${user.id}`) !== 'true');
+  }, [user?.id]);
+
+  function closeTour() {
+    if (user?.id) {
+      localStorage.setItem(`blane_recipes_tour_completed_${user.id}`, 'true');
+    }
+    setTourOpen(false);
+  }
 
   async function loadAll() {
     if (!user) return;
@@ -113,28 +127,36 @@ export default function Recipes() {
   return (
     <>
       <Navbar />
+      <RecipesTour isOpen={tourOpen} onClose={closeTour} />
       <main className="rp-main">
         <div className="rp-content">
 
-          <div className="rp-page-header">
+          <div className="rp-page-header" data-recipes-tour="header">
             <div>
               <h1 className="rp-page-title">Recipes</h1>
               <p className="rp-page-sub">Filipino meals matched to your nutrition goals</p>
               <div style={{ marginTop: 8 }}><CurrentSeasonPill /></div>
             </div>
-            <span style={{ fontSize: 13, color: '#4d6e5a' }}>
-              <span style={{ color: '#2ddc7a', fontWeight: 700 }}>{filtered.length}</span> recipes found
-            </span>
+            <div className="rp-header-actions">
+              <button className="rp-tour-trigger" type="button" onClick={() => setTourOpen(true)}>
+                <span aria-hidden="true">ⓘ</span> Take a tour
+              </button>
+              <span style={{ fontSize: 13, color: '#4d6e5a' }}>
+                <span style={{ color: '#2ddc7a', fontWeight: 700 }}>{filtered.length}</span> recipes found
+              </span>
+            </div>
           </div>
 
-          <ConstraintActiveBar activeConstraints={activeConstraints} />
+          <div data-recipes-tour="constraints">
+            <ConstraintActiveBar activeConstraints={activeConstraints} />
+          </div>
           {(constraintError || ingredientError) && (
             <div className="rp-empty-state">
               <p className="rp-empty-text">{constraintError || ingredientError}</p>
             </div>
           )}
 
-          <div className="rp-toolbar">
+          <div className="rp-toolbar" data-recipes-tour="search">
             <div className="rp-search-wrap">
               <span className="rp-search-icon">🔍</span>
               <input
@@ -146,7 +168,7 @@ export default function Recipes() {
             </div>
           </div>
 
-          <div className="rp-filter-row">
+          <div className="rp-filter-row" data-recipes-tour="filters">
             {TYPE_FILTERS.map((f) => (
               <button
                 key={f}
@@ -168,7 +190,7 @@ export default function Recipes() {
             ))}
           </div>
 
-          <div className="rp-grid">
+          <div className="rp-grid" data-recipes-tour="results">
             {loading || !constraintsReady ? (
               <div className="rp-empty-state"><p className="rp-empty-text">Loading recipes…</p></div>
             ) : constraintError || ingredientError ? null

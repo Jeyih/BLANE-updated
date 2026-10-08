@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { applyDynamicRecipePrices, loadMarketIngredientPrices } from '../lib/pricing';
 import Navbar from '../components/Navbar';
+import DashboardTour from '../components/DashboardTour';
 import FeedbackWidget from '../components/FeedbackWidget';
 import DriftWidget from '../components/DriftWidget';
 import RecommendWidget from '../components/RecommendWidget';
@@ -51,8 +52,14 @@ export default function Dashboard() {
   const [profile, setProfile]   = useState(null);
   const [firstName, setFirstName] = useState('...');
   const [logs, setLogs]         = useState([]);
+  const [tourOpen, setTourOpen] = useState(false);
 
   useEffect(() => { loadProfile(); }, [user]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setTourOpen(localStorage.getItem(`blane_dashboard_tour_completed_${user.id}`) !== 'true');
+  }, [user?.id]);
 
   async function loadProfile() {
     if (!user) return;
@@ -72,20 +79,31 @@ export default function Dashboard() {
     setTimeout(() => setCheckinToast(''), 4000);
   }
 
+  function closeTour() {
+    if (user?.id) {
+      localStorage.setItem(`blane_dashboard_tour_completed_${user.id}`, 'true');
+    }
+    setTourOpen(false);
+  }
+
   const today = new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
     <>
       <Navbar />
+      <DashboardTour isOpen={tourOpen} onClose={closeTour} />
       <main className="dash-main">
         <div className="dash-content">
 
-          <div className="dash-page-header">
+          <div className="dash-page-header" data-dashboard-tour="overview">
             <div>
               <h1 className="dash-page-title">Good day, <span style={{ color: '#2ddc7a' }}>{firstName}</span> 👋</h1>
               <p className="dash-page-date" style={{ color: '#d1fae5', fontSize: 15 }}>{today} · Personalized for your metabolic profile</p>
             </div>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button className="dash-tour-trigger" type="button" onClick={() => setTourOpen(true)}>
+                <span aria-hidden="true">ⓘ</span> Take a tour
+              </button>
               <span className="widget-badge" style={{ fontSize: 13, padding: '8px 16px', background: 'rgba(45, 220, 122, 0.2)', border: '1px solid #2ddc7a' }}>
                 ● Real-time Adaptive Engine
               </span>
@@ -105,7 +123,7 @@ export default function Dashboard() {
             flexWrap: 'wrap',
             gap: '14px',
             boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-          }}>
+          }} data-dashboard-tour="check-in">
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '24px' }}>🌱</span>
               <div>
@@ -257,7 +275,7 @@ function MealPlanWidget({ profile }) {
   const currentItem = plannedMeals[activeTabIdx] || plannedMeals[0];
 
   return (
-    <div className="widget col-8">
+    <div className="widget col-8" data-dashboard-tour="meal-plan">
       <div className="widget-header">
         <div className="widget-title-row">
           <div className="widget-icon">🍽️</div>
@@ -378,7 +396,7 @@ function BmiWidget({ profile }) {
   const idealHigh = hasData ? (24.9 * (h / 100) * (h / 100)).toFixed(1) : null;
 
   return (
-    <div className="widget col-4">
+    <div className="widget col-4" data-dashboard-tour="body-stats">
       <div className="widget-header">
         <div className="widget-title-row">
           <div className="widget-icon">📊</div>

@@ -146,7 +146,7 @@ export default function RecommendWidget({ profile }) {
   }, [profile, recipes]);
 
   return (
-    <div className="rec-widget col-12">
+    <div className="rec-widget col-12" data-dashboard-tour="recommendations">
       <div className="rec-header">
         <div className="rec-header-left">
           <div className="rec-header-icon">⭐</div>

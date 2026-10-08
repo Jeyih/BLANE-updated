@@ -31,6 +31,32 @@
   margin-top: 3px;
 }
 
+.mk-header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mk-tour-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(45, 220, 122, 0.45);
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: rgba(45, 220, 122, 0.08);
+  color: #d1fae5;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mk-tour-trigger:hover {
+  background: rgba(45, 220, 122, 0.18);
+}
+
 .mk-location-bar {
   display: flex;
   align-items: center;

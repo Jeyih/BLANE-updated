@@ -10,6 +10,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
+import MealPlanTour from '../components/MealPlanTour';
 import WhyButton from '../components/WhyButton';
 import PortionOptimizerPanel, { OptimizeButton } from '../components/PortionOptimizerPanel';
 import { scoreRecipe } from '../lib/seasonal';
@@ -84,6 +85,7 @@ function generateDefaultPlan(recipeList) {
 export default function MealPlan() {
   const { user } = useAuth();
   const [profile, setProfile]                 = useState(null);
+  const [tourOpen, setTourOpen]               = useState(false);
   const [recipes, setRecipes]                 = useState([]);
   const [loadingRecipes, setLoadingRecipes]   = useState(true);
   const [constraintDefinitions, setConstraintDefinitions] = useState({});
@@ -123,6 +125,11 @@ export default function MealPlan() {
     loadConstraintDefinitions().then((definitions) => {
       if (definitions) setConstraintDefinitions(definitions);
     });
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setTourOpen(localStorage.getItem(`blane_mealplan_tour_completed_${user.id}`) !== 'true');
   }, [user?.id]);
 
   useEffect(() => {
@@ -422,6 +429,13 @@ export default function MealPlan() {
     setGroceryList((prev) => prev.filter((_, i) => i !== idx));
   }
 
+  function closeTour() {
+    if (user?.id) {
+      localStorage.setItem(`blane_mealplan_tour_completed_${user.id}`, 'true');
+    }
+    setTourOpen(false);
+  }
+
   // Filter candidate recipes for Add/Swap modals
   const availableRecipesForAdd = slotTypeChoice
     ? recipes.filter((r) => r.type === slotTypeChoice || slotTypeChoice === 'Custom' || slotTypeChoice === 'Brunch')
@@ -430,21 +444,25 @@ export default function MealPlan() {
   return (
     <>
       <Navbar />
+      <MealPlanTour isOpen={tourOpen} onClose={closeTour} />
       <main className="mp-main">
         <div className="mp-content">
 
-          <div className="mp-page-header">
+          <div className="mp-page-header" data-mealplan-tour="header">
             <div>
               <h1 className="mp-page-title">Meal Plan</h1>
               <p className="mp-page-sub">Weekly adaptive plan — updated by BLANE AI</p>
             </div>
             <div className="mp-header-actions">
+              <button className="mp-tour-trigger" type="button" onClick={() => setTourOpen(true)}>
+                <span aria-hidden="true">ⓘ</span> Take a tour
+              </button>
               <button className="mp-btn mp-btn-outline" onClick={exportWeekPlan}>Export Week</button>
               <button className="mp-btn mp-btn-primary" onClick={regeneratePlan}>Regenerate Plan</button>
             </div>
           </div>
 
-          <div className="week-nav">
+          <div className="week-nav" data-mealplan-tour="week">
             <button className="week-arrow" onClick={() => setWeekOffset((o) => o - 1)}>‹</button>
             <span className="week-label">{weekLabel}</span>
             <div className="week-days">
@@ -474,7 +492,7 @@ export default function MealPlan() {
 
           <div className="day-view">
             <div className="meal-slots-col">
-              <div className="day-summary-bar">
+              <div className="day-summary-bar" data-mealplan-tour="summary">
                 <div className="day-summary-item">
                   <span className="day-summary-label">Calories</span>
                   <span className="day-summary-value green">{totalKcal} <small style={{ fontSize: 13, color: '#4d6e5a', fontWeight: 400 }}>/ {calGoal} kcal</small></span>
@@ -496,55 +514,57 @@ export default function MealPlan() {
                 </div>
               </div>
 
-              {loadingRecipes ? (
-                <div className="empty-slot">Loading recipes from database…</div>
-              ) : slots.length === 0 ? (
-                <div className="empty-slot"><span className="empty-slot-icon">🍽️</span>No meals planned yet. Add a slot below!</div>
-              ) : (
-                slots.map((slot, idx) => (
-                  <SlotCard
-                    key={idx}
-                    slot={slot}
-                    idx={idx}
-                    completed={Boolean(completedMeals[getMealCompletionKey(selectedDate, slot, idx)])}
-                    onToggleComplete={() => {
-                      const key = getMealCompletionKey(selectedDate, slot, idx);
-                      setCompletionTarget({
-                        key,
-                        action: completedMeals[key] ? 'undo' : 'complete',
-                        mealName: getMeal(slot.mealId)?.name || slot.type,
-                      });
-                    }}
-                    profile={profile}
-                    appliedOptimization={appliedOptimizations[slot.mealId]}
-                    onPortionApplied={(mealId, result) => setAppliedOptimizations((prev) => ({
-                      ...prev,
-                      [mealId]: {
-                        scaleFactor: result.scaleFactor,
-                        ingredients: result.ingredients,
-                        optimizedKcal: result.optimizedKcal,
-                      },
-                    }))}
-                    onOriginalMeal={(mealId) => setAppliedOptimizations((prev) => {
-                      const next = { ...prev };
-                      delete next[mealId];
-                      return next;
-                    })}
-                    activeConstraints={activeConstraints}
-                    constraintDefinitions={constraintDefinitions}
-                    getMeal={getMeal}
-                    totalMealsToday={slots.length}
-                    groceryList={groceryList}
-                    openOptimizerId={openOptimizerId}
-                    onSetOpenOptimizer={setOpenOptimizerId}
-                    onRemove={() => removeSlot(idx)}
-                    onSwap={openSwap}
-                    onAddGrocery={addMealToGrocery}
-                  />
-                ))
-              )}
+              <div className="meal-slots-list" data-mealplan-tour="meal-slots">
+                {loadingRecipes ? (
+                  <div className="empty-slot">Loading recipes from database…</div>
+                ) : slots.length === 0 ? (
+                  <div className="empty-slot"><span className="empty-slot-icon">🍽️</span>No meals planned yet. Add a slot below!</div>
+                ) : (
+                  slots.map((slot, idx) => (
+                    <SlotCard
+                      key={idx}
+                      slot={slot}
+                      idx={idx}
+                      completed={Boolean(completedMeals[getMealCompletionKey(selectedDate, slot, idx)])}
+                      onToggleComplete={() => {
+                        const key = getMealCompletionKey(selectedDate, slot, idx);
+                        setCompletionTarget({
+                          key,
+                          action: completedMeals[key] ? 'undo' : 'complete',
+                          mealName: getMeal(slot.mealId)?.name || slot.type,
+                        });
+                      }}
+                      profile={profile}
+                      appliedOptimization={appliedOptimizations[slot.mealId]}
+                      onPortionApplied={(mealId, result) => setAppliedOptimizations((prev) => ({
+                        ...prev,
+                        [mealId]: {
+                          scaleFactor: result.scaleFactor,
+                          ingredients: result.ingredients,
+                          optimizedKcal: result.optimizedKcal,
+                        },
+                      }))}
+                      onOriginalMeal={(mealId) => setAppliedOptimizations((prev) => {
+                        const next = { ...prev };
+                        delete next[mealId];
+                        return next;
+                      })}
+                      activeConstraints={activeConstraints}
+                      constraintDefinitions={constraintDefinitions}
+                      getMeal={getMeal}
+                      totalMealsToday={slots.length}
+                      groceryList={groceryList}
+                      openOptimizerId={openOptimizerId}
+                      onSetOpenOptimizer={setOpenOptimizerId}
+                      onRemove={() => removeSlot(idx)}
+                      onSwap={openSwap}
+                      onAddGrocery={addMealToGrocery}
+                    />
+                  ))
+                )}
+              </div>
 
-                            <button className="add-slot-btn" onClick={() => setAddSlotOpen(true)}>
+              <button className="add-slot-btn" data-mealplan-tour="add-slot" onClick={() => setAddSlotOpen(true)}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                 Add meal slot
               </button>
@@ -553,7 +573,7 @@ export default function MealPlan() {
 
             </div>
 
-            <div className="grocery-panel">
+            <div className="grocery-panel" data-mealplan-tour="grocery-list">
               <div className="grocery-panel-header">
                 <div className="grocery-panel-title-row">
                   <div className="grocery-panel-icon">🛒</div>
@@ -818,7 +838,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
   }
 
   return (
-    <div className="po-panel">
+    <div className="po-panel" data-mealplan-tour="price-optimizer">
       <div className="po-header">
         <div className="po-header-left">
           <div className="po-header-icon">💸</div>
