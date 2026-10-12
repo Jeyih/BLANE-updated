@@ -801,6 +801,29 @@
   color: var(--color-primary);
 }
 
+.form-error,
+.form-success {
+  display: block;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.form-error {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+}
+
+.form-success {
+  background: rgba(45, 220, 122, 0.08);
+  border-color: rgba(45, 220, 122, 0.2);
+  color: #86efac;
+}
+
 .form-submit {
   width: 100%;
   margin-top: 8px;
@@ -836,6 +859,33 @@
 
 .form-terms a {
   color: var(--color-primary);
+}
+
+.reset-password-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  background: linear-gradient(180deg, rgba(8, 18, 15, 0.96), rgba(5, 10, 8, 0.96));
+}
+
+.reset-password-card {
+  max-width: 440px;
+  width: 100%;
+}
+
+.reset-password-card h3 {
+  margin: 0 0 12px;
+  font-size: 30px;
+  line-height: 1.2;
+  color: var(--color-text-1);
+}
+
+.reset-password-card p {
+  font-size: 14px;
+  color: var(--color-text-2);
+  line-height: 1.6;
 }
 
 /* ============================================================

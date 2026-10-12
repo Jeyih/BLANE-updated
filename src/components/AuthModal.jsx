@@ -17,13 +17,18 @@ import { useAuth } from '../context/AuthContext';
 import { REDIRECT_AFTER_LOGIN, REDIRECT_AFTER_REGISTER } from '../lib/supabase';
 
 export default function AuthModal({ open, tab, onClose, onSwitchTab }) {
-  const { login, register } = useAuth();
+  const { login, register, resetPassword } = useAuth();
   const navigate = useNavigate();
 
   const [loginEmail, setLoginEmail]       = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError]       = useState('');
   const [loginLoading, setLoginLoading]   = useState(false);
+
+  const [forgotEmail, setForgotEmail]     = useState('');
+  const [forgotError, setForgotError]     = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   const [regName, setRegName]             = useState('');
   const [regEmail, setRegEmail]           = useState('');
@@ -91,6 +96,30 @@ export default function AuthModal({ open, tab, onClose, onSwitchTab }) {
     }
   }
 
+  async function handleForgotPasswordSubmit(e) {
+    e.preventDefault();
+    setForgotError('');
+    setForgotSuccess('');
+
+    const email = (forgotEmail || loginEmail || '').trim();
+    if (!email) {
+      setForgotError('Please enter your email address.');
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      await resetPassword(email);
+      setLoginEmail(email);
+      setForgotEmail(email);
+      setForgotSuccess(`A password reset link has been sent to ${email}. Check your inbox and follow the instructions.`);
+    } catch (err) {
+      setForgotError(err.message || 'Unable to send a password reset email.');
+    } finally {
+      setForgotLoading(false);
+    }
+  }
+
   return (
     <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" role="dialog" aria-modal="true">
@@ -115,11 +144,17 @@ export default function AuthModal({ open, tab, onClose, onSwitchTab }) {
         {tab === 'login' && (
           <form onSubmit={handleLoginSubmit} noValidate>
             {loginError && <p className="form-error" style={{ display: 'block' }}>{loginError}</p>}
+            {forgotSuccess && <p className="form-success">{forgotSuccess}</p>}
+            {forgotError && <p className="form-error" style={{ display: 'block' }}>{forgotError}</p>}
             <div className="form-group">
               <label className="form-label" htmlFor="login-email">Email address</label>
               <input
                 className="form-input" type="email" id="login-email" placeholder="you@example.com"
-                value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
+                value={loginEmail} onChange={(e) => {
+                  setLoginEmail(e.target.value);
+                  if (forgotError) setForgotError('');
+                  if (forgotSuccess) setForgotSuccess('');
+                }}
               />
             </div>
             <div className="form-group">
@@ -129,7 +164,17 @@ export default function AuthModal({ open, tab, onClose, onSwitchTab }) {
                 value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)}
               />
             </div>
-            <div className="form-forgot"><a href="#">Forgot password?</a></div>
+            <div className="form-forgot">
+              <a href="#" onClick={(e) => {
+                e.preventDefault();
+                setForgotError('');
+                setForgotSuccess('');
+                setForgotEmail(loginEmail || '');
+                void handleForgotPasswordSubmit(e);
+              }}>
+                {forgotLoading ? 'Sending…' : 'Forgot password?'}
+              </a>
+            </div>
             <button type="submit" className="btn btn-primary btn-lg form-submit" disabled={loginLoading}>
               {loginLoading ? 'Please wait…' : 'Sign in'}
             </button>

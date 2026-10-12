@@ -22,6 +22,7 @@ import { loadConstraintDefinitions } from './lib/constraints';
 import { loadIngredientSeasons } from './lib/seasonal';
 
 import Landing from './pages/Landing';
+import ResetPassword from './pages/ResetPassword';
 import Onboarding from './pages/Onboarding';
 import Dashboard from './pages/Dashboard';
 import MealPlan from './pages/MealPlan';
@@ -52,6 +53,7 @@ export default function App() {
         <Routes>
           {/* Public */}
           <Route path="/" element={<Landing />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Protected — placeholders for now, built next in order */}
           <Route element={<ProtectedRoute />}>

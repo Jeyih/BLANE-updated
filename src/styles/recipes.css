@@ -590,6 +590,12 @@
   background: rgba(45, 220, 122, 0.1);
 }
 
+.modal-section-note {
+  margin: -4px 0 12px;
+  font-size: 12px;
+  color: #4d6e5a;
+}
+
 /* Ingredients */
 .modal-ingredients {
   display: flex;

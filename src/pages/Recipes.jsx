@@ -88,7 +88,7 @@ export default function Recipes() {
         name: ing.name || ing.ingredient_name || ing.food_name,
         ingredient_name: ing.ingredient_name,
         food_name: ing.food_name,
-        qty: ing.qty || ing.grams,
+        qty: ing.qty ?? ing.grams,
         status: ing.status,
       });
     });
@@ -293,7 +293,7 @@ function RecipeModal({ recipe, activeConstraints, constraintDefinitions, onClose
             </div>
             <div className="modal-meta-chip">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-              {recipe.servings} {recipe.servings === 1 ? 'serving' : 'servings'}
+              Makes {recipe.servings} {Number(recipe.servings) === 1 ? 'serving' : 'servings'}
             </div>
             <div className="modal-meta-chip">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
@@ -319,13 +319,14 @@ function RecipeModal({ recipe, activeConstraints, constraintDefinitions, onClose
           <ViolationDetail violations={violations} />
 
           <div className="modal-section-title" style={{ marginTop: 22 }}>Ingredients</div>
+          <p className="modal-section-note">Amounts are in grams (g), unless another unit is listed.</p>
           <div className="modal-ingredients">
             {recipe.ingredients.map((ing) => (
               <div key={ing.name}>
                 <div className="modal-ingredient-row">
                   <div className="modal-ing-dot"></div>
                   <span className="modal-ing-name">{ing.name}</span>
-                  <span className="modal-ing-qty">{ing.qty}</span>
+                  <span className="modal-ing-qty">{formatIngredientQuantity(ing.qty)}</span>
                   <IngSeasonTag ingredientName={ing.name} />
                   <span className={'modal-ing-status ' + ing.status}>{ing.status === 'avail' ? '✓' : '⚠'}</span>
                 </div>
@@ -362,6 +363,15 @@ function RecipeModal({ recipe, activeConstraints, constraintDefinitions, onClose
       </div>
     </div>
   );
+}
+
+function formatIngredientQuantity(quantity) {
+  if (quantity == null || quantity === '') return 'Amount not listed';
+  if (typeof quantity === 'number') return Number.isFinite(quantity) ? `${quantity} g` : 'Amount not listed';
+
+  const value = String(quantity).trim();
+  if (!value) return 'Amount not listed';
+  return /^\d+(?:\.\d+)?$/.test(value) ? `${value} g` : value;
 }
 
 function MacroBar({ label, value, max, color }) {

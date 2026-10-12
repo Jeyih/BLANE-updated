@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { isAdmin } from '../lib/admin-auth';
 import { loadConstraintDefinitions } from '../lib/constraints';
 import '../styles/admin.css';
+import '../styles/nav.css';
 
 const MARKET_TYPES = [
   { value: 'palengke', label: 'Palengke' },
@@ -110,6 +111,9 @@ export default function Admin() {
   const [markets, setMarkets] = useState([]);
   const [recipes, setRecipes] = useState([]);
   const [fnriItems, setFnriItems] = useState([]);
+  const [feedbackRecords, setFeedbackRecords] = useState([]);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
 
   const [searchMarkets, setSearchMarkets] = useState('');
   const [searchRecipes, setSearchRecipes] = useState('');
@@ -278,6 +282,48 @@ export default function Admin() {
       loadSeasonRecords(),
     ]);
   }
+
+  async function loadFeedback() {
+    setFeedbackLoading(true);
+    try {
+      const pageSize = 500;
+      const allFeedback = [];
+
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await supabase
+          .from('feedback')
+          .select('id, sender_name, category, message, page_path, created_at')
+          .order('created_at', { ascending: false })
+          .range(offset, offset + pageSize - 1);
+        if (error) throw error;
+
+        allFeedback.push(...(data || []));
+        if (!data || data.length < pageSize) break;
+      }
+
+      setFeedbackRecords(allFeedback);
+    } catch (error) {
+      showToast('Error loading feedback: ' + error.message, true);
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }
+
+  async function openFeedbackModal() {
+    setFeedbackModalOpen(true);
+    await loadFeedback();
+  }
+
+  useEffect(() => {
+    if (!feedbackModalOpen) return undefined;
+
+    function handleFeedbackModalKeyDown(event) {
+      if (event.key === 'Escape') setFeedbackModalOpen(false);
+    }
+
+    document.addEventListener('keydown', handleFeedbackModalKeyDown);
+    return () => document.removeEventListener('keydown', handleFeedbackModalKeyDown);
+  }, [feedbackModalOpen]);
 
   async function loadMarkets() {
     const { data, error } = await supabase.from('markets').select('*').order('name');
@@ -1145,6 +1191,13 @@ export default function Admin() {
               <div className="ad-page-title">🛠️ Admin Panel <span className="ad-admin-badge">ADMIN ACCESS</span></div>
               <div className="ad-page-sub">Manage markets, recipes, onboarding metadata, seasonal food data, and dietary constraints</div>
             </div>
+            <button
+              className="dash-feedback-trigger"
+              type="button"
+              onClick={openFeedbackModal}
+            >
+              View User Feedback
+            </button>
           </div>
 
           <div className="ad-tabs">
@@ -1545,8 +1598,74 @@ export default function Admin() {
               </table>
             </div>
           </div>
+
         </div>
       </main>
+
+      <div
+        className={feedbackModalOpen ? 'ad-modal-overlay active' : 'ad-modal-overlay'}
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setFeedbackModalOpen(false);
+        }}
+      >
+        <section
+          className="ad-modal ad-feedback-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ad-feedback-modal-title"
+        >
+          <div className="ad-feedback-modal-heading">
+            <div>
+              <div className="ad-modal-title" id="ad-feedback-modal-title">User Feedback</div>
+              <div className="ad-page-sub">Review messages submitted by BLANE users.</div>
+            </div>
+            <button
+              className="ad-icon-btn"
+              type="button"
+              aria-label="Close user feedback"
+              onClick={() => setFeedbackModalOpen(false)}
+            >
+              ×
+            </button>
+          </div>
+          <div className="ad-toolbar ad-feedback-toolbar">
+            <span className="ad-result-count"><span>{feedbackRecords.length}</span> submissions</span>
+            <button className="ad-add-btn" type="button" onClick={loadFeedback} disabled={feedbackLoading}>
+              {feedbackLoading ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
+          <div className="ad-table-wrap ad-feedback-table-wrap">
+            <table className="ad-table ad-feedback-table">
+              <thead>
+                <tr>
+                  <th>Submitted by</th>
+                  <th>Category</th>
+                  <th>Message</th>
+                  <th>Page</th>
+                  <th>Submitted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {feedbackLoading ? (
+                  <tr className="ad-empty-row"><td colSpan="5">Loading feedback…</td></tr>
+                ) : feedbackRecords.length === 0 ? (
+                  <tr className="ad-empty-row"><td colSpan="5">No feedback submissions yet.</td></tr>
+                ) : (
+                  feedbackRecords.map((item) => (
+                    <tr key={item.id}>
+                      <td className="ad-table-name">{item.sender_name}</td>
+                      <td>{item.category}</td>
+                      <td className="ad-feedback-message">{item.message}</td>
+                      <td>{item.page_path}</td>
+                      <td>{new Date(item.created_at).toLocaleString()}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
 
       <div className={marketModalOpen ? 'ad-modal-overlay active' : 'ad-modal-overlay'} onClick={(e) => { if (e.target === e.currentTarget) closeMarketModal(); }}>
         <div className="ad-modal" onClick={(e) => e.stopPropagation()}>

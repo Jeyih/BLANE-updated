@@ -19,6 +19,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { isAdmin } from '../lib/admin-auth';
+import FeedbackDialog from './FeedbackDialog';
 import '../styles/nav.css';
 
 const NAV_LINKS = [
@@ -47,6 +48,7 @@ export default function Navbar() {
   const [initial, setInitial]       = useState('?');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileOpen, setMobileOpen]     = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const dropdownRef = useRef(null);
 
@@ -122,6 +124,17 @@ export default function Navbar() {
         <div className="dash-navbar-right">
           <span className="dash-greeting">Hello, <strong>{firstName}</strong></span>
 
+          <button
+            className="dash-feedback-trigger"
+            type="button"
+            onClick={() => setFeedbackOpen(true)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"/>
+            </svg>
+            Feedback
+          </button>
+
           <div style={{ position: 'relative' }} ref={dropdownRef}>
             <button
               className="dash-avatar-btn"
@@ -184,6 +197,13 @@ export default function Navbar() {
           </Link>
         ))}
         <button
+          className="dash-nav-link dash-mobile-feedback"
+          type="button"
+          onClick={() => { setMobileOpen(false); setFeedbackOpen(true); }}
+        >
+          Feedback
+        </button>
+        <button
           className="dash-nav-link"
           style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', color: '#f87171' }}
           onClick={handleLogout}
@@ -191,6 +211,8 @@ export default function Navbar() {
           Sign out
         </button>
       </div>
+
+      <FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </>
   );
 }

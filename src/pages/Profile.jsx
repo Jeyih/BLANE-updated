@@ -46,7 +46,7 @@ export default function Profile() {
   const [dietaryOpts, setDietaryOpts] = useState([]);
   const [medicalOpts, setMedicalOpts] = useState([]);
   const [allergyOpts, setAllergyOpts] = useState([]);
-  const [activeTab, setActiveTab] = useState('basic');
+  const [activeTab, setActiveTab] = useState('profile');
   const [editingBasic, setEditingBasic] = useState(false);
   const [editingHealth, setEditingHealth] = useState(false);
   const [basicForm, setBasicForm] = useState({
@@ -452,18 +452,11 @@ export default function Profile() {
 
             <div className="pf-tabs">
               <button
-                className={`pf-tab-btn ${activeTab === 'basic' ? 'active' : ''}`}
-                onClick={() => toggleTab('basic')}
+                className={`pf-tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
+                onClick={() => toggleTab('profile')}
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                Basic Info
-              </button>
-              <button
-                className={`pf-tab-btn ${activeTab === 'health' ? 'active' : ''}`}
-                onClick={() => toggleTab('health')}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                Health
+                Profile
               </button>
               <button
                 className={`pf-tab-btn ${activeTab === 'account' ? 'active' : ''}`}
@@ -474,7 +467,7 @@ export default function Profile() {
               </button>
             </div>
 
-            <div className={`pf-tab-panel ${activeTab === 'basic' ? 'active' : ''}`}>
+            <div className={`pf-tab-panel ${activeTab === 'profile' ? 'active' : ''}`}>
               <div className="pf-section-card">
                 <div className="pf-section-header">
                   <div className="pf-section-title-row">
@@ -621,9 +614,6 @@ export default function Profile() {
                   </div>
                 )}
               </div>
-            </div>
-
-            <div className={`pf-tab-panel ${activeTab === 'health' ? 'active' : ''}`}>
               <div className="pf-section-card">
                 <div className="pf-section-header">
                   <div className="pf-section-title-row">

@@ -57,6 +57,10 @@
   margin-top: 3px;
 }
 
+.ad-page-header .dash-feedback-trigger {
+  display: flex;
+}
+
 /* ---- Tabs ---- */
 .ad-tabs {
   display: flex;
@@ -185,6 +189,52 @@
 
 .ad-table-name { font-weight: 600; color: #e8f5ee; }
 .ad-table-icon { font-size: 18px; margin-right: 4px; }
+
+.ad-feedback-table-wrap { overflow-x: auto; }
+.ad-feedback-table { min-width: 900px; }
+.ad-feedback-message {
+  min-width: 320px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ad-modal.ad-feedback-modal {
+  width: min(1500px, 96vw);
+  max-width: 1500px;
+  max-height: 92vh;
+  padding: 32px;
+}
+
+.ad-feedback-modal-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ad-feedback-modal-heading .ad-modal-title {
+  margin-bottom: 0;
+}
+
+.ad-feedback-modal-heading .ad-icon-btn {
+  flex: 0 0 auto;
+  font-size: 22px;
+}
+
+.ad-feedback-toolbar {
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.ad-feedback-table-wrap {
+  max-height: 68vh;
+  overflow: auto;
+}
+
+.ad-add-btn:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
 
 .ad-status-pill {
   font-size: 10px;
@@ -423,4 +473,6 @@
   .ad-field-full { grid-column: span 1; }
   .ad-table { font-size: 12px; }
   .ad-sub-row { grid-template-columns: 1fr 1fr; }
+  .ad-feedback-modal { width: 100%; max-height: 90vh; padding: 22px; }
+  .ad-feedback-table-wrap { max-height: 60vh; }
 }

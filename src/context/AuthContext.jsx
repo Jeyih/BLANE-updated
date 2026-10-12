@@ -66,12 +66,28 @@ export function AuthProvider({ children }) {
     return data; // data.session is null if email confirmation is required
   }
 
+  /* ---- PASSWORD RESET — send a recovery email ---- */
+  async function resetPassword(email) {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  /* ---- UPDATE PASSWORD — used after a recovery token is received ---- */
+  async function updatePassword(newPassword) {
+    const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+    return data;
+  }
+
   /* ---- LOGOUT — mirrors old handleLogout() ---- */
   async function logout() {
     await supabase.auth.signOut();
   }
 
-  const value = { session, user: session?.user ?? null, loading, login, register, logout };
+  const value = { session, user: session?.user ?? null, loading, login, register, resetPassword, updatePassword, logout };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
