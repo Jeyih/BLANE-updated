@@ -76,6 +76,15 @@ export function getActiveConstraints(profile, definitions = CB_CONSTRAINTS) {
     .filter((key, index, values) => key && values.indexOf(key) === index);
 }
 
+export function getUnmatchedConstraints(profile, definitions = CB_CONSTRAINTS) {
+  return ['dietary_restrictions', 'medical_conditions', 'allergies'].flatMap((field) =>
+    asList(profile?.[field]).filter((value) => {
+      const selected = normalized(typeof value === 'object' ? value.key || value.label : value);
+      return !Object.entries(definitions).some(([key, definition]) =>
+        normalized(key) === selected || normalized(definition.label) === selected);
+    }));
+}
+
 export function checkRecipeViolations(recipe, activeConstraints, filterOn = true, definitions = CB_CONSTRAINTS) {
   if (!filterOn || activeConstraints.length === 0) return [];
 

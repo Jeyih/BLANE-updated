@@ -1,5 +1,7 @@
 // Reviewed product matches. No fuzzy matching or price guesses during refresh.
 export const METRO_SOURCES = [
+  { names: ['Garlic bulb'], id: 9650, title: 'Q Garlic Native', basis: '1 kg', requireNetWeight: true },
+  { names: ['Onion, Bombay bulb'], id: 4593, title: 'Gf Onion Native Red – Kilo', basis: '1 kg', requireNetWeight: true },
   { names: ['Malunggay leaves'], id: 9743, title: 'QV Malunggay Leaves 1kg', basis: '1 kg' },
   { names: ['Chicken liver'], id: 4489, title: 'Q Chicken Liver – Kilo', basis: '1 kg' },
   { names: ['Soy sauce'], id: 9280, title: 'Datu Puti Soy Sauce 1L', basis: '1 l' },

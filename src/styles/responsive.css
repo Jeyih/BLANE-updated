@@ -53,11 +53,11 @@
   .week-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
   .week-day-btn { min-width: 0; padding: 8px 2px; }
   .meal-card-top, .po-meal-top { gap: 12px; flex-wrap: wrap; }
-  .po-meal-main { display: grid; grid-template-columns: 22px 36px minmax(0, 1fr) auto; }
-  .po-meal-info { grid-column: 3 / 5; }
-  .po-meal-cost-wrap { grid-column: 1 / 4; align-items: flex-start; min-width: 0; }
+  .po-meal-main { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; }
+  .po-meal-info { grid-column: 2 / 4; }
+  .po-meal-cost-wrap { grid-column: 1 / 3; align-items: flex-start; min-width: 0; }
   .po-meal-name { white-space: normal; }
-  .po-expand-btn { grid-column: 4; }
+  .po-expand-btn { grid-column: 3; }
   .mk-ing-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 12px; }
   .mk-ing-row-header { display: none; }
   .mk-ing-row-name { grid-column: 1 / -1; }

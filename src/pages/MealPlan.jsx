@@ -6,7 +6,7 @@
    and manages weekly meal slots, calorie goals, swap options,
    and grocery list generation.
    ============================================================ */
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
@@ -15,8 +15,10 @@ import WhyButton from '../components/WhyButton';
 import PortionOptimizerPanel, { OptimizeButton } from '../components/PortionOptimizerPanel';
 import { scoreRecipe } from '../lib/seasonal';
 import { SeasonBadge, IngSeasonTag, SeasonalAltBanner } from '../components/SeasonalBadges';
-import { loadConstraintDefinitions, getActiveConstraints, checkRecipeViolations } from '../lib/constraints';
+import { loadConstraintDefinitions, getActiveConstraints, getUnmatchedConstraints, checkRecipeViolations } from '../lib/constraints';
 import { applyDynamicRecipePrices, formatPrice, formatEstimatedPrice, pricingLabel } from '../lib/pricing';
+import { isBudgetPriced, isAffordableMeal } from '../lib/meal-budget';
+import { mealSuggestionService, selectRecipeFallback } from '../lib/meal-suggestions';
 import PriceEstimateNotice from '../components/PriceEstimateNotice';
 import { useIngredientPrices } from '../context/PriceContext';
 import { ViolationBadge, ViolationDetail } from '../components/ConstraintWarnings';
@@ -762,47 +764,96 @@ function PriceOptimizerPanel({ meals = [], profile }) {
   const [dailyBudget, setDailyBudget] = useState(200);
   const [appliedBudget, setAppliedBudget] = useState(200);
   const [sortMode, setSortMode] = useState('cost');
-  const [filterOver, setFilterOver] = useState(false);
+  const [filterOver, setFilterOver] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
   const [suggestionType, setSuggestionType] = useState('Lunch');
   const [suggestion, setSuggestion] = useState(null);
   const [suggestionLoading, setSuggestionLoading] = useState(false);
   const [suggestionError, setSuggestionError] = useState('');
+  const [suggestionNotice, setSuggestionNotice] = useState('');
+  const suggestionRequest = useRef(0);
+  useEffect(() => {
+    suggestionRequest.current += 1;
+    setSuggestion(null);
+    setSuggestionNotice('');
+    setSuggestionError('');
+    setSuggestionLoading(false);
+    return () => { suggestionRequest.current += 1; };
+  }, [profile, appliedBudget, suggestionType]);
 
-  const perMeal = Math.round(appliedBudget / 4);
+  const liveSuggestion = useMemo(() => suggestion
+    ? applyDynamicRecipePrices([suggestion], priceRecords)[0] : null, [suggestion, priceRecords]);
+
+  const perMeal = appliedBudget / 4;
 
   const sortedMeals = useMemo(() => {
     const list = [...meals];
     if (sortMode === 'cost') {
-      return list.sort((a, b) => (a.budgetEligible ? a.cost : Infinity) - (b.budgetEligible ? b.cost : Infinity));
+      return list.sort((a, b) => (isBudgetPriced(a) ? a.cost : Infinity) - (isBudgetPriced(b) ? b.cost : Infinity));
     }
-    return list.sort((a, b) => (b.budgetEligible && b.cost > 0 ? b.kcal / b.cost : 0) - (a.budgetEligible && a.cost > 0 ? a.kcal / a.cost : 0));
+    return list.sort((a, b) => (isBudgetPriced(b) && b.cost > 0 ? b.kcal / b.cost : 0) - (isBudgetPriced(a) && a.cost > 0 ? a.kcal / a.cost : 0));
   }, [sortMode, meals]);
 
-  const visibleMeals = filterOver ? sortedMeals.filter((meal) => meal.budgetEligible && meal.cost <= perMeal) : sortedMeals;
-  const affordableCount = sortedMeals.filter((meal) => meal.budgetEligible && meal.cost <= perMeal).length;
+  const visibleMeals = filterOver ? sortedMeals.filter((meal) => isAffordableMeal(meal, perMeal)) : sortedMeals;
+  const affordableCount = sortedMeals.filter((meal) => isAffordableMeal(meal, perMeal)).length;
+  const unverifiedCount = sortedMeals.filter((meal) => !isBudgetPriced(meal)).length;
   const cheapestDay = computeCheapestDay(meals, perMeal);
 
   async function suggestMeal() {
+    const requestId = ++suggestionRequest.current;
+    setSuggestion(null);
     setSuggestionLoading(true);
     setSuggestionError('');
+    setSuggestionNotice('');
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sign in to get a personalized FNRI meal suggestion.');
+      const definitions = await loadConstraintDefinitions();
+      if (!definitions || getUnmatchedConstraints(profile, definitions).length) {
+        throw new Error('Your dietary preferences could not be fully checked. Please check your health profile before requesting a suggestion.');
+      }
+      const active = getActiveConstraints(profile, definitions);
+      const isAllowed = (meal) => checkRecipeViolations(meal, active, true, definitions).length === 0;
+      const priceMeal = (meal) => applyDynamicRecipePrices([meal], priceRecords)[0];
+      const validate = (meal) => meal.type === suggestionType && isAffordableMeal(priceMeal(meal), perMeal) && isAllowed(meal);
       const functionUrl = `${import.meta.env.VITE_SUPABASE_URL.replace('.supabase.co', '.functions.supabase.co')}/optimize-meal`;
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ mode: 'suggest', profile, budget: perMeal, mealType: suggestionType }),
+      const result = await mealSuggestionService.get({
+        key: JSON.stringify({ user: session.user.id, profile, budget: perMeal, mealType: suggestionType, definitions }),
+        validate,
+        request: async () => {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 12_000);
+          try {
+            const response = await fetch(functionUrl, {
+              method: 'POST', signal: controller.signal,
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+              body: JSON.stringify({ mode: 'suggest', profile, budget: perMeal, mealType: suggestionType }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              const error = new Error(payload.error || 'AI temporarily unavailable.');
+              error.status = response.status;
+              throw error;
+            }
+            return { ...payload, type: suggestionType, servings: 1,
+              ingredients: (payload.ingredients || []).map((ing) => ({ ...ing, quantity: ing.quantity })) };
+          } finally { clearTimeout(timeout); }
+        },
+        fallback: () => {
+          const meal = selectRecipeFallback(applyDynamicRecipePrices(meals, priceRecords), { mealType: suggestionType, budget: perMeal, isAllowed });
+          return meal && { ...meal, mealType: suggestionType, source: 'Existing recipe · fallback',
+            reason: 'Selected from your existing recipes using current sourced prices and your dietary preferences. No AI generation was used.' };
+        },
       });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Could not generate a meal suggestion.');
-      const [priced] = applyDynamicRecipePrices([{ ingredients: (payload.ingredients || []).map((ing) => ({ ...ing, quantity: ing.quantity })), servings: 1 }], priceRecords);
-      setSuggestion({ ...payload, estimatedCost: priced.cost, pricingSource: priced.pricingSource, quantityEstimated: priced.quantityEstimated });
+      if (requestId !== suggestionRequest.current) return;
+      const priced = priceMeal(result.meal);
+      setSuggestion({ ...result.meal, ...priced });
+      setSuggestionNotice(result.delivery === 'cached' ? 'Reused a recent suggestion; ingredient prices have been checked again.'
+        : result.delivery === 'fallback' ? 'AI is temporarily unavailable or could not provide a suitable meal. Showing an existing recipe instead.' : 'AI suggestion checked against current ingredient prices and dietary rules.');
     } catch (error) {
-      setSuggestionError(error.message);
+      if (requestId === suggestionRequest.current) setSuggestionError(error.message);
     } finally {
-      setSuggestionLoading(false);
+      if (requestId === suggestionRequest.current) setSuggestionLoading(false);
     }
   }
 
@@ -810,6 +861,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
     const nextBudget = Math.max(50, Math.min(2000, Number(dailyBudget) || 200));
     setDailyBudget(nextBudget);
     setAppliedBudget(nextBudget);
+    setFilterOver(true);
     setSuggestion(null);
     setSuggestionError('');
   }
@@ -857,7 +909,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
           <div className="po-header-icon">💸</div>
           <div>
             <div className="po-title">Price-Aware Meal Optimizer</div>
-            <div className="po-sub">Costs use current market averages (₱/kg); unmatched ingredients use recipe estimates.</div>
+            <div className="po-sub">Shows sourced meal estimates within your budget. Prices update automatically.</div>
           </div>
         </div>
       </div>
@@ -865,6 +917,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
       <div style={{ padding: '0 24px' }}>
         <PriceEstimateNotice />
         <p className="price-estimate-note">Meal estimates are per serving. Raw estimates exclude cooking yield and preparation costs. Base-only subtotals and missing prices are excluded from affordability results.</p>
+        {unverifiedCount > 0 && <p className="price-estimate-note">{unverifiedCount} meals have incomplete or unverified prices and are excluded from affordable results. View all meals to inspect their ingredient sources.</p>}
       </div>
       <div className="po-budget-row">
         <div className="po-budget-input-wrap">
@@ -880,7 +933,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
           />
         </div>
         <span className="po-budget-label">Budget</span>
-        <div className="po-per-meal-chip">≈ <strong>₱{perMeal}</strong> / meal</div>
+        <div className="po-per-meal-chip"><strong>₱{perMeal.toFixed(2)}</strong> / meal</div>
         <button className="po-apply-btn" type="button" onClick={applyBudget}>
           Apply Budget
         </button>
@@ -889,25 +942,27 @@ function PriceOptimizerPanel({ meals = [], profile }) {
       <div className="po-ai-suggest-row">
         <div>
           <div className="po-ai-suggest-title">Suggest an affordable meal</div>
-          <div className="po-ai-suggest-sub">Gemini uses DOST-FNRI nutrition data and your health profile.</div>
+          <div className="po-ai-suggest-sub">Recent suggestions are reused for 15 minutes. Existing recipes are used when AI is unavailable.</div>
         </div>
         <select value={suggestionType} onChange={(event) => setSuggestionType(event.target.value)} aria-label="Suggested meal type">
           <option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option>
         </select>
         <button className="po-apply-btn" type="button" onClick={suggestMeal} disabled={suggestionLoading}>
-          {suggestionLoading ? 'Analyzing...' : 'Suggest with AI'}
+          {suggestionLoading ? 'Finding a meal...' : 'Suggest a meal'}
         </button>
       </div>
       {suggestionError && <div className="po-ai-suggest-error">{suggestionError}</div>}
-      {suggestion && (
+      {suggestionNotice && <p className="meal-action-status" role="status">{suggestionNotice}</p>}
+      {liveSuggestion && !isAffordableMeal(liveSuggestion, perMeal) && <div className="po-ai-suggest-error" role="status">The suggestion no longer has a complete sourced estimate within your current budget. Choose an affordable meal below or request another suggestion.</div>}
+      {liveSuggestion && isAffordableMeal(liveSuggestion, perMeal) && (
         <div className="po-ai-suggestion">
           <div className="po-ai-suggestion-heading">
-            <div><strong>{suggestion.name}</strong><span>{suggestion.mealType} · {formatEstimatedPrice(suggestion.estimatedCost)} ({pricingLabel(suggestion)}) · {suggestion.kcal} kcal</span></div>
+            <div><strong>{suggestion.name}</strong><span>{suggestion.mealType} · {formatEstimatedPrice(liveSuggestion.cost)} ({pricingLabel(liveSuggestion)}) · {suggestion.kcal} kcal</span></div>
             <span className="po-ai-source">{suggestion.source}</span>
           </div>
           <p>{suggestion.reason}</p>
           <div className="po-ai-macros">{suggestion.protein}g protein · {suggestion.carbs}g carbs · {suggestion.fats}g fat</div>
-          <div className="po-ai-ingredients">{(suggestion.ingredients || []).map((ingredient) => <span key={ingredient.fct_id}>{ingredient.quantity} {ingredient.name}</span>)}</div>
+          <div className="po-ai-ingredients">{(suggestion.ingredients || []).map((ingredient, index) => <span key={`${ingredient.fct_id || ingredient.name}-${index}`}>{ingredient.quantity} {ingredient.name}</span>)}</div>
         </div>
       )}
 
@@ -919,7 +974,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
         <div className="po-summary-divider" />
         <div className="po-summary-item">
           <div className="po-summary-label">Per Meal</div>
-          <div className="po-summary-value yellow">₱{perMeal}</div>
+          <div className="po-summary-value yellow">₱{perMeal.toFixed(2)}</div>
         </div>
         <div className="po-summary-divider" />
         <div className="po-summary-item">
@@ -968,24 +1023,24 @@ function PriceOptimizerPanel({ meals = [], profile }) {
           className={`po-filter-toggle ${filterOver ? 'active' : ''}`}
           onClick={() => setFilterOver((prev) => !prev)}
         >
-          {filterOver ? 'Show all meals' : 'Hide over budget'}
+          {filterOver ? 'View all meals' : 'Affordable meals only'}
         </button>
       </div>
 
       <div className="po-meals-list">
+        {!visibleMeals.length && <div className="po-ai-suggest-error" role="status">No meals with complete, verified source estimates fit your ₱{perMeal.toFixed(2)} per-meal budget yet. Try a higher budget or view all meals to check which ingredients need pricing.</div>}
         {visibleMeals.map((meal) => {
-          const isOver = meal.budgetEligible && meal.cost > perMeal;
-          const affordClass = !meal.budgetEligible ? 'unknown' : meal.cost <= perMeal * 0.6 ? 'cheap'
+          const isOver = isBudgetPriced(meal) && meal.cost > perMeal;
+          const affordClass = !isBudgetPriced(meal) ? 'unknown' : meal.cost <= perMeal * 0.6 ? 'cheap'
             : meal.cost <= perMeal ? 'okay'
             : meal.cost <= perMeal * 1.3 ? 'pricey'
             : 'over';
-          const valueScore = meal.budgetEligible && meal.cost > 0 ? Math.round((meal.kcal / meal.cost) * 10) / 10 : '—';
+          const valueScore = isBudgetPriced(meal) && meal.cost > 0 ? Math.round((meal.kcal / meal.cost) * 10) / 10 : '—';
           const maxIngredientCost = Math.max(...(meal.ingredients || []).map((ingredient) => ingredient.cost || 0), 0);
 
           return (
             <div key={meal.id} className={`po-meal-row ${isOver ? 'over-budget' : ''}`}>
               <div className="po-meal-main" onClick={() => toggleExpand(meal.id)}>
-                <div className={`po-meal-rank ${meal.id.startsWith('m') && parseInt(meal.id.slice(1), 10) <= 3 ? 'top3' : ''}`}>{meal.id.startsWith('m') ? `#${meal.id.slice(1)}` : meal.id}</div>
                 <div className="po-meal-emoji">{meal.emoji}</div>
                 <div className="po-meal-info">
                   <div className="po-meal-name">{meal.name}</div>
@@ -1028,7 +1083,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
                           return (
                             <tr key={ing.name}>
                               <td><span className="po-ing-cost-name"><span className="po-ing-dot" />{ing.name}</span>
-                                <div className="price-estimate-note">{ing.evidence?.label}<br />{ing.priceRecords?.length ? ing.priceRecords.map((p) => <div key={p.sourceUrl}><a href={p.sourceUrl} target="_blank" rel="noreferrer">{p.source}</a> · {p.observedAt}<br />{p.description} · {formatPrice(p.price)} / {p.unit}<br />{p.notes}{p.conversionSourceUrl && <div><a href={p.conversionSourceUrl} target="_blank" rel="noreferrer">View yield database</a></div>}{ing.cost === null && <div>Needs a compatible volume or piece count.</div>}</div>) : 'No matching sourced price'}</div>
+                                <div className="price-estimate-note">{ing.evidence?.label}<br />{ing.priceRecords?.length ? ing.priceRecords.map((p) => <div key={p.sourceUrl}><a href={p.sourceUrl} target="_blank" rel="noreferrer">{p.source}</a> · {p.observedAt}<br />{p.description} · {formatPrice(p.price)} / {p.unit}<br />{p.notes}{p.conversionNote && <div>{p.conversionNote}</div>}{p.conversionSourceUrl && <div><a href={p.conversionSourceUrl} target="_blank" rel="noreferrer">View Philippine portion reference</a></div>}{ing.cost === null && <div>Needs a compatible volume or piece count.</div>}</div>) : 'No matching sourced price'}</div>
                               </td>
                               <td>{ing.quantity || '—'}</td>
                               <td>{ing.grams ? `${ing.grams} g` : '—'}</td>
@@ -1059,7 +1114,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
 function computeCheapestDay(meals = [], perMeal) {
   const types = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
   const costs = types.map((type) => {
-    const mealsOfType = meals.filter((meal) => meal.type === type && meal.budgetEligible);
+    const mealsOfType = meals.filter((meal) => meal.type === type && isBudgetPriced(meal));
     if (mealsOfType.length === 0) return null;
     const cheapest = mealsOfType.reduce((a, b) => (a.cost < b.cost ? a : b));
     return cheapest.cost;
@@ -1110,7 +1165,7 @@ function SlotCard({ slot, idx, completed, onToggleComplete, profile, appliedOpti
                   <ViolationBadge violations={violations} />
                 </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
+              <div className="meal-card-right">
                 <div className="meal-kcal-badge"><span>{meal.kcal}</span><small>kcal</small></div>
                 <div className={`meal-cost-badge${!meal.cost ? ' meal-cost-badge--zero' : ''}`} title={pricingLabel(meal)}>{formatEstimatedPrice(meal.cost)}</div>
                 <div className="price-estimate-note">{pricingLabel(meal)}</div>
@@ -1177,7 +1232,7 @@ function SlotCard({ slot, idx, completed, onToggleComplete, profile, appliedOpti
               </button>
               <OptimizeButton onToggle={() => onSetOpenOptimizer(openOptimizerId === meal.id ? null : meal.id)} />
               <WhyButton meal={meal} profile={profile} violations={violations} />
-              <button className={'toggle-ingredients-btn' + (ingredientsOpen ? ' open' : '')} onClick={() => setIngredientsOpen((v) => !v)}>
+              <button type="button" className={'toggle-ingredients-btn' + (ingredientsOpen ? ' open' : '')} aria-expanded={ingredientsOpen} onClick={() => setIngredientsOpen((v) => !v)}>
                 Ingredients <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6" /></svg>
               </button>
             </div>

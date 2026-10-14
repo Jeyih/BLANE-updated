@@ -11,6 +11,9 @@
 .price-catalog table { width: 100%; border-collapse: collapse; text-align: left; }
 .price-catalog th, .price-catalog td { padding: 8px 10px; border-bottom: 1px solid rgba(45,220,122,.12); white-space: nowrap; }
 .price-catalog th { color: #e8f5ee; }
+.price-catalog td details { max-width: 320px; white-space: normal; }
+.price-catalog td details ul { padding-left: 18px; }
+.price-catalog td details li { margin: 8px 0; }
 .price-estimate-note { color: #8aab96; font-size: 11px; line-height: 1.5; }
 .price-catalog-controls, .price-pagination { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
 .price-catalog-controls input, .price-catalog-controls select { background: #111f16; color: #e8f5ee; border: 1px solid rgba(45,220,122,.25); border-radius: 8px; padding: 8px 10px; max-width: 100%; }

@@ -9,12 +9,12 @@ const rows = names.map((name) => ingredientPriceAudit(name, db.recipeIngredients
 const counts = {};
 for (const row of rows) counts[row.evidence.label] = (counts[row.evidence.label] || 0) + 1;
 const date = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
-const header = ['Ingredient', 'Source price PHP', 'Unit', 'Evidence status', 'Actual source product', 'Source URL', 'Observed date', 'Assumptions', 'Conversion database URLs'];
+const header = ['Ingredient', 'Source price PHP', 'Unit', 'Evidence status', 'Actual source product', 'Source URL', 'Observed date', 'Assumptions', 'Conversion database URLs', 'Required verification'];
 const data = rows.map((row) => {
   const source = row.quote?.records[0];
   return [row.name, row.quote?.price ?? '', row.quote?.unit || '', row.evidence.label,
     source?.description || source?.name || '', source?.sourceUrl || '', source?.observedAt || '',
-    row.assumptions.join(' | '), row.conversionSources.join(' | ')];
+    [...row.assumptions, ...row.conversionNotes].join(' | '), row.conversionSources.join(' | '), row.verificationTasks.join(' | ')];
 });
 const csv = [header, ...data].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
 await writeFile(new URL('../PRICE_EVIDENCE_AUDIT.csv', import.meta.url), '\uFEFF' + csv);
@@ -27,6 +27,7 @@ const report = [`# Ingredient price evidence audit — ${date}`, '',
   '- [DA price monitoring](https://www.da.gov.ph/price-monitoring/)',
   '- [Metro public product catalogue](https://shopmetro.ph/wp-json/wc/store/v1/products)',
   '- [FNRI Philippine food composition catalogue](https://i.fnri.dost.gov.ph/fct/library) (nutrition data; not a price or cooking-yield database)', '',
+  '- [DOST-FNRI MARFEL portion weights](https://marfel.fnri.dost.gov.ph/marfel-food-exchange-list?category=-1&page=1) and [AP/EP definitions](https://marfel.fnri.dost.gov.ph/marfel-faqs): four exact food matches use published purchase and edible weights, labeled as reference estimates.', '',
   'Rice and oats use Philippine raw-product price benchmarks with explicit equal-weight assumptions. These are not verified cooked-food costs. A measured or documented Philippine preparation yield is required before certifying the recipe cost.', '',
   'Exact ordinary duck liver, domestic quail, suckling-pig leg and lima-bean pod quotations remain unverified. Their displayed estimates use explicitly disclosed different-product benchmarks. Retail listings found for premium foie gras, pet treats, whole birds, unspecified beans, and prepared foods without pack weights do not establish exact affordable prices for these foods. A dated matching supplier quote or measured preparation yield is still required.', '',
   'Assumption-based recipe calculations are excluded from affordability and cheapest-day results. The website keeps their labeled estimates visible for review.', '',
@@ -35,7 +36,7 @@ const report = [`# Ingredient price evidence audit — ${date}`, '',
   '| --- | --- | --- | --- | --- |',
   ...rows.map((row) => {
     const source = row.quote?.records[0];
-    return `| ${cell(row.name)} | ${row.quote ? `${formatPrice(row.quote.price)} / ${row.quote.unit}` : 'Unavailable'} | ${cell(row.evidence.label)} | ${source ? `[${cell(source.description || source.name)}](${source.sourceUrl}) · ${source.observedAt}` : 'No source'} | ${cell(row.assumptions.join(' '))} ${row.conversionSources.map((url) => `[Yield database](${url})`).join(' ')} |`;
+    return `| ${cell(row.name)} | ${row.quote ? `${formatPrice(row.quote.price)} / ${row.quote.unit}` : 'Unavailable'} | ${cell(row.evidence.label)} | ${source ? `[${cell(source.description || source.name)}](${source.sourceUrl}) · ${source.observedAt}` : 'No source'} | ${cell([...row.assumptions, ...row.conversionNotes].join(' '))} ${row.conversionSources.map((url) => `[Portion reference](${url})`).join(' ')} |`;
   }), '',
   'Refresh source snapshots and rerun `node scripts/export-price-evidence.mjs` to regenerate this report. The app audit and CSV export use the current live feed.', ''].join('\n');
 await writeFile(new URL('../PRICE_EVIDENCE_AUDIT.md', import.meta.url), report);

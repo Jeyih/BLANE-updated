@@ -361,7 +361,7 @@ function RecipeModal({ recipe, activeConstraints, constraintDefinitions, onClose
                   <IngSeasonTag ingredientName={ing.name} />
                   <span className={'modal-ing-status ' + ing.status}>{ing.status === 'avail' ? '✓' : '⚠'}</span>
                 </div>
-                <div className="price-estimate-note">{formatEstimatedPrice(ing.cost)} · {ing.evidence?.label}{ing.priceRecords?.map((p) => <div key={p.sourceUrl}><a href={p.sourceUrl} target="_blank" rel="noreferrer">{p.source}</a> · {p.observedAt}<br />{p.description} · {formatPrice(p.price)} / {p.unit}<br />{p.notes}{p.conversionSourceUrl && <div><a href={p.conversionSourceUrl} target="_blank" rel="noreferrer">View yield database</a></div>}</div>)}</div>
+                <div className="price-estimate-note">{formatEstimatedPrice(ing.cost)} · {ing.evidence?.label}{ing.priceRecords?.map((p) => <div key={p.sourceUrl}><a href={p.sourceUrl} target="_blank" rel="noreferrer">{p.source}</a> · {p.observedAt}<br />{p.description} · {formatPrice(p.price)} / {p.unit}<br />{p.notes}{p.conversionNote && <div>{p.conversionNote}</div>}{p.conversionSourceUrl && <div><a href={p.conversionSourceUrl} target="_blank" rel="noreferrer">View Philippine portion reference</a></div>}</div>)}</div>
                 <SeasonalAltBanner ingredientName={ing.name} />
               </div>
             ))}

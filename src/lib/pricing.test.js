@@ -4,6 +4,22 @@ import { applyDynamicRecipePrices, normalizeMarketPrices, parsePriceQuantity, pa
 
 const reference = (name, price, unit = 'kg') => ({ name, price, unit, kind: 'reference', region: 'NCR', sourceUrl: 'https://www.da.gov.ph/report.pdf' });
 
+test('exact ingredient quotes supersede comparable benchmarks and remain dynamic', () => {
+  const benchmark = reference('Whole duck', 598);
+  const actual = { ...reference('Duck breast', 900), sourceType: 'retailer', verified: true,
+    sourceUrl: 'https://www.thesausageguy.shop/panglao/poultry', estimateType: 'product', currency: 'PHP', sourceCountry: 'PH' };
+  const recipe = { ingredients: [{ name: 'Duck breast', grams: 100 }], servings: 1 };
+  const [priced] = applyDynamicRecipePrices([recipe], [benchmark, actual]);
+  assert.equal(priced.cost, 90);
+  assert.equal(priced.budgetEligible, true);
+  assert.equal(priced.comparableEstimate, false);
+  assert.equal(ingredientQuote('Duck breast', [benchmark, actual]).price, 900);
+  assert.equal(applyDynamicRecipePrices([recipe], [benchmark, { ...actual, price: 950 }])[0].cost, 95);
+  const [fallback] = applyDynamicRecipePrices([recipe], [benchmark]);
+  assert.equal(fallback.cost, 59.8);
+  assert.equal(fallback.budgetEligible, false);
+});
+
 test('market cards and scanner resolve the recorded malunggay typo and update prices', () => {
   const quote = { name: 'Malunggay leaves', price: 110, unit: 'kg', kind: 'reference', sourceType: 'retailer', verified: true,
     sourceUrl: 'https://shopmetro.ph/product/malunggay' };
@@ -61,12 +77,12 @@ test('chicken curry is costable with its recorded scant cup quantity and updates
   const prices = [reference('Chicken, white meat, boiled', 400), reference('Potato', 100), reference('Carrot', 100),
     reference('Coconut milk', 200, 'l'), reference('Red onion', 100), reference('Local garlic', 200)];
   const [meal] = applyDynamicRecipePrices([recipe], prices);
-  assert.equal(meal.cost, 51);
+  assert.equal(meal.cost, 51.34, 'Carrot uses the documented FNRI purchase portion rather than equal raw/cooked weight');
   assert.equal(meal.ingredients[3].cost, 24, 'Uses recipe volume, not an assumed 100g = 100ml density');
   assert.equal(meal.quantityEstimated, true);
   assert.match(meal.ingredients[3].priceRecords[0].notes, /240 ml/);
   const [updated] = applyDynamicRecipePrices([recipe], prices.map((p) => p.name === 'Coconut milk' ? { ...p, price: 300 } : p));
-  assert.equal(updated.cost, 57);
+  assert.equal(updated.cost, 57.34);
 });
 
 test('unverified local quotes are excluded; sourced costs are calculated per serving', () => {

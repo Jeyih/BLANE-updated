@@ -31,13 +31,13 @@ export default function IngredientPriceCatalogue() {
 
   function exportAudit() {
     const selected = coverage.catalogue.filter((food) => scope !== 'recipes' || food.inRecipes);
-    const header = ['Ingredient', 'Source price PHP', 'Source unit', 'Evidence status', 'Actual listed product', 'Source URL', 'Observed date', 'Assumptions', 'Conversion database URLs'];
+    const header = ['Ingredient', 'Source price PHP', 'Source unit', 'Evidence status', 'Actual listed product', 'Source URL', 'Observed date', 'Assumptions', 'Conversion database URLs', 'Required verification'];
     const csv = [header, ...selected.map((food) => {
       const audit = ingredientPriceAudit(food.food_name, recipeIngredients, records);
       const source = audit.quote?.records[0];
       return [food.food_name, audit.quote?.price ?? '', audit.quote?.unit || '', audit.evidence.label,
         source?.description || source?.name || '', source?.sourceUrl || '', source?.observedAt || '',
-        audit.assumptions.join(' | '), audit.conversionSources.join(' | ')];
+        [...audit.assumptions, ...audit.conversionNotes].join(' | '), audit.conversionSources.join(' | '), audit.verificationTasks.join(' | ')];
     })].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
@@ -67,7 +67,7 @@ export default function IngredientPriceCatalogue() {
         <tbody>{visible.map((food) => <tr key={food.fct_id}>
           <td>{food.food_name}<div className="price-estimate-note">Food ID {food.fct_id}</div></td>
           <td>{food.quote ? <>{formatPrice(food.quote.price)} / {food.quote.unit}<div className="price-estimate-note">{food.quote.records[0].partial ? 'Base ingredient only' : food.quote.records[0].estimateType === 'comparable' ? 'Comparable-product estimate' : food.quote.records[0].estimateType === 'raw' ? 'Raw-ingredient estimate' : 'Product reference'}<br />{food.quote.records[0].notes}<br />{food.quote.records[0].packPrice && `${formatPrice(food.quote.records[0].packPrice)} / ${food.quote.records[0].packQuantity}`} {food.quote.records[0].availability}</div></> : 'Price unavailable'}</td>
-          <td>{food.evidence.label}<div className="price-estimate-note">{food.evidence.reason}</div></td>
+          <td>{food.evidence.label}<div className="price-estimate-note">{food.evidence.reason}{food.conversionNotes?.map((note) => <p key={note}>{note}</p>)}{food.conversionSources?.map((url) => <div key={url}><a href={url} target="_blank" rel="noreferrer">DOST-FNRI portion reference</a></div>)}</div>{food.verificationTasks?.length > 0 && <details><summary>How to verify</summary><ul>{food.verificationTasks.map((task) => <li key={task}>{task}</li>)}</ul></details>}</td>
           <td>{food.quote ? food.quote.records[0].kind === 'local' ? `Tarlac recorded quotes (${food.quote.records.length})`
             : <a href={food.quote.records[0].sourceUrl} target="_blank" rel="noreferrer">{food.quote.records[0].source}</a> : 'Needs a matching market or retailer quote'}</td>
           <td>{food.quote ? [...new Set(food.quote.records.map((p) => p.observedAt || 'Date not provided'))].join(', ') : '—'}</td>

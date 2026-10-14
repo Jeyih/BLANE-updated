@@ -3,6 +3,34 @@ import { METRO_SOURCES, SHOPIFY_SOURCES } from './retail-source-config.js';
 
 export const TOCINO_URL = 'https://montereycommunityonlinemarket.com.ph/product/beef-tocino-500g/';
 export const DUCK_URL = 'https://shop.gerald.ph/whole-duck';
+export const DUCK_BREAST_URL = 'https://www.thesausageguy.shop/panglao/poultry';
+
+export function parseDuckBreastPrice(html) {
+  const products = [];
+  function walk(value) {
+    if (!value || typeof value !== 'object') return;
+    if (value['@type'] === 'Product') products.push(value);
+    Object.values(value).forEach((child) => { if (Array.isArray(child)) child.forEach(walk); else walk(child); });
+  }
+  for (const [, json] of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try { walk(JSON.parse(json)); } catch { /* Reject if no valid matching product remains. */ }
+  }
+  const product = products.find((p) => p.name === 'Duck Breast (Dalee)');
+  const offer = product?.offers;
+  const spec = offer?.priceSpecification;
+  if (offer?.priceCurrency !== 'PHP' || spec?.priceCurrency !== 'PHP'
+    || spec.referenceQuantity?.unitCode !== 'KGM' || Number(spec.referenceQuantity?.value) !== 1
+    || offer.seller?.name !== 'The Sausage Guy Panglao' || Number(offer.price) !== Number(spec.price)
+    || !Number.isFinite(Number(spec.price)) || Number(spec.price) <= 0) {
+    throw new Error('Duck-breast product, seller or PHP/kg quote changed.');
+  }
+  return { name: 'Duck breast', key: ingredientKey('Duck breast'), description: product.name,
+    price: Number(spec.price), unit: 'kg', kind: 'reference', sourceType: 'retailer', verified: true,
+    currency: 'PHP', sourceCountry: 'PH', region: 'Panglao, Bohol / Philippine retailer',
+    source: 'The Sausage Guy Panglao official shop', sourceUrl: DUCK_BREAST_URL,
+    observedAt: new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10), estimateType: 'product',
+    availability: offer.availability === 'https://schema.org/InStock' ? 'Listed in stock' : 'Stock status not confirmed' };
+}
 
 export function parseWholeDuckPrice(html) {
   const section = html.match(/<div class=product-price>[\s\S]*?<meta itemprop=priceCurrency content=PHP>/)?.[0];
@@ -50,9 +78,15 @@ export function decodeProductName(value) {
     .replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&rsquo;|&apos;/g, "'").replace(/&quot;/g, '"');
 }
 
-export function productRecords(config, product, packPrice, source, url) {
+export function productRecords(config, product, packPrice, source, url, description = '') {
   if (ingredientKey(decodeProductName(product)) !== ingredientKey(config.title)) throw new Error('Retail product identity changed.');
   const basis = parsePriceQuantity(config.basis);
+  if (config.requireNetWeight) {
+    const text = decodeProductName(description.replace(/<[^>]*>/g, ' '));
+    const labelled = text.match(/Net Weight:\s*(\d+(?:\.\d+)?\s*(?:kg|g|ml|l))\b/i)?.[1];
+    const stated = parsePriceQuantity(labelled);
+    if (!stated || stated.unit !== basis?.unit || stated.amount !== basis?.amount) throw new Error('Labelled product weight changed.');
+  }
   if (!basis || !Number.isFinite(packPrice) || packPrice <= 0) throw new Error('Invalid retailer price or pack basis.');
   return config.names.map((name) => ({ name, key: ingredientKey(name), description: decodeProductName(product),
     price: packPrice / basis.amount, unit: basis.unit, packPrice, packQuantity: config.basis,
@@ -88,7 +122,7 @@ export async function fetchRetailPrices(previousRecords = []) {
         const product = products.find((p) => p.id === config.id);
         if (!product || product.prices?.currency_code !== 'PHP' || product.prices.price_range) throw new Error('Product or PHP price is unavailable.');
         const price = Number(product.prices.price) / 10 ** Number(product.prices.currency_minor_unit);
-        records.push(...productRecords(config, product.name, price, 'Metro official online store', product.permalink).map((p) => ({ ...p, availability: product.is_in_stock ? 'Listed in stock' : 'Listed out of stock' })));
+        records.push(...productRecords(config, product.name, price, 'Metro official online store', product.permalink, product.description).map((p) => ({ ...p, availability: product.is_in_stock ? 'Listed in stock' : 'Listed out of stock' })));
       } catch (error) { fallback(config, error); }
     }
   } catch (error) { for (const config of METRO_SOURCES) fallback(config, error); }
@@ -111,6 +145,8 @@ export async function fetchRetailPrices(previousRecords = []) {
   await Promise.all([worker(), worker(), worker()]);
   try { records.push(parseWholeDuckPrice(await (await get(DUCK_URL)).text())); }
   catch (error) { fallback({ names: ['Whole duck'] }, error); }
+  try { records.push(parseDuckBreastPrice(await (await get(DUCK_BREAST_URL)).text())); }
+  catch (error) { fallback({ names: ['Duck breast'] }, error); }
   try { records.push({ ...parseRetailPrice(await (await get(TOCINO_URL)).text()), verified: true, estimateType: 'product' }); }
   catch (error) { fallback({ names: ['Beef, sweet cured'] }, error); }
   if (!records.length) throw new Error('No verified retailer prices could be loaded.');

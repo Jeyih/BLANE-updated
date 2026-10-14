@@ -22,7 +22,7 @@ export default function PriceSourceStatus({ showCatalog = false }) {
     <p>Cooked foods may use labeled raw-ingredient estimates. Base-only subtotals exclude extra ingredients and are not complete meal costs.</p>
     <p>Liquid household measures use 240 ml per cup, 15 ml per tablespoon and 5 ml per teaspoon. Approximate quantities are labeled; “scant” uses the stated full measure as an upper estimate.</p>
     <p>Rare ingredients may use comparable Philippine product benchmarks for budgeting. These are labeled estimates, not exact prices for the requested species or cut; open the ingredients to see each comparison.</p>
-    <p>Prices use Philippine DA reports and Philippine store listings in pesos only. Assumption-based costs are excluded from affordability results. Philippine cooking-yield data is still needed for raw/cooked conversions.</p>
+    <p>Prices use Philippine DA reports and Philippine store listings in pesos only. Unsupported assumptions are excluded from affordability results. Carrot, cabbage, squash and sitaw use labeled DOST-FNRI purchase/edible portion references; other cooked-food conversions still need documented evidence.</p>
     {warning && <p className="price-warning">{warning}</p>}
     {stale && <p className="price-warning">This report is over 14 days old. Check current prices before shopping.</p>}
     {report && <a href={report.url} target="_blank" rel="noreferrer">View official DA report</a>}
