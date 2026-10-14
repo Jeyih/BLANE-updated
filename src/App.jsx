@@ -17,6 +17,7 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { PriceProvider } from './context/PriceContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { loadConstraintDefinitions } from './lib/constraints';
 import { loadIngredientSeasons } from './lib/seasonal';
@@ -49,6 +50,7 @@ export default function App() {
 
   return (
     <AuthProvider>
+      <PriceProvider>
       <BrowserRouter>
         <Routes>
           {/* Public */}
@@ -67,6 +69,7 @@ export default function App() {
           </Route>
         </Routes>
       </BrowserRouter>
+      </PriceProvider>
     </AuthProvider>
   );
 }

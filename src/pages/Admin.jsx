@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { isAdmin } from '../lib/admin-auth';
 import { loadConstraintDefinitions } from '../lib/constraints';
+import PriceSourceStatus from '../components/PriceSourceStatus';
 import '../styles/admin.css';
 import '../styles/nav.css';
 
@@ -813,6 +814,7 @@ export default function Admin() {
     }
 
     showToast('✓ Market saved successfully');
+    window.dispatchEvent(new Event('blane-prices-updated'));
     closeMarketModal();
     await loadMarkets();
   }
@@ -826,6 +828,7 @@ export default function Admin() {
       return;
     }
     showToast('✓ Market deleted');
+    window.dispatchEvent(new Event('blane-prices-updated'));
     await loadMarkets();
   }
 
@@ -1222,6 +1225,7 @@ export default function Admin() {
           </div>
 
           <div className={activeTab === 'markets' ? 'ad-tab-panel active' : 'ad-tab-panel'}>
+            <PriceSourceStatus showCatalog />
             <div className="ad-toolbar">
               <input
                 className="ad-search-input"
@@ -1745,7 +1749,7 @@ export default function Admin() {
               {marketIngredients.map((ing, idx) => (
                 <div key={idx} className="ad-sub-row">
                   <input className="ad-input" placeholder="Ingredient name" value={ing.name} onChange={(e) => updateMarketIngredient(idx, 'name', e.target.value)} />
-                  <input className="ad-input" placeholder="Qty" value={ing.qty} onChange={(e) => updateMarketIngredient(idx, 'qty', e.target.value)} />
+                  <input className="ad-input" placeholder="Price basis, e.g. 1 kg" aria-label="Quantity covered by this price" value={ing.qty} onChange={(e) => updateMarketIngredient(idx, 'qty', e.target.value)} />
                   <input className="ad-input" type="number" placeholder="₱" value={ing.price} onChange={(e) => updateMarketIngredient(idx, 'price', e.target.value)} />
                   <select className="ad-select" value={ing.status} onChange={(e) => updateMarketIngredient(idx, 'status', e.target.value)}>
                     <option value="avail">Avail</option>

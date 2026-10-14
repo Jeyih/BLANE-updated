@@ -7,10 +7,16 @@
    recipe_steps tables) — same tables the Admin Panel manages —
    instead of a hardcoded array.
    ============================================================ */
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { useIngredientPrices } from '../context/PriceContext';
+import { applyDynamicRecipePrices, formatPrice, formatEstimatedPrice, pricingLabel } from '../lib/pricing';
+import { isDessert, addMealForToday } from '../lib/meal-experience';
+import FastFoodChoices from '../components/FastFoodChoices';
+import PriceEstimateNotice from '../components/PriceEstimateNotice';
+import '../styles/meal-experience.css';
 import Navbar from '../components/Navbar';
 import RecipesTour from '../components/RecipesTour';
 import { scoreRecipe } from '../lib/seasonal';
@@ -19,17 +25,19 @@ import { loadConstraintDefinitions, getActiveConstraints, checkRecipeViolations 
 import { ConstraintActiveBar, ViolationBadge, ViolationDetail } from '../components/ConstraintWarnings';
 import '../styles/recipes.css';
 
-const TYPE_FILTERS = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+const TYPE_FILTERS = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert'];
 const DIET_FILTERS = ['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free'];
 const DIFF_COLORS  = { easy: '#2ddc7a', medium: '#fbbf24', hard: '#f87171' };
 
 export default function Recipes() {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [profile, setProfile]   = useState(null);
   const [tourOpen, setTourOpen] = useState(false);
-  const [recipes, setRecipes]   = useState([]);
+  const [savedRecipes, setRecipes] = useState([]);
+  const { records } = useIngredientPrices();
+  const recipes = useMemo(() => applyDynamicRecipePrices(savedRecipes, records), [savedRecipes, records]);
   const [loading, setLoading]   = useState(true);
   const [constraintsReady, setConstraintsReady] = useState(false);
     const [constraintDefinitions, setConstraintDefinitions] = useState({});
@@ -39,6 +47,8 @@ export default function Recipes() {
   const [dietFilter, setDietFilter] = useState('');
   const [search, setSearch]     = useState('');
   const [openRecipeId, setOpenRecipeId] = useState(null);
+  const [fastFood, setFastFood] = useState(false);
+  const [actionMessage, setActionMessage] = useState('');
 
   useEffect(() => { loadAll(); }, [user]);
 
@@ -88,7 +98,8 @@ export default function Recipes() {
         name: ing.name || ing.ingredient_name || ing.food_name,
         ingredient_name: ing.ingredient_name,
         food_name: ing.food_name,
-        qty: ing.qty ?? ing.grams,
+        qty: ing.quantity ?? ing.qty,
+        grams: ing.grams,
         status: ing.status,
       });
     });
@@ -113,7 +124,7 @@ export default function Recipes() {
   const activeConstraints = getActiveConstraints(profile, constraintDefinitions);
 
   const filtered = recipes.filter((r) => {
-        const matchType = !typeFilter || r.type === typeFilter;
+        const matchType = !typeFilter || (typeFilter === 'Dessert' ? isDessert(r) : r.type === typeFilter);
         const dietKey = dietFilter ? dietFilter.toLowerCase().replace('-', '_').replace(' ', '_') : '';
         const matchDiet = !dietFilter || r.diet.includes(dietKey);
         const q = search.trim().toLowerCase();
@@ -123,6 +134,10 @@ export default function Recipes() {
       });
 
   const openRecipe = recipes.find((r) => r.id === openRecipeId);
+  const linkedRecipe = searchParams.get('recipe');
+  useEffect(() => {
+    if (!loading && linkedRecipe && recipes.some((r) => String(r.id) === linkedRecipe)) setOpenRecipeId(linkedRecipe);
+  }, [loading, linkedRecipe]);
 
   return (
     <>
@@ -150,6 +165,12 @@ export default function Recipes() {
           <div data-recipes-tour="constraints">
             <ConstraintActiveBar activeConstraints={activeConstraints} />
           </div>
+          <PriceEstimateNotice />
+          <div className="rp-filter-row" aria-label="Food choices">
+            <button type="button" className={'rp-filter-btn' + (!fastFood ? ' active' : '')} onClick={() => setFastFood(false)}>Home-cooked recipes</button>
+            <button type="button" className={'rp-filter-btn' + (fastFood ? ' active' : '')} onClick={() => setFastFood(true)}>Fast-food varieties</button>
+          </div>
+          {actionMessage && <p className="meal-action-status" role="status">{actionMessage}</p>}
           {(constraintError || ingredientError) && (
             <div className="rp-empty-state">
               <p className="rp-empty-text">{constraintError || ingredientError}</p>
@@ -190,7 +211,7 @@ export default function Recipes() {
             ))}
           </div>
 
-          <div className="rp-grid" data-recipes-tour="results">
+          {fastFood ? <FastFoodChoices mealType={typeFilter || 'Lunch'} /> : <div className="rp-grid" data-recipes-tour="results">
             {loading || !constraintsReady ? (
               <div className="rp-empty-state"><p className="rp-empty-text">Loading recipes…</p></div>
             ) : constraintError || ingredientError ? null
@@ -207,10 +228,15 @@ export default function Recipes() {
                   activeConstraints={activeConstraints}
                   constraintDefinitions={constraintDefinitions}
                   onClick={() => setOpenRecipeId(recipe.id)}
+                  onUse={() => {
+                    if (checkRecipeViolations(recipe, activeConstraints, true, constraintDefinitions).length) return;
+                    try { const saved = addMealForToday(recipe); setActionMessage(`Added ${recipe.name} to today's ${saved.type.toLowerCase()}.`); }
+                    catch { setActionMessage('Could not save this meal. Please try again.'); }
+                  }}
                 />
               ))
             )}
-          </div>
+          </div>}
 
         </div>
       </main>
@@ -220,15 +246,19 @@ export default function Recipes() {
           recipe={openRecipe}
           activeConstraints={activeConstraints}
           constraintDefinitions={constraintDefinitions}
-          onClose={() => setOpenRecipeId(null)}
-          onAddToMealPlan={() => { setOpenRecipeId(null); navigate('/mealplan'); }}
+          onClose={() => { setOpenRecipeId(null); if (linkedRecipe) setSearchParams({}); }}
+          onAddToMealPlan={() => {
+            if (checkRecipeViolations(openRecipe, activeConstraints, true, constraintDefinitions).length) return;
+            try { const saved = addMealForToday(openRecipe); setActionMessage(`Added ${openRecipe.name} to today's ${saved.type.toLowerCase()}.`); setOpenRecipeId(null); if (linkedRecipe) setSearchParams({}); }
+            catch { setActionMessage('Could not save this meal. Please try again.'); }
+          }}
         />
       )}
     </>
   );
 }
 
-function RecipeCard({ recipe, activeConstraints, constraintDefinitions, onClick }) {
+function RecipeCard({ recipe, activeConstraints, constraintDefinitions, onClick, onUse }) {
   const seasonScore = scoreRecipe(recipe.ingredients);
   const violations = checkRecipeViolations(recipe, activeConstraints, true, constraintDefinitions);
   const bannerGlow = seasonScore.cssClass === 'in-season' ? ' in-season-glow' : '';
@@ -257,8 +287,9 @@ function RecipeCard({ recipe, activeConstraints, constraintDefinitions, onClick 
         </div>
         <div className="recipe-card-footer">
           <div className="recipe-kcal">{recipe.kcal}<small> kcal</small></div>
-          <div className="recipe-cost">₱{recipe.cost}</div>
+          <div className="recipe-cost">{formatEstimatedPrice(recipe.cost)}<div className="price-estimate-note">{pricingLabel(recipe)}</div></div>
           <div className="recipe-card-view-btn">View recipe →</div>
+          <button className="quick-meal-action" type="button" disabled={hasViolation} onClick={(event) => { event.stopPropagation(); onUse(); }}>Use today</button>
         </div>
       </div>
     </div>
@@ -304,7 +335,7 @@ function RecipeModal({ recipe, activeConstraints, constraintDefinitions, onClose
 
           <div className="modal-stats-row">
             <div className="modal-stat"><span className="modal-stat-value">{recipe.kcal}</span><span className="modal-stat-label">Calories</span></div>
-            <div className="modal-stat"><span className="modal-stat-value yellow">₱{recipe.cost}</span><span className="modal-stat-label">Est. Cost</span></div>
+            <div className="modal-stat"><span className="modal-stat-value yellow">{formatEstimatedPrice(recipe.cost)}</span><span className="modal-stat-label">{pricingLabel(recipe)}</span></div>
             <div className="modal-stat"><span className="modal-stat-value">{recipe.protein}g</span><span className="modal-stat-label">Protein</span></div>
             <div className="modal-stat"><span className="modal-stat-value blue">{recipe.carbs}g</span><span className="modal-stat-label">Carbs</span></div>
           </div>
@@ -330,6 +361,7 @@ function RecipeModal({ recipe, activeConstraints, constraintDefinitions, onClose
                   <IngSeasonTag ingredientName={ing.name} />
                   <span className={'modal-ing-status ' + ing.status}>{ing.status === 'avail' ? '✓' : '⚠'}</span>
                 </div>
+                <div className="price-estimate-note">{formatEstimatedPrice(ing.cost)} · {ing.evidence?.label}{ing.priceRecords?.map((p) => <div key={p.sourceUrl}><a href={p.sourceUrl} target="_blank" rel="noreferrer">{p.source}</a> · {p.observedAt}<br />{p.description} · {formatPrice(p.price)} / {p.unit}<br />{p.notes}{p.conversionSourceUrl && <div><a href={p.conversionSourceUrl} target="_blank" rel="noreferrer">View yield database</a></div>}</div>)}</div>
                 <SeasonalAltBanner ingredientName={ing.name} />
               </div>
             ))}
@@ -354,9 +386,9 @@ function RecipeModal({ recipe, activeConstraints, constraintDefinitions, onClose
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
               Back
             </button>
-            <button className="rp-btn rp-btn-primary" onClick={onAddToMealPlan}>
+            <button className="rp-btn rp-btn-primary" disabled={violations.length > 0} onClick={onAddToMealPlan}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-              Add to Meal Plan
+              {violations.length ? 'Check dietary conflicts' : `Use for today's ${recipe.type === 'Dessert' ? 'snack' : recipe.type.toLowerCase()}`}
             </button>
           </div>
         </div>

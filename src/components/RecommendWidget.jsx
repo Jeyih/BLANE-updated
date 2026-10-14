@@ -6,9 +6,16 @@
    Scores all recipes against the user's profile (goal +
    constraint safety + calorie fit) and shows the top 3 picks.
    ============================================================ */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useIngredientPrices } from '../context/PriceContext';
+import { applyDynamicRecipePrices, formatEstimatedPrice as formatPrice, pricingLabel } from '../lib/pricing';
+import { addMealForToday, currentMealType, philippineClock, DEFAULT_SLOTS } from '../lib/meal-experience';
+import useMealClock from '../hooks/useMealClock';
+import FastFoodChoices from './FastFoodChoices';
+import PriceEstimateNotice from './PriceEstimateNotice';
+import '../styles/meal-experience.css';
 import '../styles/recommend.css';
 
 // Data-driven metadata is loaded from the database.
@@ -63,12 +70,25 @@ async function loadRecommendationData() {
       };
     });
   }
+  return !constraintErr && !goalErr;
 }
 
 export default function RecommendWidget({ profile }) {
+  const now = useMealClock();
+  let schedule = DEFAULT_SLOTS;
+  try { const plan = JSON.parse(localStorage.getItem('blane_meal_plan') || '{}'); schedule = plan[philippineClock(now).dayIndex]?.length ? plan[philippineClock(now).dayIndex] : DEFAULT_SLOTS; } catch { /* Use the default meal schedule. */ }
+  const mealType = currentMealType(now, schedule);
+  const [metadataReady, setMetadataReady] = useState(false);
+  const [metadataError, setMetadataError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [recipes, setRecipes] = useState([]);
+  const [savedRecipes, setRecipes] = useState([]);
+  const { records } = useIngredientPrices();
+  const recipes = useMemo(() => applyDynamicRecipePrices(savedRecipes, records), [savedRecipes, records]);
   const [top3, setTop3]       = useState([]);
+  const matchesMealType = (recipe) => recipe.type === mealType || mealType === 'Brunch' && recipe.type === 'Breakfast' || mealType === 'Dessert' && recipe.type === 'Snack';
+  // Do not show the previous period's cards while the new ranking is loading.
+  const visibleTop3 = top3.filter((item) => matchesMealType(item.recipe));
 
   useEffect(() => {
     let cancelled = false;
@@ -95,7 +115,7 @@ export default function RecommendWidget({ profile }) {
       const ingByRecipe = {};
       (ingData || []).forEach((ing) => {
         if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
-        ingByRecipe[ing.recipe_id].push({ name: ing.name });
+        ingByRecipe[ing.recipe_id].push({ name: ing.name || ing.ingredient_name || ing.food_name, qty: ing.quantity ?? ing.qty, grams: ing.grams });
       });
 
       setRecipes((recipesData || []).map((r) => ({
@@ -107,6 +127,7 @@ export default function RecommendWidget({ profile }) {
         goal: r.goal_tags || [],
         kcal: r.kcal,
         cost: r.cost,
+        servings: r.servings || 1,
         protein: r.protein_g,
         carbs: r.carbs_g,
         fats: r.fats_g,
@@ -122,8 +143,8 @@ export default function RecommendWidget({ profile }) {
   useEffect(() => {
     let cancelled = false;
     async function prepareMetadata() {
-      await loadRecommendationData();
-      if (!cancelled) setLoading(false);
+      const ready = await loadRecommendationData();
+      if (!cancelled) { setMetadataReady(ready); if (!ready) setMetadataError('Your dietary preferences could not be checked. Please reload to get meal recommendations.'); }
     }
     prepareMetadata();
     return () => { cancelled = true; };
@@ -131,7 +152,7 @@ export default function RecommendWidget({ profile }) {
 
   useEffect(() => {
     let cancelled = false;
-    if (!profile || recipes.length === 0) {
+    if (!metadataReady || !profile || recipes.length === 0) {
       setTop3([]);
       return;
     }
@@ -139,11 +160,11 @@ export default function RecommendWidget({ profile }) {
     setLoading(true);
     const timer = setTimeout(() => {
       if (cancelled) return;
-      setTop3(scoreAndRankRecipes(profile, recipes));
+      setTop3(scoreAndRankRecipes(profile, recipes.filter((recipe) => recipe.type === mealType || mealType === 'Brunch' && recipe.type === 'Breakfast' || mealType === 'Dessert' && recipe.type === 'Snack')));
       setLoading(false);
     }, 400);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [profile, recipes]);
+  }, [profile, recipes, mealType, metadataReady]);
 
   return (
     <div className="rec-widget col-12" data-dashboard-tour="recommendations">
@@ -151,14 +172,16 @@ export default function RecommendWidget({ profile }) {
         <div className="rec-header-left">
           <div className="rec-header-icon">⭐</div>
           <div>
-            <div className="rec-header-title">Recommended for You</div>
-            <div className="rec-header-sub">Top 3 picks · Based on your goal &amp; dietary profile</div>
+            <div className="rec-header-title">Recommended for {mealType} now</div>
+            <div className="rec-header-sub">Ready for this time of day · Use a meal in one tap</div>
           </div>
         </div>
         <Link to="/recipes" className="rec-view-all-btn">View all recipes →</Link>
       </div>
 
-      {loading ? (
+      <PriceEstimateNotice />
+      {actionMessage && <p className="meal-action-status" role="status">{actionMessage}</p>}
+      {metadataError ? <p className="meal-action-status">{metadataError}</p> : loading || !metadataReady ? (
         <SkeletonLoader />
       ) : !profile?.goal && !profile?.height_cm ? (
         <div className="rec-no-profile">
@@ -167,14 +190,19 @@ export default function RecommendWidget({ profile }) {
         </div>
       ) : (
         <div className="rec-cards-grid">
-          {top3.map((item, i) => <RecCard key={item.recipe.id} item={item} rank={i} />)}
+          {visibleTop3.map((item, i) => <RecCard key={item.recipe.id} item={item} rank={i} mealType={mealType} onUse={() => {
+            try { addMealForToday(item.recipe, { type: mealType }); setActionMessage(`Added ${item.recipe.name} to today's ${mealType.toLowerCase()}.`); }
+            catch { setActionMessage('Could not save the meal. Please try again.'); }
+          }} />)}
+          {!visibleTop3.length && <p>No recipe matches your preferences for this meal. <Link to="/recipes">Browse recipes</Link>.</p>}
         </div>
       )}
+      <FastFoodChoices mealType={mealType} />
     </div>
   );
 }
 
-function RecCard({ item, rank }) {
+function RecCard({ item, rank, mealType, onUse }) {
   const ranks  = ['🥇', '🥈', '🥉'];
   const colors = ['#2ddc7a', '#60a5fa', '#a78bfa'];
   const color  = item.allergyHit ? '#f87171' : item.violations > 0 ? '#fbbf24' : colors[rank];
@@ -184,9 +212,9 @@ function RecCard({ item, rank }) {
   const recipe  = item.recipe;
 
   return (
-    <Link to="/recipes" className="rec-card" style={{ position: 'relative' }}>
+    <div className="rec-card-shell"><Link to={`/recipes?recipe=${encodeURIComponent(recipe.id)}`} className="rec-card" style={{ position: 'relative' }}>
       <div className="rec-card-banner">
-        {recipe.emoji}
+        {recipe.emoji || '🍲'}
         <span className="rec-card-rank">{ranks[rank]}</span>
         <span className="rec-card-type-tag">{recipe.type}</span>
       </div>
@@ -212,11 +240,14 @@ function RecCard({ item, rank }) {
         <div className="rec-stats">
           <span className="rec-stat-chip"><b>{recipe.kcal}</b> kcal</span>
           <span className="rec-stat-chip"><b>{recipe.protein}g</b> P</span>
-          <span className="rec-stat-chip">₱<b>{recipe.cost}</b></span>
+        </div>
+        <div className="rec-price" title={pricingLabel(recipe)}>
+          <span className="rec-price-value">{formatPrice(recipe.cost)}</span>
+          <span className="rec-price-note">{pricingLabel(recipe)}</span>
         </div>
         <div className="rec-reason">{item.reason}</div>
       </div>
-    </Link>
+    </Link><div className="rec-card-actions"><button className="quick-meal-action" type="button" onClick={onUse}>Use for today's {mealType.toLowerCase()}</button></div></div>
   );
 }
 
@@ -288,8 +319,8 @@ function scoreAndRankRecipes(profile, recipes) {
     return { recipe, score: Math.max(0, score), reason, violations, allergyHit };
   });
 
-  scored.sort((a, b) => (b.score !== a.score ? b.score - a.score : Math.random() - 0.5));
-  return scored.slice(0, 3);
+  scored.sort((a, b) => b.score - a.score || String(a.recipe.id).localeCompare(String(b.recipe.id)));
+  return scored.filter((item) => !item.allergyHit && item.violations === 0).slice(0, 3);
 }
 
 function generateReason(recipe, goal, violations, perMealKcal, profile) {

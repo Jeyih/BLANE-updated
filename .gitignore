@@ -1,4 +1,15 @@
 node_modules
+tmp/responsive-preview.html
+tmp/mobile-responsive.png
+tmp/ingredient-pricing-audit.json
+tmp/retail-price-source.html
+tmp/store-product-discovery.json
+tmp/secondary-products.json
+tmp/jelexie-products.json
+tmp/*-source.html
+tmp/*-source.json
+tmp/duck-store.json
+tmp/pickaroo-duck.html
 dist
 .env
 .env.local

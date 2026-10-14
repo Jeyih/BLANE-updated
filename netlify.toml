@@ -2,6 +2,10 @@
   command = "npm run build"
   publish = "dist"
 
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["pdf-parse"]
+
 [dev]
   command = "npm run dev"
   port = 5173

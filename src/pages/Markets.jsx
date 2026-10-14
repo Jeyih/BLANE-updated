@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { useIngredientPrices } from '../context/PriceContext';
+import { marketIngredientPriceText } from '../lib/pricing';
 import Navbar from '../components/Navbar';
 import MarketsTour from '../components/MarketsTour';
 import { IngSeasonTag } from '../components/SeasonalBadges';
@@ -56,6 +58,7 @@ function getSavedMealIds() {
 }
 
 export default function Markets() {
+  const { records: priceRecords } = useIngredientPrices();
   const { user } = useAuth();
   const [markets, setMarkets] = useState([]);
   const [tourOpen, setTourOpen] = useState(false);
@@ -682,7 +685,7 @@ export default function Markets() {
                           {ing.name}
                         </div>
                         <div className="mk-ing-row-qty">{ing.qty}</div>
-                        <div className="mk-ing-row-price">{ing.price}</div>
+                        <div className="mk-ing-row-price">{marketIngredientPriceText(ing, priceRecords)}</div>
                         <div className={`mk-ing-row-status ${ing.status}`}>
                           {ing.status === 'avail'
                             ? '✓ Available'
@@ -718,6 +721,7 @@ function completeMarketIngredients(existingIngredients, ingredientCatalog, mealP
 }
 
 function GeoMarketScanner({ markets, userCoords, onLocate }) {
+  const { records: priceRecords } = useIngredientPrices();
   const [activeTab, setActiveTab] = useState('search');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -894,7 +898,7 @@ function GeoMarketScanner({ markets, userCoords, onLocate }) {
                         <div className="gm-result-ing-dot" />
                         {ing.name}
                       </div>
-                      <div className="gm-result-ing-price">{ing.price}</div>
+                      <div className="gm-result-ing-price">{marketIngredientPriceText(ing, priceRecords)}</div>
                       <span className={`gm-result-ing-status ${ing.status}`}>
                         {ing.status === 'avail'
                           ? '✓ Available'

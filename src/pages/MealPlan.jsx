@@ -16,7 +16,9 @@ import PortionOptimizerPanel, { OptimizeButton } from '../components/PortionOpti
 import { scoreRecipe } from '../lib/seasonal';
 import { SeasonBadge, IngSeasonTag, SeasonalAltBanner } from '../components/SeasonalBadges';
 import { loadConstraintDefinitions, getActiveConstraints, checkRecipeViolations } from '../lib/constraints';
-import { applyDynamicRecipePrices, loadMarketIngredientPrices } from '../lib/pricing';
+import { applyDynamicRecipePrices, formatPrice, formatEstimatedPrice, pricingLabel } from '../lib/pricing';
+import PriceEstimateNotice from '../components/PriceEstimateNotice';
+import { useIngredientPrices } from '../context/PriceContext';
 import { ViolationBadge, ViolationDetail } from '../components/ConstraintWarnings';
 import '../styles/mealplan.css';
 import '../styles/priceopt.css';
@@ -86,7 +88,9 @@ export default function MealPlan() {
   const { user } = useAuth();
   const [profile, setProfile]                 = useState(null);
   const [tourOpen, setTourOpen]               = useState(false);
-  const [recipes, setRecipes]                 = useState([]);
+  const [savedRecipes, setRecipes]            = useState([]);
+  const { records: priceRecords } = useIngredientPrices();
+  const recipes = useMemo(() => applyDynamicRecipePrices(savedRecipes, priceRecords), [savedRecipes, priceRecords]);
   const [loadingRecipes, setLoadingRecipes]   = useState(true);
   const [constraintDefinitions, setConstraintDefinitions] = useState({});
   const [currentWeekOffset, setWeekOffset]     = useState(0);
@@ -162,7 +166,6 @@ export default function MealPlan() {
     }
 
     const { data: ingData } = await supabase.from('recipe_ingredients').select('*').order('sort_order');
-    const marketPrices = await loadMarketIngredientPrices(supabase);
     const linkedFctIds = [...new Set((ingData || []).map((ing) => ing.fct_id).filter(Boolean))];
     let nutrientByFctId = {};
     if (linkedFctIds.length > 0) {
@@ -204,7 +207,6 @@ export default function MealPlan() {
           protein: nutrient?.protein_g == null ? null : Number(nutrient.protein_g) * servingFactor,
           carbs: nutrient?.available_carbohydrate_g == null ? null : Number(nutrient.available_carbohydrate_g) * servingFactor,
           fats: nutrient?.total_fat_g == null ? null : Number(nutrient.total_fat_g) * servingFactor,
-          cost: Number(((r.cost || 0) / Math.max((ingByRecipe[r.id] || []).length, 1)).toFixed(2)),
         };
       });
 
@@ -228,8 +230,7 @@ export default function MealPlan() {
       };
     });
 
-    const dynamicallyPricedRecipes = applyDynamicRecipePrices(formatted, marketPrices);
-    setRecipes(dynamicallyPricedRecipes);
+    setRecipes(formatted);
     setLoadingRecipes(false);
 
     // Initialize daySlots if empty
@@ -245,7 +246,7 @@ export default function MealPlan() {
         console.error('Error parsing stored meal plan:', e);
       }
     }
-    setDaySlots(generateDefaultPlan(dynamicallyPricedRecipes));
+    setDaySlots(generateDefaultPlan(formatted));
   }
 
   useEffect(() => {
@@ -254,6 +255,15 @@ export default function MealPlan() {
       window.dispatchEvent(new Event('blane-meal-plan-updated'));
     }
   }, [daySlots]);
+
+  useEffect(() => {
+    const sync = (event) => {
+      if (event?.key && event.key !== 'blane_meal_plan') return;
+      try { const plan = JSON.parse(localStorage.getItem('blane_meal_plan') || '{}'); if (plan && typeof plan === 'object' && !Array.isArray(plan)) setDaySlots(plan); } catch { /* Keep the last usable plan. */ }
+    };
+    window.addEventListener('storage', sync);
+    return () => window.removeEventListener('storage', sync);
+  }, []);
 
   function getMeal(id) {
     if (!id) return null;
@@ -300,7 +310,7 @@ export default function MealPlan() {
         dayArr.forEach((s) => {
           const m = getMeal(s.mealId);
           if (m) {
-            text += `  [${s.type} - ${s.time || 'Meal'}] ${m.name} (${m.kcal} kcal, ${m.protein}g P, ₱${m.cost})\n`;
+            text += `  [${s.type} - ${s.time || 'Meal'}] ${m.name} (${m.kcal} kcal, ${m.protein}g P, ${formatEstimatedPrice(m.cost)} · ${pricingLabel(m)})\n`;
           } else {
             text += `  [${s.type}] No meal assigned\n`;
           }
@@ -334,6 +344,7 @@ export default function MealPlan() {
 
   const totalKcal = slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.kcal || 0), 0);
   const totalCost = Math.round(slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.cost || 0), 0));
+  const missingCosts = slots.some((slot) => !getMeal(slot.mealId) || getMeal(slot.mealId).priceIncomplete);
   const totalProtein = Math.round(slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.protein || 0), 0));
   const calGoal = getCalorieGoal(profile);
   const dayPct = Math.min(Math.round((totalKcal / calGoal) * 100), 100);
@@ -609,8 +620,8 @@ export default function MealPlan() {
               </div>
 
               <div className="grocery-cost-total">
-                <span className="grocery-cost-label">Est. today's total</span>
-                <span className="grocery-cost-value">₱{totalCost}</span>
+                <span className="grocery-cost-label">{missingCosts ? 'Known costs only (incomplete)' : "Est. today's total"}</span>
+                <span className="grocery-cost-value">{formatEstimatedPrice(totalCost)}</span>
               </div>
 
               <button
@@ -669,7 +680,7 @@ export default function MealPlan() {
                   <option value="">-- Choose a recipe from database --</option>
                   {(availableRecipesForAdd.length > 0 ? availableRecipesForAdd : recipes).map((r) => (
                     <option key={r.id} value={r.id}>
-                      {r.emoji} {r.name} ({r.kcal} kcal · ₱{r.cost})
+                      {r.emoji} {r.name} ({r.kcal} kcal · {formatEstimatedPrice(r.cost)})
                     </option>
                   ))}
                 </select>
@@ -709,7 +720,7 @@ export default function MealPlan() {
                           <span>{alt.type}</span> &nbsp;·&nbsp; <span>{alt.kcal} kcal</span> &nbsp;·&nbsp; {alt.protein}g protein &nbsp;·&nbsp; {alt.prep}
                         </div>
                       </div>
-                      <div className="swap-option-cost" style={{ color: '#fbbf24', fontWeight: 600 }}>₱{alt.cost}</div>
+                      <div className="swap-option-cost" style={{ color: '#fbbf24', fontWeight: 600 }}>{formatEstimatedPrice(alt.cost)}</div>
                     </div>
                   </div>
                 ))}
@@ -747,6 +758,7 @@ export default function MealPlan() {
 }
 
 function PriceOptimizerPanel({ meals = [], profile }) {
+  const { records: priceRecords } = useIngredientPrices();
   const [dailyBudget, setDailyBudget] = useState(200);
   const [appliedBudget, setAppliedBudget] = useState(200);
   const [sortMode, setSortMode] = useState('cost');
@@ -762,13 +774,13 @@ function PriceOptimizerPanel({ meals = [], profile }) {
   const sortedMeals = useMemo(() => {
     const list = [...meals];
     if (sortMode === 'cost') {
-      return list.sort((a, b) => a.cost - b.cost);
+      return list.sort((a, b) => (a.budgetEligible ? a.cost : Infinity) - (b.budgetEligible ? b.cost : Infinity));
     }
-    return list.sort((a, b) => (b.kcal / b.cost || 0) - (a.kcal / a.cost || 0));
+    return list.sort((a, b) => (b.budgetEligible && b.cost > 0 ? b.kcal / b.cost : 0) - (a.budgetEligible && a.cost > 0 ? a.kcal / a.cost : 0));
   }, [sortMode, meals]);
 
-  const visibleMeals = filterOver ? sortedMeals.filter((meal) => meal.cost <= perMeal) : sortedMeals;
-  const affordableCount = sortedMeals.filter((meal) => meal.cost <= perMeal).length;
+  const visibleMeals = filterOver ? sortedMeals.filter((meal) => meal.budgetEligible && meal.cost <= perMeal) : sortedMeals;
+  const affordableCount = sortedMeals.filter((meal) => meal.budgetEligible && meal.cost <= perMeal).length;
   const cheapestDay = computeCheapestDay(meals, perMeal);
 
   async function suggestMeal() {
@@ -781,11 +793,12 @@ function PriceOptimizerPanel({ meals = [], profile }) {
       const response = await fetch(functionUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ mode: 'suggest', profile, budget: appliedBudget, mealType: suggestionType }),
+        body: JSON.stringify({ mode: 'suggest', profile, budget: perMeal, mealType: suggestionType }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Could not generate a meal suggestion.');
-      setSuggestion(payload);
+      const [priced] = applyDynamicRecipePrices([{ ingredients: (payload.ingredients || []).map((ing) => ({ ...ing, quantity: ing.quantity })), servings: 1 }], priceRecords);
+      setSuggestion({ ...payload, estimatedCost: priced.cost, pricingSource: priced.pricingSource, quantityEstimated: priced.quantityEstimated });
     } catch (error) {
       setSuggestionError(error.message);
     } finally {
@@ -816,7 +829,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
       );
     }
 
-    const expensiveIngredient = [...ingredients].sort((a, b) => (b.cost || 0) - (a.cost || 0))[0];
+    const expensiveIngredient = ingredients.filter((ing) => ing.cost !== null).sort((a, b) => b.cost - a.cost)[0];
     if (!expensiveIngredient) {
       return (
         <div className="po-sub-suggestion">
@@ -849,6 +862,10 @@ function PriceOptimizerPanel({ meals = [], profile }) {
         </div>
       </div>
 
+      <div style={{ padding: '0 24px' }}>
+        <PriceEstimateNotice />
+        <p className="price-estimate-note">Meal estimates are per serving. Raw estimates exclude cooking yield and preparation costs. Base-only subtotals and missing prices are excluded from affordability results.</p>
+      </div>
       <div className="po-budget-row">
         <div className="po-budget-input-wrap">
           <span className="po-currency-prefix">₱</span>
@@ -885,7 +902,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
       {suggestion && (
         <div className="po-ai-suggestion">
           <div className="po-ai-suggestion-heading">
-            <div><strong>{suggestion.name}</strong><span>{suggestion.mealType} · ₱{Math.round(suggestion.estimatedCost)} estimated · {suggestion.kcal} kcal</span></div>
+            <div><strong>{suggestion.name}</strong><span>{suggestion.mealType} · {formatEstimatedPrice(suggestion.estimatedCost)} ({pricingLabel(suggestion)}) · {suggestion.kcal} kcal</span></div>
             <span className="po-ai-source">{suggestion.source}</span>
           </div>
           <p>{suggestion.reason}</p>
@@ -912,11 +929,11 @@ function PriceOptimizerPanel({ meals = [], profile }) {
         <div className="po-summary-divider" />
         <div className="po-summary-item">
           <div className="po-summary-label">Cheapest Full Day</div>
-          <div className={`po-summary-value ${cheapestDay <= appliedBudget ? 'green' : 'red'}`}>₱{cheapestDay}</div>
+          <div className={`po-summary-value ${cheapestDay !== null && cheapestDay <= appliedBudget ? 'green' : 'red'}`}>{formatEstimatedPrice(cheapestDay)}</div>
         </div>
         <div className="po-summary-divider" />
         <div className="po-budget-progress">
-          <div className="po-budget-bar-labels"><span>Cheapest day cost</span><span>{Math.min(Math.round((cheapestDay / appliedBudget) * 100), 120)}%</span></div>
+          <div className="po-budget-bar-labels"><span>Cheapest day cost</span><span>{cheapestDay === null ? 'Incomplete prices' : `${Math.round((cheapestDay / appliedBudget) * 100)}%`}</span></div>
           <div className="po-budget-bar-bg">
             <div
               className="po-budget-bar-fill"
@@ -957,12 +974,12 @@ function PriceOptimizerPanel({ meals = [], profile }) {
 
       <div className="po-meals-list">
         {visibleMeals.map((meal) => {
-          const isOver = meal.cost > perMeal;
-          const affordClass = meal.cost <= perMeal * 0.6 ? 'cheap'
+          const isOver = meal.budgetEligible && meal.cost > perMeal;
+          const affordClass = !meal.budgetEligible ? 'unknown' : meal.cost <= perMeal * 0.6 ? 'cheap'
             : meal.cost <= perMeal ? 'okay'
             : meal.cost <= perMeal * 1.3 ? 'pricey'
             : 'over';
-          const valueScore = Math.round((meal.kcal / meal.cost) * 10) / 10;
+          const valueScore = meal.budgetEligible && meal.cost > 0 ? Math.round((meal.kcal / meal.cost) * 10) / 10 : '—';
           const maxIngredientCost = Math.max(...(meal.ingredients || []).map((ingredient) => ingredient.cost || 0), 0);
 
           return (
@@ -979,11 +996,11 @@ function PriceOptimizerPanel({ meals = [], profile }) {
                   </div>
                 </div>
                 <div className="po-meal-cost-wrap">
-                  <div className="po-meal-cost">₱{meal.cost}</div>
+                  <div className="po-meal-cost">{formatEstimatedPrice(meal.cost)}</div>
                   <span className={`po-price-source ${meal.pricingSource === 'market' ? 'market' : ''}`}>
-                    {meal.pricingSource === 'market' ? 'Market estimate' : 'Recipe estimate'}
+                    {pricingLabel(meal)}
                   </span>
-                  <span className={`po-afford-badge ${affordClass}`}>{affordClass === 'cheap' ? 'Budget-Friendly' : affordClass === 'okay' ? 'Affordable' : affordClass === 'pricey' ? 'Slightly Over' : 'Over Budget'}</span>
+                  <span className={`po-afford-badge ${affordClass}`}>{affordClass === 'unknown' ? 'Needs verification' : affordClass === 'cheap' ? 'Budget-Friendly' : affordClass === 'okay' ? 'Affordable' : affordClass === 'pricey' ? 'Slightly Over' : 'Over Budget'}</span>
                 </div>
                 <button className={`po-expand-btn ${expandedId === meal.id ? 'open' : ''}`} type="button" onClick={(event) => { event.stopPropagation(); toggleExpand(meal.id); }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
@@ -1010,14 +1027,16 @@ function PriceOptimizerPanel({ meals = [], profile }) {
                           const barPct = maxIngredientCost > 0 ? Math.round(((ing.cost || 0) / maxIngredientCost) * 100) : 0;
                           return (
                             <tr key={ing.name}>
-                              <td><span className="po-ing-cost-name"><span className="po-ing-dot" />{ing.name}</span></td>
+                              <td><span className="po-ing-cost-name"><span className="po-ing-dot" />{ing.name}</span>
+                                <div className="price-estimate-note">{ing.evidence?.label}<br />{ing.priceRecords?.length ? ing.priceRecords.map((p) => <div key={p.sourceUrl}><a href={p.sourceUrl} target="_blank" rel="noreferrer">{p.source}</a> · {p.observedAt}<br />{p.description} · {formatPrice(p.price)} / {p.unit}<br />{p.notes}{p.conversionSourceUrl && <div><a href={p.conversionSourceUrl} target="_blank" rel="noreferrer">View yield database</a></div>}{ing.cost === null && <div>Needs a compatible volume or piece count.</div>}</div>) : 'No matching sourced price'}</div>
+                              </td>
                               <td>{ing.quantity || '—'}</td>
                               <td>{ing.grams ? `${ing.grams} g` : '—'}</td>
                               <td>{ing.calories == null ? '—' : `${ing.calories} kcal`}</td>
                               <td>
                                 <div className="po-ing-cost-cell">
                                   <span className="po-cost-bar-bg"><span className="po-cost-bar-fill" style={{ width: `${barPct}%` }} /></span>
-                                  <span className="po-ing-cost-price">₱{ing.cost || 0}</span>
+                                  <span className="po-ing-cost-price">{formatEstimatedPrice(ing.cost)}</span>
                                 </div>
                               </td>
                             </tr>
@@ -1039,12 +1058,13 @@ function PriceOptimizerPanel({ meals = [], profile }) {
 
 function computeCheapestDay(meals = [], perMeal) {
   const types = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
-  return types.reduce((total, type) => {
-    const mealsOfType = meals.filter((meal) => meal.type === type);
-    if (mealsOfType.length === 0) return total;
+  const costs = types.map((type) => {
+    const mealsOfType = meals.filter((meal) => meal.type === type && meal.budgetEligible);
+    if (mealsOfType.length === 0) return null;
     const cheapest = mealsOfType.reduce((a, b) => (a.cost < b.cost ? a : b));
-    return total + cheapest.cost;
-  }, 0);
+    return cheapest.cost;
+  });
+  return costs.includes(null) ? null : Math.round(costs.reduce((sum, cost) => sum + cost, 0) * 100) / 100;
 }
 
 function SlotCard({ slot, idx, completed, onToggleComplete, profile, appliedOptimization, onPortionApplied, onOriginalMeal, activeConstraints, constraintDefinitions, getMeal, totalMealsToday, groceryList, openOptimizerId, onSetOpenOptimizer, onRemove, onSwap, onAddGrocery }) {
@@ -1092,7 +1112,8 @@ function SlotCard({ slot, idx, completed, onToggleComplete, profile, appliedOpti
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div className="meal-kcal-badge"><span>{meal.kcal}</span><small>kcal</small></div>
-                <div className={`meal-cost-badge${!meal.cost ? ' meal-cost-badge--zero' : ''}`}>₱{meal.cost}</div>
+                <div className={`meal-cost-badge${!meal.cost ? ' meal-cost-badge--zero' : ''}`} title={pricingLabel(meal)}>{formatEstimatedPrice(meal.cost)}</div>
+                <div className="price-estimate-note">{pricingLabel(meal)}</div>
               </div>
             </div>
 

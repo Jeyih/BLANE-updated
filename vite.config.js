@@ -1,10 +1,27 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { handler as ingredientPrices } from './netlify/functions/ingredient-prices.mjs'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
+    {
+      name: 'ingredient-price-api',
+      configureServer(server) {
+        server.middlewares.use('/.netlify/functions/ingredient-prices', async (req, res) => {
+          try {
+            const query = new URL(req.url || '/', 'http://localhost').searchParams;
+            const result = await ingredientPrices({ httpMethod: req.method, queryStringParameters: { refresh: query.get('refresh') } });
+            res.writeHead(result.statusCode, result.headers);
+            res.end(result.body);
+          } catch {
+            res.writeHead(503, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Price source unavailable' }));
+          }
+        });
+      },
+    },
     react(),
     VitePWA({
       registerType: 'autoUpdate',

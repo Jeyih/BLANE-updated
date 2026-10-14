@@ -251,6 +251,7 @@
 
 .meal-main-info {
   flex: 1;
+  min-width: 0;
 }
 
 .meal-main-name {
@@ -272,6 +273,37 @@
   gap: 10px;
   flex-wrap: wrap;
 }
+
+.meal-recipe-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  margin: 0 0 14px;
+  border: 1px solid rgba(45, 220, 122, 0.35);
+  border-radius: 10px;
+  background: rgba(45, 220, 122, 0.08);
+  color: #2ddc7a;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.meal-recipe-link:hover {
+  background: rgba(45, 220, 122, 0.16);
+  border-color: #2ddc7a;
+}
+
+.meal-recipe-link:focus-visible {
+  outline: 2px solid #2ddc7a;
+  outline-offset: 3px;
+}
+
+.meal-recipe-link svg { flex-shrink: 0; }
 
 .meal-macro-chip {
   background: #12261b;

@@ -99,9 +99,40 @@
    ============================================================ */
 .rec-cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
+
+.rec-widget > .price-estimate-note { margin: 0 0 18px; }
+.rec-header-sub, .rec-view-all-btn { color: #a9c7b3; }
+
+.rec-card-shell {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #111f16;
+  border: 1px solid rgba(45, 220, 122, 0.18);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.rec-card-shell:hover { border-color: rgba(45, 220, 122, 0.4); }
+.rec-card-shell .rec-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  border: 0;
+  border-radius: 0;
+  min-width: 0;
+}
+.rec-card-shell .rec-card:hover { transform: none; box-shadow: none; }
+.rec-card-shell .rec-card:focus-visible { outline: 2px solid #2ddc7a; outline-offset: -3px; }
+.rec-card-actions {
+  margin-top: auto;
+  padding: 16px;
+  border-top: 1px solid rgba(45, 220, 122, 0.1);
+}
+.rec-card-actions .quick-meal-action { width: 100%; min-height: 42px; }
 
 /* ---- Individual recommendation card ---- */
 .rec-card {
@@ -143,8 +174,8 @@
 
 /* Emoji banner */
 .rec-card-banner {
-  height: 90px;
-  background: #0d1a12;
+  height: 80px;
+  background: linear-gradient(135deg, #163423, #0d1a12);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -170,11 +201,11 @@
 
 /* Card body */
 .rec-card-body {
-  padding: 12px 14px 14px;
+  padding: 16px;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .rec-card-name {
@@ -183,6 +214,7 @@
   font-weight: 700;
   color: #e8f5ee;
   line-height: 1.3;
+  min-height: 2.6em;
 }
 
 /* Match score row */
@@ -220,7 +252,7 @@
 
 .rec-score-label {
   font-size: 10px;
-  color: #4d6e5a;
+  color: #a9c7b3;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 2px;
@@ -241,12 +273,13 @@
 
 /* Reason text */
 .rec-reason {
-  font-size: 11px;
-  color: #8aab96;
+  font-size: 12px;
+  color: #b4cebd;
   line-height: 1.5;
   border-top: 1px solid rgba(45, 220, 122, 0.07);
   padding-top: 8px;
   margin-top: auto;
+  min-height: 4.5em;
 }
 
 .rec-reason strong {
@@ -262,18 +295,22 @@
 }
 
 .rec-stat-chip {
-  font-size: 10px;
+  font-size: 12px;
   background: #0d1a12;
   border: 1px solid rgba(45, 220, 122, 0.1);
   border-radius: 6px;
-  padding: 2px 7px;
-  color: #4d6e5a;
+  padding: 4px 8px;
+  color: #a9c7b3;
 }
 
 .rec-stat-chip b {
-  color: #8aab96;
+  color: #d1fae5;
   font-weight: 600;
 }
+
+.rec-price { display: flex; flex-direction: column; gap: 4px; }
+.rec-price-value { font-size: 16px; font-weight: 700; color: #e8f5ee; }
+.rec-price-note { font-size: 11px; line-height: 1.45; color: #a9c7b3; min-height: 2.9em; }
 
 /* ============================================================
    LOADING STATE

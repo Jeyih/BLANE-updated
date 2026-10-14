@@ -1,8 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { applyDynamicRecipePrices, loadMarketIngredientPrices } from '../lib/pricing';
+import { applyDynamicRecipePrices, formatEstimatedPrice as formatPrice, pricingLabel } from '../lib/pricing';
+import { philippineClock, timedSlotIndex, availableMealSlots } from '../lib/meal-experience';
+import useMealClock from '../hooks/useMealClock';
+import PriceEstimateNotice from '../components/PriceEstimateNotice';
+import '../styles/meal-experience.css';
+import { useIngredientPrices } from '../context/PriceContext';
 import Navbar from '../components/Navbar';
 import DashboardTour from '../components/DashboardTour';
 import FeedbackWidget from '../components/FeedbackWidget';
@@ -196,7 +201,10 @@ export default function Dashboard() {
    WIDGET 1 — TODAY'S MEAL PLAN (Dynamic from MealPlan / Supabase)
    ============================================================ */
 function MealPlanWidget({ profile }) {
-  const [recipes, setRecipes] = useState([]);
+  const now = useMealClock();
+  const [savedRecipes, setRecipes] = useState([]);
+  const { records } = useIngredientPrices();
+  const recipes = useMemo(() => applyDynamicRecipePrices(savedRecipes, records), [savedRecipes, records]);
   const [daySlots, setDaySlots] = useState({});
   const [loading, setLoading] = useState(true);
   const [activeTabIdx, setActiveTabIdx] = useState(0);
@@ -206,7 +214,6 @@ function MealPlanWidget({ profile }) {
       setLoading(true);
       const { data: recipesData } = await supabase.from('recipes').select('*').order('name');
       const { data: ingData } = await supabase.from('recipe_ingredients').select('*').order('sort_order');
-      const marketPrices = await loadMarketIngredientPrices(supabase);
 
       const ingByRecipe = {};
       (ingData || []).forEach((ing) => {
@@ -214,7 +221,7 @@ function MealPlanWidget({ profile }) {
         ingByRecipe[ing.recipe_id].push({ name: ing.name || ing.ingredient_name || ing.food_name, qty: ing.quantity ?? ing.qty, grams: ing.grams, status: ing.status || 'avail' });
       });
 
-      const formattedRecipes = applyDynamicRecipePrices((recipesData || []).map((r) => ({
+      const formattedRecipes = (recipesData || []).map((r) => ({
         id: r.id,
         emoji: r.emoji || '🍲',
         name: r.name,
@@ -224,11 +231,12 @@ function MealPlanWidget({ profile }) {
         prep: `${r.cook_time_min || 20} min`,
         kcal: r.kcal || 0,
         cost: r.cost || 0,
+        servings: r.servings || 1,
         protein: r.protein_g || 0,
         carbs: r.carbs_g || 0,
         fats: r.fats_g || 0,
         ingredients: ingByRecipe[r.id] || [],
-      })), marketPrices);
+      }));
 
       setRecipes(formattedRecipes);
 
@@ -250,6 +258,7 @@ function MealPlanWidget({ profile }) {
       if (formattedRecipes.length > 0) {
         const defaultPlan = generateDefaultPlan(formattedRecipes);
         setDaySlots(defaultPlan);
+        localStorage.setItem('blane_meal_plan', JSON.stringify(defaultPlan));
       }
       setLoading(false);
     }
@@ -262,13 +271,28 @@ function MealPlanWidget({ profile }) {
     return recipes.find((r) => r.id === id || String(r.id) === String(id)) || null;
   }
 
-  const todayIndex = new Date().getDay();
+  useEffect(() => {
+    const syncPlan = (event) => {
+      if (event?.key && event.key !== 'blane_meal_plan') return;
+      try { const saved = JSON.parse(localStorage.getItem('blane_meal_plan') || '{}'); if (saved && typeof saved === 'object') setDaySlots(saved); } catch { /* Keep the last usable plan. */ }
+    };
+    window.addEventListener('blane-meal-plan-updated', syncPlan);
+    window.addEventListener('storage', syncPlan);
+    return () => { window.removeEventListener('blane-meal-plan-updated', syncPlan); window.removeEventListener('storage', syncPlan); };
+  }, []);
+  const clock = philippineClock(now);
+  const todayIndex = clock.dayIndex;
   const todaySlots = daySlots[todayIndex] || [];
-  const plannedMeals = todaySlots.map((s) => ({ slot: s, meal: getMeal(s.mealId) })).filter((item) => item.meal);
+  const allPlannedMeals = todaySlots.map((s) => ({ slot: s, meal: getMeal(s.mealId) })).filter((item) => item.meal);
+  const plannedMeals = availableMealSlots(todaySlots, now).map((s) => ({ slot: s, meal: getMeal(s.mealId) })).filter((item) => item.meal);
+  const autoIndex = timedSlotIndex(plannedMeals.map((i) => i.slot), now);
+  const availableSlotKey = plannedMeals.map((item) => item.slot.type).join('|');
+  useEffect(() => { setActiveTabIdx(autoIndex); }, [autoIndex, clock.dateKey, availableSlotKey]);
 
-  const totalKcal = plannedMeals.reduce((acc, item) => acc + item.meal.kcal, 0);
-  const totalProtein = plannedMeals.reduce((acc, item) => acc + item.meal.protein, 0);
-  const totalCost = plannedMeals.reduce((acc, item) => acc + item.meal.cost, 0);
+  const totalKcal = allPlannedMeals.reduce((acc, item) => acc + item.meal.kcal, 0);
+  const totalProtein = allPlannedMeals.reduce((acc, item) => acc + item.meal.protein, 0);
+  const totalCost = allPlannedMeals.reduce((acc, item) => acc + (item.meal.cost || 0), 0);
+  const missingCosts = allPlannedMeals.some((item) => item.meal.priceIncomplete);
   const calGoal = getCalorieGoal(profile);
   const calPct = Math.min(Math.round((totalKcal / calGoal) * 100), 100);
 
@@ -281,7 +305,7 @@ function MealPlanWidget({ profile }) {
           <div className="widget-icon">🍽️</div>
           <div>
             <div className="widget-title">Today's Meal Plan</div>
-            <div className="widget-subtitle">Adapted to your goals &amp; local market</div>
+            <div className="widget-subtitle">Remaining meals today · Philippine time</div>
           </div>
         </div>
         <Link to="/mealplan" className="widget-badge" style={{ textDecoration: 'none' }}>
@@ -294,7 +318,7 @@ function MealPlanWidget({ profile }) {
       ) : plannedMeals.length === 0 ? (
         <div className="dash-empty-state" style={{ padding: '32px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: 44, marginBottom: 14 }}>🍽️</div>
-          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: '#ffffff' }}>No meals planned for today yet.</div>
+          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: '#ffffff' }}>{allPlannedMeals.length ? 'No remaining meals planned for today.' : 'No meals planned for today yet.'}</div>
           <div style={{ color: '#d1fae5', lineHeight: 1.6, marginBottom: 16 }}>
             Customize your schedule or pick recipes on the Meal Plan page.
           </div>
@@ -304,6 +328,7 @@ function MealPlanWidget({ profile }) {
         </div>
       ) : (
         <>
+          <div className="meal-now-banner">Available meal: {plannedMeals[autoIndex]?.slot.type} · {plannedMeals[autoIndex]?.slot.time}</div>
           <div className="meal-tabs">
             {plannedMeals.map((item, idx) => (
               <button
@@ -322,7 +347,11 @@ function MealPlanWidget({ profile }) {
                 <div className="meal-emoji-big">{currentItem.meal.emoji}</div>
                 <div className="meal-main-info">
                   <div className="meal-main-name">{currentItem.meal.name}</div>
-                  <div className="meal-main-meta">{currentItem.slot.time || 'Today'} &nbsp;·&nbsp; {currentItem.meal.prep} prep &nbsp;·&nbsp; ₱{currentItem.meal.cost}</div>
+                  <div className="meal-main-meta">{currentItem.slot.time || 'Today'} &nbsp;·&nbsp; {currentItem.meal.prep} prep &nbsp;·&nbsp; {formatPrice(currentItem.meal.cost)} ({pricingLabel(currentItem.meal)})</div>
+                  <Link to={`/recipes?recipe=${encodeURIComponent(currentItem.meal.id)}`} className="meal-recipe-link">
+                    <span>View this recipe</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                  </Link>
                   <div className="meal-macros-row">
                     <div className="meal-macro-chip"><span>{currentItem.meal.protein}g</span> <small>Protein</small></div>
                     <div className="meal-macro-chip"><span>{currentItem.meal.carbs}g</span> <small>Carbs</small></div>
@@ -354,8 +383,9 @@ function MealPlanWidget({ profile }) {
           )}
 
           <div className="daily-cal-summary">
+            <PriceEstimateNotice />
             <div className="daily-cal-row">
-              <span className="daily-cal-label">Today's Total: <b>{totalProtein}g</b> P · <b>₱{totalCost}</b> Est. Cost</span>
+              <span className="daily-cal-label">Today's Total: <b>{totalProtein}g</b> P · <b>{formatPrice(totalCost)}</b> {missingCosts ? 'Known costs (incomplete)' : 'Est. Cost'}</span>
               <span className="daily-cal-numbers"><span>{totalKcal}</span> / {calGoal} kcal</span>
             </div>
             <div className="daily-cal-bar-bg">
