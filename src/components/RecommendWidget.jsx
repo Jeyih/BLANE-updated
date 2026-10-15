@@ -13,7 +13,6 @@ import { useIngredientPrices } from '../context/PriceContext';
 import { applyDynamicRecipePrices, formatEstimatedPrice as formatPrice, pricingLabel } from '../lib/pricing';
 import { addMealForToday, currentMealType, philippineClock, DEFAULT_SLOTS } from '../lib/meal-experience';
 import useMealClock from '../hooks/useMealClock';
-import FastFoodChoices from './FastFoodChoices';
 import PriceEstimateNotice from './PriceEstimateNotice';
 import '../styles/meal-experience.css';
 import '../styles/recommend.css';
@@ -197,7 +196,6 @@ export default function RecommendWidget({ profile }) {
           {!visibleTop3.length && <p>No recipe matches your preferences for this meal. <Link to="/recipes">Browse recipes</Link>.</p>}
         </div>
       )}
-      <FastFoodChoices mealType={mealType} />
     </div>
   );
 }

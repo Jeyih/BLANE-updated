@@ -14,7 +14,6 @@ import { supabase } from '../lib/supabase';
 import { useIngredientPrices } from '../context/PriceContext';
 import { applyDynamicRecipePrices, formatPrice, formatEstimatedPrice, pricingLabel } from '../lib/pricing';
 import { isDessert, addMealForToday } from '../lib/meal-experience';
-import FastFoodChoices from '../components/FastFoodChoices';
 import PriceEstimateNotice from '../components/PriceEstimateNotice';
 import '../styles/meal-experience.css';
 import Navbar from '../components/Navbar';
@@ -47,7 +46,6 @@ export default function Recipes() {
   const [dietFilter, setDietFilter] = useState('');
   const [search, setSearch]     = useState('');
   const [openRecipeId, setOpenRecipeId] = useState(null);
-  const [fastFood, setFastFood] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
 
   useEffect(() => { loadAll(); }, [user]);
@@ -166,10 +164,6 @@ export default function Recipes() {
             <ConstraintActiveBar activeConstraints={activeConstraints} />
           </div>
           <PriceEstimateNotice />
-          <div className="rp-filter-row" aria-label="Food choices">
-            <button type="button" className={'rp-filter-btn' + (!fastFood ? ' active' : '')} onClick={() => setFastFood(false)}>Home-cooked recipes</button>
-            <button type="button" className={'rp-filter-btn' + (fastFood ? ' active' : '')} onClick={() => setFastFood(true)}>Fast-food varieties</button>
-          </div>
           {actionMessage && <p className="meal-action-status" role="status">{actionMessage}</p>}
           {(constraintError || ingredientError) && (
             <div className="rp-empty-state">
@@ -211,7 +205,7 @@ export default function Recipes() {
             ))}
           </div>
 
-          {fastFood ? <FastFoodChoices mealType={typeFilter || 'Lunch'} /> : <div className="rp-grid" data-recipes-tour="results">
+          <div className="rp-grid" data-recipes-tour="results">
             {loading || !constraintsReady ? (
               <div className="rp-empty-state"><p className="rp-empty-text">Loading recipes…</p></div>
             ) : constraintError || ingredientError ? null
@@ -236,7 +230,7 @@ export default function Recipes() {
                 />
               ))
             )}
-          </div>}
+          </div>
 
         </div>
       </main>

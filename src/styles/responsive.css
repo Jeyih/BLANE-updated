@@ -46,7 +46,6 @@
   .rec-cards-grid, .rec-loading { grid-template-columns: minmax(0, 1fr); }
   .rec-header-left { flex: 1 1 100%; }
   .rec-card-name, .rec-price-note, .rec-reason { min-height: 0; }
-  .fast-food-choices { padding: 14px; }
   .rp-search-wrap { width: 100%; max-width: 100%; }
   .rp-filter-row { flex-wrap: wrap; gap: 8px; }
   .rp-filter-btn { min-height: 40px; }

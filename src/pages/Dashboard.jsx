@@ -306,9 +306,9 @@ function MealPlanWidget({ profile }) {
   const activeMealType = visibleMealTypes[Math.min(activeTabIdx, visibleMealTypes.length - 1)];
   const currentItem = plannedMeals.find((item) => item.slot.type === activeMealType);
   const mealTimeGuide = {
-    Breakfast: 'Breakfast: only @ 10:30am',
-    Lunch: 'Lunch: only @ 2:30pm',
-    Snack: 'Snack: only @ 7:00pm',
+    Breakfast: 'Breakfast: Until 10:30am',
+    Lunch: 'Lunch: 10:30am to 2:30pm',
+    Snack: 'Snack: 2:30pm to 7:00pm',
     Dinner: 'Dinner: 7:00pm to 11:59pm',
   }[activeMealType];
 

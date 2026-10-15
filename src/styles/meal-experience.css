@@ -1,16 +1,6 @@
-.fast-food-choices { margin: 20px 0; padding: 20px; border: 1px solid #24452f; border-radius: 14px; background: #0d1a12; color: #d1fae5; }
-.fast-food-choices h3 { margin: 0 0 8px; font-size: 18px; color: #e8f5ee; }
-.fast-food-choices p { margin: 0 0 16px; font-size: 13px; }
-.fast-food-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.fast-food-card { display: flex; flex-direction: column; gap: 8px; padding: 16px; color: #d1fae5; text-decoration: none; border: 1px solid #31533d; border-radius: 12px; }
-.fast-food-card > span:first-child { font-size: 28px; }
-.fast-food-card b { color: #2ddc7a; margin-top: auto; }
-.fast-food-card:hover, .fast-food-card:focus-visible { border-color: #2ddc7a; background: #152b1d; }
 .meal-now-banner { padding: 12px 24px; color: #d1fae5; background: #143323; font-weight: 600; }
 .quick-meal-action { border: 1px solid #2ddc7a; border-radius: 9px; background: #2ddc7a; color: #06130b; padding: 10px 14px; font-weight: 700; cursor: pointer; }
 .quick-meal-action:disabled { opacity: .55; cursor: default; }
 .recipe-card-footer { flex-wrap: wrap; gap: 10px; }
 .recipe-card-footer .quick-meal-action { flex-basis: 100%; }
 .meal-action-status { color: #d1fae5; padding: 10px 20px; font-size: 13px; }
-@media (max-width: 800px) { .fast-food-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 440px) { .fast-food-grid { grid-template-columns: 1fr; } }
