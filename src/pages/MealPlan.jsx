@@ -122,6 +122,7 @@ export default function MealPlan() {
 
   const [swapTarget, setSwapTarget] = useState(null);
   const [swapChoice, setSwapChoice] = useState(null);
+  const [swapSearch, setSwapSearch] = useState('');
   const [completionTarget, setCompletionTarget] = useState(null);
 
   useEffect(() => {
@@ -387,6 +388,7 @@ export default function MealPlan() {
   function openSwap(mealOrSlot, slotIdx) {
     setSwapTarget({ meal: mealOrSlot, slotIdx });
     setSwapChoice(null);
+    setSwapSearch('');
   }
 
   function confirmSwap() {
@@ -453,6 +455,16 @@ export default function MealPlan() {
   const availableRecipesForAdd = slotTypeChoice
     ? recipes.filter((r) => r.type === slotTypeChoice || slotTypeChoice === 'Custom' || slotTypeChoice === 'Brunch')
     : recipes;
+  const filteredSwapRecipes = recipes.filter((recipe) => {
+    if (swapTarget?.meal?.id && recipe.id === swapTarget.meal.id) return false;
+    const query = swapSearch.trim().toLowerCase();
+    if (!query) return true;
+    return [
+      recipe.name,
+      recipe.type,
+      ...(recipe.ingredients || []).map((ingredient) => ingredient.name),
+    ].some((value) => value?.toLowerCase().includes(query));
+  });
 
   return (
     <>
@@ -704,10 +716,19 @@ export default function MealPlan() {
             <div className="swap-modal-title">
               {swapTarget.meal?.name ? `Swapping: ${swapTarget.meal.name}` : `Select recipe for ${swapTarget.meal?.type || 'slot'}`}
             </div>
+            <div className="swap-search-wrap">
+              <span className="swap-search-icon" aria-hidden="true">🔍</span>
+              <input
+                className="swap-search-input"
+                type="search"
+                aria-label="Search recipes"
+                placeholder="Search by recipe, meal type, or ingredient..."
+                value={swapSearch}
+                onChange={(event) => setSwapSearch(event.target.value)}
+              />
+            </div>
             <div className="swap-options" style={{ maxHeight: 360, overflowY: 'auto' }}>
-              {recipes
-                .filter((r) => !swapTarget.meal?.id || r.id !== swapTarget.meal.id)
-                .map((alt) => (
+              {filteredSwapRecipes.length > 0 ? filteredSwapRecipes.map((alt) => (
                   <div
                     key={alt.id}
                     className={'swap-option-card' + (swapChoice === alt.id ? ' selected' : '')}
@@ -725,7 +746,9 @@ export default function MealPlan() {
                       <div className="swap-option-cost" style={{ color: '#fbbf24', fontWeight: 600 }}>{formatEstimatedPrice(alt.cost)}</div>
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <p className="swap-empty-state" role="status">No recipes match your search.</p>
+                )}
             </div>
             <button className="mp-btn mp-btn-primary swap-confirm-btn" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }} onClick={confirmSwap}>
               Confirm Selection
