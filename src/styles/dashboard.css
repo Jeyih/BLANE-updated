@@ -214,6 +214,61 @@
   background: rgba(45, 220, 122, 0.1);
 }
 
+.meal-time-guide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: -8px 2px 18px;
+  color: #b6d8c2;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.meal-plan-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 9px 14px;
+  border: 1px solid rgba(45, 220, 122, 0.45);
+  border-radius: 10px;
+  color: #2ddc7a;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.meal-plan-link:hover {
+  background: rgba(45, 220, 122, 0.1);
+  border-color: #2ddc7a;
+}
+
+.meal-plan-link:focus-visible {
+  outline: 2px solid #2ddc7a;
+  outline-offset: 3px;
+}
+
+.meal-empty-panel {
+  padding: 28px 20px;
+  border: 1px dashed rgba(45, 220, 122, 0.28);
+  border-radius: 14px;
+  background: rgba(10, 22, 16, 0.55);
+  text-align: center;
+}
+
+.meal-empty-title {
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.meal-empty-description {
+  margin-top: 6px;
+  color: #d1fae5;
+  font-size: 13px;
+}
+
 /* Meal panel */
 .meal-panel {
   display: none;

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { applyDynamicRecipePrices, formatEstimatedPrice as formatPrice, pricingLabel } from '../lib/pricing';
-import { philippineClock, timedSlotIndex, availableMealSlots } from '../lib/meal-experience';
+import { philippineClock, timedSlotIndex, availableMealSlots, DEFAULT_SLOTS } from '../lib/meal-experience';
 import useMealClock from '../hooks/useMealClock';
 import PriceEstimateNotice from '../components/PriceEstimateNotice';
 import '../styles/meal-experience.css';
@@ -283,10 +283,17 @@ function MealPlanWidget({ profile }) {
   const clock = philippineClock(now);
   const todayIndex = clock.dayIndex;
   const todaySlots = daySlots[todayIndex] || [];
+  const visibleMealTypes = availableMealSlots(DEFAULT_SLOTS, now).map((slot) => slot.type);
   const allPlannedMeals = todaySlots.map((s) => ({ slot: s, meal: getMeal(s.mealId) })).filter((item) => item.meal);
-  const plannedMeals = availableMealSlots(todaySlots, now).map((s) => ({ slot: s, meal: getMeal(s.mealId) })).filter((item) => item.meal);
-  const autoIndex = timedSlotIndex(plannedMeals.map((i) => i.slot), now);
-  const availableSlotKey = plannedMeals.map((item) => item.slot.type).join('|');
+  const plannedMeals = todaySlots
+    .filter((slot) => visibleMealTypes.includes(slot.type))
+    .map((s) => ({ slot: s, meal: getMeal(s.mealId) }))
+    .filter((item) => item.meal);
+  const autoIndex = timedSlotIndex(
+    visibleMealTypes.map((type) => DEFAULT_SLOTS.find((slot) => slot.type === type)),
+    now
+  );
+  const availableSlotKey = visibleMealTypes.join('|');
   useEffect(() => { setActiveTabIdx(autoIndex); }, [autoIndex, clock.dateKey, availableSlotKey]);
 
   const totalKcal = allPlannedMeals.reduce((acc, item) => acc + item.meal.kcal, 0);
@@ -296,7 +303,14 @@ function MealPlanWidget({ profile }) {
   const calGoal = getCalorieGoal(profile);
   const calPct = Math.min(Math.round((totalKcal / calGoal) * 100), 100);
 
-  const currentItem = plannedMeals[activeTabIdx] || plannedMeals[0];
+  const activeMealType = visibleMealTypes[Math.min(activeTabIdx, visibleMealTypes.length - 1)];
+  const currentItem = plannedMeals.find((item) => item.slot.type === activeMealType);
+  const mealTimeGuide = {
+    Breakfast: 'Breakfast: only @ 10:30am',
+    Lunch: 'Lunch: only @ 2:30pm',
+    Snack: 'Snack: only @ 7:00pm',
+    Dinner: 'Dinner: 7:00pm to 11:59pm',
+  }[activeMealType];
 
   return (
     <div className="widget col-8" data-dashboard-tour="meal-plan">
@@ -313,35 +327,32 @@ function MealPlanWidget({ profile }) {
         </Link>
       </div>
 
+      <div className="meal-tabs" role="group" aria-label="Meal type">
+        {DEFAULT_SLOTS.map((slot) => {
+          const index = visibleMealTypes.indexOf(slot.type);
+          if (index === -1) return null;
+          return (
+            <button
+              key={slot.type}
+              type="button"
+              className={'meal-tab-btn' + (slot.type === activeMealType ? ' active' : '')}
+              aria-pressed={slot.type === activeMealType}
+              onClick={() => setActiveTabIdx(index)}
+            >
+              {slot.type}
+            </button>
+          );
+        })}
+      </div>
+      <div className="meal-time-guide" aria-live="polite">
+        <span>{mealTimeGuide}</span>
+      </div>
+
       {loading ? (
         <div style={{ padding: '32px 0', textAlign: 'center', color: '#d1fae5', fontSize: '15px' }}>Loading today's meal plan…</div>
-      ) : plannedMeals.length === 0 ? (
-        <div className="dash-empty-state" style={{ padding: '32px 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: 44, marginBottom: 14 }}>🍽️</div>
-          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: '#ffffff' }}>{allPlannedMeals.length ? 'No remaining meals planned for today.' : 'No meals planned for today yet.'}</div>
-          <div style={{ color: '#d1fae5', lineHeight: 1.6, marginBottom: 16 }}>
-            Customize your schedule or pick recipes on the Meal Plan page.
-          </div>
-          <Link to="/mealplan" className="widget-badge" style={{ textDecoration: 'none', padding: '8px 16px', fontSize: 13 }}>
-            Plan Today's Meals →
-          </Link>
-        </div>
       ) : (
         <>
-          <div className="meal-now-banner">Available meal: {plannedMeals[autoIndex]?.slot.type} · {plannedMeals[autoIndex]?.slot.time}</div>
-          <div className="meal-tabs">
-            {plannedMeals.map((item, idx) => (
-              <button
-                key={idx}
-                className={'meal-tab-btn' + (idx === activeTabIdx ? ' active' : '')}
-                onClick={() => setActiveTabIdx(idx)}
-              >
-                {item.slot.type}
-              </button>
-            ))}
-          </div>
-
-          {currentItem && (
+          {currentItem ? (
             <div className="meal-panel active">
               <div className="meal-main-card">
                 <div className="meal-emoji-big">{currentItem.meal.emoji}</div>
@@ -380,6 +391,12 @@ function MealPlanWidget({ profile }) {
                 </div>
               )}
             </div>
+          ) : (
+            <div className="meal-empty-panel">
+              <div className="meal-empty-title">No {activeMealType.toLowerCase()} planned yet</div>
+              <div className="meal-empty-description">Add a {activeMealType.toLowerCase()} to today's plan to see it here.</div>
+              <Link to="/mealplan" className="meal-plan-link">Plan today's meals <span aria-hidden="true">→</span></Link>
+            </div>
           )}
 
           <div className="daily-cal-summary">
@@ -392,6 +409,7 @@ function MealPlanWidget({ profile }) {
               <div className="daily-cal-bar-fill" style={{ width: calPct + '%' }}></div>
             </div>
           </div>
+          <Link to="/mealplan" className="meal-plan-link">View full meal plan <span aria-hidden="true">→</span></Link>
         </>
       )}
     </div>

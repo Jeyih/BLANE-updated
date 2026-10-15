@@ -7,7 +7,7 @@ test('Dashboard changes meal at Philippine schedule boundaries and midnight', ()
   assert.equal(currentMealType(new Date('2026-10-14T02:30:00Z')), 'Lunch');
   assert.equal(currentMealType(new Date('2026-10-14T04:00:00Z')), 'Lunch');
   assert.equal(currentMealType(new Date('2026-10-14T04:59:59Z')), 'Lunch');
-  assert.equal(currentMealType(new Date('2026-10-14T05:00:00Z')), 'Snack');
+  assert.equal(currentMealType(new Date('2026-10-14T05:00:00Z')), 'Lunch');
   assert.equal(currentMealType(new Date('2026-10-14T10:29:59Z')), 'Snack');
   assert.equal(currentMealType(new Date('2026-10-14T07:00:00Z')), 'Snack');
   assert.equal(currentMealType(new Date('2026-10-14T10:30:00Z')), 'Dinner');
@@ -21,8 +21,10 @@ test('expired Dashboard options stay hidden until Philippine midnight without ch
   const typesAt = (time) => availableMealSlots(slots, new Date(time)).map((slot) => slot.type);
   assert.deepEqual(typesAt('2026-10-14T02:29:59Z'), ['Breakfast', 'Lunch', 'Snack', 'Dinner']);
   assert.deepEqual(typesAt('2026-10-14T02:30:00Z'), ['Lunch', 'Snack', 'Dinner']);
-  assert.deepEqual(typesAt('2026-10-14T05:00:00Z'), ['Snack', 'Dinner']);
-  assert.deepEqual(typesAt('2026-10-14T10:30:00Z'), ['Dinner']);
+  assert.deepEqual(typesAt('2026-10-14T06:29:59Z'), ['Lunch', 'Snack', 'Dinner']);
+  assert.deepEqual(typesAt('2026-10-14T06:30:00Z'), ['Snack', 'Dinner']);
+  assert.deepEqual(typesAt('2026-10-14T10:59:59Z'), ['Snack', 'Dinner']);
+  assert.deepEqual(typesAt('2026-10-14T11:00:00Z'), ['Dinner']);
   assert.deepEqual(typesAt('2026-10-14T15:59:59Z'), ['Dinner']);
   assert.deepEqual(typesAt('2026-10-14T16:00:00Z'), ['Breakfast', 'Lunch', 'Snack', 'Dinner']);
   assert.equal(JSON.stringify(slots), saved);
@@ -31,9 +33,9 @@ test('expired Dashboard options stay hidden until Philippine midnight without ch
 test('custom serving times and missing upcoming slots never restore an expired meal', () => {
   const date = new Date('2026-10-14T05:00:00Z');
   const slots = [{ type: 'Dinner', time: '7:30 PM' }, { type: 'Breakfast', time: '11:00 AM' }, { type: 'Lunch', time: '1:15 PM' }];
-  assert.deepEqual(availableMealSlots(slots, date), [slots[0]]);
-  assert.equal(currentMealType(date, slots), 'Dinner');
-  assert.equal(currentMealType(date, [slots[1], slots[2]]), 'Snack');
+  assert.deepEqual(availableMealSlots(slots, date), [slots[0], slots[2]]);
+  assert.equal(currentMealType(date, slots), 'Lunch');
+  assert.equal(currentMealType(date, [slots[1], slots[2]]), 'Lunch');
   assert.equal(currentMealType(new Date('2026-10-14T10:30:00Z'), []), 'Dinner');
   assert.deepEqual(availableMealSlots([], date), []);
 });

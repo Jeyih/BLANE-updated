@@ -26,7 +26,7 @@ export function timedSlotIndex(slots, date = new Date()) {
   return [...timed].reverse().find((s) => s.minute <= now)?.index ?? timed[0].index;
 }
 // Dashboard cutoffs are independent of saved preparation/serving times.
-const MEAL_CUTOFFS = { Breakfast: 630, Brunch: 780, Lunch: 780, Snack: 1110, Dessert: 1110 };
+const MEAL_CUTOFFS = { Breakfast: 630, Brunch: 780, Lunch: 870, Snack: 1140, Dessert: 1140 };
 export function availableMealSlots(slots, date = new Date()) {
   const minutes = philippineClock(date).minutes;
   return slots.filter((slot) => MEAL_CUTOFFS[slot.type] === undefined || minutes < MEAL_CUTOFFS[slot.type]);
