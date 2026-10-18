@@ -7,6 +7,8 @@
 .widget-title-row, .rec-header-left { min-width: 0; }
 .widget-title-row > div:last-child, .rec-header-left > div:last-child { min-width: 0; }
 .widget-header { gap: 14px; flex-wrap: wrap; }
+:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 4px; }
+.pf-btn:disabled { cursor: not-allowed; opacity: .65; }
 .meal-main-name, .meal-main-meta, .rec-card-name, .rec-price-note { overflow-wrap: anywhere; }
 
 @media (max-width: 768px) {

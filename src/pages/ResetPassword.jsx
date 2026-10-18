@@ -1,3 +1,4 @@
+import PasswordInput from '../components/PasswordInput';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -90,10 +91,10 @@ export default function ResetPassword() {
 
             <div className="form-group">
               <label className="form-label" htmlFor="reset-new-password">New password</label>
-              <input
+              <PasswordInput
                 className="form-input"
-                id="reset-new-password"
-                type="password"
+                id="reset-new-password" autoComplete="new-password"
+
                 placeholder="Enter a new password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -102,10 +103,10 @@ export default function ResetPassword() {
 
             <div className="form-group">
               <label className="form-label" htmlFor="reset-confirm-password">Confirm password</label>
-              <input
+              <PasswordInput
                 className="form-input"
-                id="reset-confirm-password"
-                type="password"
+                id="reset-confirm-password" autoComplete="new-password"
+
                 placeholder="Repeat your new password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}

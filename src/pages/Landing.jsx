@@ -15,21 +15,21 @@ import AuthModal from '../components/AuthModal';
 import '../styles/landing.css';
 
 const FEATURES = [
-  { icon: '🔄', num: 'Module 01', name: 'Real-Time Body Feedback Loop', desc: 'Continuously syncs with wearable and health data to adjust your nutrition targets on the fly — no more static meal plans.' },
-  { icon: '📉', num: 'Module 02', name: 'Health Drift Detection', desc: 'Detects subtle shifts in your health metrics over time and proactively recalibrates your recommendations before issues arise.' },
-  { icon: '⚖️', num: 'Module 03', name: 'Dynamic Portion Optimizer', desc: 'Computes ideal portion sizes based on your activity level, metabolic rate, and daily goals — recalculated every day.' },
-  { icon: '📍', num: 'Module 04', name: 'GeoMarket Ingredient Scanner', desc: 'Scans nearby markets and stores for available ingredients so that every meal plan is realistic and locally actionable.' },
-  { icon: '💸', num: 'Module 05 & 06', name: 'Price-Aware & Seasonal Optimizer', desc: 'Combines real-time local pricing data with seasonal ingredient availability to suggest meals that are not just healthy, but genuinely affordable and easy to source in your area right now. Never recommends out-of-season produce at peak prices.', wide: true },
-  { icon: '💡', num: 'Module 07', name: 'Explainable AI', desc: 'Every recommendation comes with a clear, human-readable reason — so you always understand why BLANE suggests what it does.' },
-  { icon: '🚫', num: 'Module 08', name: 'Constraint-Based Planning', desc: 'Handles allergies, intolerances, religious restrictions, and dietary preferences as hard constraints — never violated.' },
-  { icon: '📖', num: 'Module 09', name: 'Recipe Recommendation', desc: 'Matches your available ingredients and nutritional needs with a curated, step-by-step recipe library tailored to your skill level.' },
+  { icon: '🔄', num: 'Module 01', name: 'Body Feedback Loop', desc: 'Record weight, sleep, water and activity yourself. Review your entries alongside your nutrition goals.' },
+  { icon: '📉', num: 'Module 02', name: 'Health Drift Detection', desc: 'Review trends in your recorded health data and see when your recent entries differ from your usual pattern.' },
+  { icon: '⚖️', num: 'Module 03', name: 'Dynamic Portion Optimizer', desc: 'Explore portion adjustments using your profile, calorie target and available recipe information.' },
+  { icon: '📍', num: 'Module 04', name: 'GeoMarket Ingredient Scanner', desc: 'Explore listed markets and stored ingredient information. Location access helps sort nearby options.' },
+  { icon: '💸', num: 'Module 05 & 06', name: 'Price-Aware & Seasonal Optimizer', desc: 'Compare estimated ingredient costs from Philippine price references and review seasonal labels to support your planning. Actual store prices and stock may vary.', wide: true },
+  { icon: '💡', num: 'Module 07', name: 'Explainable AI', desc: 'Read recommendation reasons and request AI explanations to help you understand suggested meals.' },
+  { icon: '🚫', num: 'Module 08', name: 'Constraint-Based Planning', desc: 'Apply your dietary preferences and restriction checks. Always review ingredients and warnings before choosing a meal.' },
+  { icon: '📖', num: 'Module 09', name: 'Recipe Recommendation', desc: 'Browse recipes, inspect ingredients and nutrition details, and add a recipe to today’s meal plan.' },
 ];
 
 const STEPS = [
-  { icon: '📊', title: 'Collect your data', desc: 'Connect health apps, wearables, or input your profile and goals manually.' },
-  { icon: '🧠', title: 'AI analysis', desc: "BLANE's nine modules process your biometrics, location, budget, and preferences." },
-  { icon: '🗺️', title: 'Local matching', desc: 'Recommendations are filtered against nearby markets and current seasonal pricing.' },
-  { icon: '🍽️', title: 'Your meal plan', desc: 'Receive a personalized, explained, and affordable plan — updated in real time.' },
+  { icon: '📊', title: 'Set up your profile', desc: 'Enter your goals, preferences and health records manually.' },
+  { icon: '🧠', title: 'Review suggestions', desc: 'Explore recipe suggestions and portion options based on your profile.' },
+  { icon: '🗺️', title: 'Check the details', desc: 'Review ingredients, estimated costs and listed market information.' },
+  { icon: '🍽️', title: 'Plan your meals', desc: 'Add meals to your plan and keep track of what you have eaten.' },
 ];
 
 export default function Landing() {
@@ -70,21 +70,12 @@ export default function Landing() {
     return () => observer.disconnect();
   }, []);
 
-  /* Macro bar animation on load (replaces the setTimeout in main.js) */
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      document.querySelectorAll('.macro-bar-fill').forEach((bar) => {
-        bar.style.width = bar.getAttribute('data-width');
-      });
-    }, 600);
-    return () => clearTimeout(timer);
-  }, []);
-
   function addRevealRef(el) {
     if (el && !revealRefs.current.includes(el)) revealRefs.current.push(el);
   }
 
   function openModal(tab) {
+    setMobileOpen(false);
     setModalTab(tab);
     setModalOpen(true);
   }
@@ -101,10 +92,10 @@ export default function Landing() {
   return (
     <>
       {/* ===================== NAVIGATION ===================== */}
-      <nav className={'navbar' + (scrolled ? ' scrolled' : '')}>
+      <nav aria-label="Main navigation" className={'navbar' + (scrolled ? ' scrolled' : '')}>
         <div className="container">
           <div className="navbar-inner">
-            <a href="#" className="logo">
+            <a href="#home" className="logo">
               <div className="logo-icon">
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path d="M12 2C7.4 2 4 5.4 4 9c0 2.4 1.2 4.5 3 5.7V18c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2v-3.3c1.8-1.2 3-3.3 3-5.7 0-3.6-3.4-7-8-7zm0 2c3.3 0 6 2.7 6 5 0 2-1.2 3.7-3 4.6V18H9v-4.4C7.2 12.7 6 11 6 9c0-2.3 2.7-5 6-5z"/>
@@ -127,14 +118,17 @@ export default function Landing() {
 
             <button
               className={'hamburger' + (mobileOpen ? ' active' : '')}
+              type="button"
               aria-label="Toggle navigation"
+              aria-expanded={mobileOpen}
+              aria-controls="landing-mobile-menu"
               onClick={() => setMobileOpen((v) => !v)}
             >
               <span></span><span></span><span></span>
             </button>
           </div>
 
-          <div className={'mobile-menu' + (mobileOpen ? ' open' : '')}>
+          <div id="landing-mobile-menu" className={'mobile-menu' + (mobileOpen ? ' open' : '')}>
             <a href="#features" onClick={(e) => { e.preventDefault(); scrollToSection('features'); }}>Features</a>
             <a href="#how-it-works" onClick={(e) => { e.preventDefault(); scrollToSection('how-it-works'); }}>How It Works</a>
             <a href="#about" onClick={(e) => { e.preventDefault(); scrollToSection('about'); }}>About</a>
@@ -168,9 +162,9 @@ export default function Landing() {
               </h1>
 
               <p className="hero-desc">
-                BLANE combines real-time health data, local food availability,
-                and explainable AI to deliver personalized meal plans that
-                actually fit your life and budget.
+                Use your profile, manually recorded health data and Philippine
+                food references to explore meal ideas, review estimated costs
+                and plan around your goals and budget.
               </p>
 
               <div className="hero-actions">
@@ -186,80 +180,36 @@ export default function Landing() {
               <div className="hero-stats">
                 <div className="hero-stat">
                   <span className="hero-stat-number">9</span>
-                  <div className="hero-stat-label">AI-powered modules</div>
+                  <div className="hero-stat-label">Planning modules</div>
                 </div>
                 <div className="hero-stat">
-                  <span className="hero-stat-number">Real-time</span>
-                  <div className="hero-stat-label">Body feedback loop</div>
+                  <span className="hero-stat-number">Your data</span>
+                  <div className="hero-stat-label">Manually recorded</div>
                 </div>
                 <div className="hero-stat">
                   <span className="hero-stat-number">Local</span>
-                  <div className="hero-stat-label">Market awareness</div>
+                  <div className="hero-stat-label">Philippine references</div>
                 </div>
               </div>
             </div>
 
             <div className="hero-visual">
-              <div className="hero-float-card card-geo">
-                <div className="float-icon">📍</div>
-                <div>
-                  <div className="float-text-main">Nearby Market</div>
-                  <div className="float-text-sub">3 ingredients available</div>
-                </div>
-              </div>
-
-              <div className="hero-card-main">
+              <div className="hero-card-main planning-preview">
                 <div className="card-header">
-                  <span className="card-title-sm">Today's Plan</span>
-                  <span className="card-badge">● Live sync</span>
+                  <span className="card-title-sm">Your everyday meal plan</span>
+                  <span className="card-badge">Made around you</span>
                 </div>
-
-                <div className="nutrition-ring-wrap">
-                  <div className="ring-chart">
-                    <svg viewBox="0 0 100 100" width="100" height="100">
-                      <circle cx="50" cy="50" r="42" fill="none" stroke="#111f16" strokeWidth="10"/>
-                      <circle cx="50" cy="50" r="42" fill="none" stroke="#2ddc7a" strokeWidth="10" strokeDasharray="105 159" strokeDashoffset="0" strokeLinecap="round"/>
-                      <circle cx="50" cy="50" r="42" fill="none" stroke="#1a8c4e" strokeWidth="10" strokeDasharray="80 184" strokeDashoffset="-108" strokeLinecap="round"/>
-                      <circle cx="50" cy="50" r="42" fill="none" stroke="#a8f5c8" strokeWidth="10" strokeDasharray="37 227" strokeDashoffset="-191" strokeLinecap="round"/>
-                    </svg>
-                    <div className="ring-center-text">
-                      <span className="ring-kcal">—</span>
-                      <span className="ring-label">kcal</span>
-                    </div>
-                  </div>
-
-                  <div className="macro-list">
-                    <div className="macro-item">
-                      <div className="macro-row"><span className="macro-name">Protein</span><span className="macro-val">—</span></div>
-                      <div className="macro-bar-bg"><div className="macro-bar-fill" style={{ width: 0, background: '#2ddc7a' }} data-width="0"></div></div>
-                    </div>
-                    <div className="macro-item">
-                      <div className="macro-row"><span className="macro-name">Carbs</span><span className="macro-val">—</span></div>
-                      <div className="macro-bar-bg"><div className="macro-bar-fill" style={{ width: 0, background: '#1a8c4e' }} data-width="0"></div></div>
-                    </div>
-                    <div className="macro-item">
-                      <div className="macro-row"><span className="macro-name">Fats</span><span className="macro-val">—</span></div>
-                      <div className="macro-bar-bg"><div className="macro-bar-fill" style={{ width: 0, background: '#a8f5c8' }} data-width="0"></div></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="meal-strip">
-                  <div className="meal-item">
-                    <span className="meal-emoji">🧾</span>
-                    <div className="meal-info"><div className="meal-name">No sample recipes are included</div><div className="meal-meta">Use the Admin panel to add recipes to the database.</div></div>
-                    <span className="meal-kcal">—</span>
-                  </div>
-                </div>
+                <div className="preview-heading-icon" aria-hidden="true">🍽️</div>
+                <h2>A little planning.<br />An easier mealtime.</h2>
+                <p className="preview-intro">Set up your profile to see meals and nutrition information that fit your goals.</p>
+                <ol className="preview-checklist">
+                  <li><span className="preview-step-number" aria-hidden="true">1</span><div><strong>Start with your goals</strong><p>Your preferences guide the recipes you see.</p></div></li>
+                  <li><span className="preview-step-number" aria-hidden="true">2</span><div><strong>Review the ingredients</strong><p>See nutrition details and available cost estimates.</p></div></li>
+                  <li><span className="preview-step-number" aria-hidden="true">3</span><div><strong>Use a meal today</strong><p>Add it to your plan with one tap.</p></div></li>
+                </ol>
+                <p className="preview-estimate-note">Prices are estimates in Philippine pesos. Actual store totals may vary.</p>
               </div>
 
-              <div className="hero-float-card card-ai">
-                <div className="float-icon">🧠</div>
-                <div>
-                  <div className="float-text-main">AI Explained</div>
-                  <div className="float-text-sub">High protein · Low budget</div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -269,10 +219,10 @@ export default function Landing() {
       <section className="section" id="features">
         <div className="container">
           <span className="section-label reveal" ref={addRevealRef}>Core Features</span>
-          <h2 className="section-title reveal" ref={addRevealRef}>Nine intelligent<br />nutrition modules</h2>
+          <h2 className="section-title reveal" ref={addRevealRef}>Nine connected<br />nutrition modules</h2>
           <p className="section-sub reveal" ref={addRevealRef}>
-            Every module works together to give you a complete, adaptive, and
-            explainable nutrition experience — powered by real data.
+            Explore connected tools for meal planning, nutrition information,
+            health logs and estimated ingredient costs.
           </p>
 
           <div className="features-grid">
@@ -304,6 +254,22 @@ export default function Landing() {
               </div>
             ))}
           </div>
+          <div className="process-highlights">
+            <div className="hero-float-card">
+              <div className="float-icon" aria-hidden="true">📍</div>
+              <div>
+                <div className="float-text-main">Explore markets</div>
+                <div className="float-text-sub">Review listed ingredients</div>
+              </div>
+            </div>
+            <div className="hero-float-card">
+              <div className="float-icon" aria-hidden="true">🧠</div>
+              <div>
+                <div className="float-text-main">AI Explained</div>
+                <div className="float-text-sub">Understand your meal options</div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -314,8 +280,8 @@ export default function Landing() {
           <span className="section-label reveal" style={{ justifyContent: 'center' }} ref={addRevealRef}>Get Started</span>
           <h2 className="section-title reveal" ref={addRevealRef}>Nutrition that<br />adapts to <span style={{ color: 'var(--color-primary)' }}>you</span></h2>
           <p className="section-sub reveal" style={{ textAlign: 'center', margin: '0 auto 36px' }} ref={addRevealRef}>
-            Join BLANE and experience a nutrition system that grows smarter
-            with every meal, every metric, and every market visit.
+            Set your goals, review recipes and bring a little more structure
+            to your everyday meals.
           </p>
           <div className="cta-actions reveal" ref={addRevealRef}>
             <a href="#" className="btn btn-primary btn-lg" onClick={(e) => { e.preventDefault(); openModal('register'); }}>Create free account</a>
@@ -324,59 +290,59 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ===================== FOOTER ===================== */}
+      <section className="section landing-data-section" id="your-data" aria-labelledby="landing-data-title">
+        <div className="container">
+          <span className="section-label">Before you begin</span>
+          <h2 className="section-title" id="landing-data-title">Your data and estimates</h2>
+          <div className="landing-data-grid">
+            <div>
+              <h3>Information you enter</h3>
+              <p>Your account, profile and submitted health logs are handled through Supabase. Health information comes from your entries; BLANE does not connect to wearables or continuously measure your body.</p>
+              <p>Meal plans and completion marks are stored in this browser. Grocery entries are kept for the browser session, so these records may not appear on another device.</p>
+            </div>
+            <div>
+              <h3>Reference prices and guidance</h3>
+              <p>Meal costs use Philippine DA and store references. Prices are checked automatically while an active page uses the price feed; updates depend on source availability. Read the source and estimate labels before budgeting.</p>
+              <p>Listed markets, seasonal labels and AI suggestions are planning aids. They do not guarantee current stock or replace advice from a qualified nutrition professional.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <footer className="footer" id="contact">
         <div className="container">
           <div className="footer-inner">
             <div className="footer-brand">
-              <a href="#" className="logo">
-                <div className="logo-icon">
-                  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2C7.4 2 4 5.4 4 9c0 2.4 1.2 4.5 3 5.7V18c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2v-3.3c1.8-1.2 3-3.3 3-5.7 0-3.6-3.4-7-8-7zm0 2c3.3 0 6 2.7 6 5 0 2-1.2 3.7-3 4.6V18H9v-4.4C7.2 12.7 6 11 6 9c0-2.3 2.7-5 6-5z"/>
-                  </svg>
-                </div>
-                <span className="logo-text"><span>BL</span>ANE</span>
-              </a>
-              <p>Biological Adaptive Nutrition Engine — an intelligent nutrition recommendation system for real life.</p>
+              <a href="#home" className="logo"><span className="logo-text"><span>BL</span>ANE</span></a>
+              <p>Biological Adaptive Nutrition Engine. A capstone project for practical meal planning in Tarlac City.</p>
             </div>
-
             <div>
-              <div className="footer-col-title">Product</div>
+              <div className="footer-col-title">Explore</div>
               <ul className="footer-links">
                 <li><a href="#features" onClick={(e) => { e.preventDefault(); scrollToSection('features'); }}>Features</a></li>
-                <li><a href="#how-it-works" onClick={(e) => { e.preventDefault(); scrollToSection('how-it-works'); }}>How It Works</a></li>
-                <li><a href="#" onClick={(e) => { e.preventDefault(); openModal('register'); }}>Get Started</a></li>
-                <li><a href="#" onClick={(e) => { e.preventDefault(); openModal('login'); }}>Sign In</a></li>
+                <li><a href="#how-it-works" onClick={(e) => { e.preventDefault(); scrollToSection('how-it-works'); }}>How it works</a></li>
+                <li><a href="#about" onClick={(e) => { e.preventDefault(); scrollToSection('about'); }}>About the project</a></li>
+                <li><a href="#your-data" onClick={(e) => { e.preventDefault(); scrollToSection('your-data'); }}>Data and price information</a></li>
               </ul>
             </div>
-
             <div>
-              <div className="footer-col-title">System</div>
+              <div className="footer-col-title">Get started</div>
               <ul className="footer-links">
-                <li><a href="#">Dashboard</a></li>
-                <li><a href="#">Meal Planner</a></li>
-                <li><a href="#">Market Scan</a></li>
-                <li><a href="#">Health Sync</a></li>
+                <li><button type="button" onClick={() => openModal('register')}>Create an account</button></li>
+                <li><button type="button" onClick={() => openModal('login')}>Sign in to your dashboard</button></li>
               </ul>
             </div>
-
             <div>
-              <div className="footer-col-title">Info</div>
-              <ul className="footer-links">
-                <li><a href="#">About the Project</a></li>
-                <li><a href="#">Research Paper</a></li>
-                <li><a href="#">Privacy Policy</a></li>
-                <li><a href="#">Terms of Use</a></li>
-              </ul>
+              <div className="footer-col-title">Questions or feedback?</div>
+              <p className="footer-help">Sign in and choose Feedback in the navigation menu to send a message to the project team.</p>
+              <button type="button" className="btn btn-outline footer-help-button" onClick={() => openModal('login')}>Sign in for feedback</button>
             </div>
           </div>
-
           <div className="footer-bottom">
-            <p>© 2025 BLANE — Biological Adaptive Nutrition Engine. Capstone Project.</p>
+            <p>© {new Date().getFullYear()} BLANE · Capstone Project</p>
             <div className="footer-bottom-links">
-              <a href="#">Privacy</a>
-              <a href="#">Terms</a>
-              <a href="#">Contact</a>
+              <a href="#your-data" onClick={(e) => { e.preventDefault(); scrollToSection('your-data'); }}>Data and estimates</a>
+              <a href="#home" onClick={(e) => { e.preventDefault(); scrollToSection('home'); }}>Back to top ↑</a>
             </div>
           </div>
         </div>

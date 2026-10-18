@@ -1,3 +1,4 @@
+import PasswordInput from './PasswordInput';
 /* ============================================================
    BLANE — Auth Modal
    Replaces: the #modal-overlay markup in index.html, plus the
@@ -11,7 +12,7 @@
    state and passes them down as props; any button just calls
    the passed-in `onOpen('login')` / `onOpen('register')`.
    ============================================================ */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { REDIRECT_AFTER_LOGIN, REDIRECT_AFTER_REGISTER } from '../lib/supabase';
@@ -25,7 +26,6 @@ export default function AuthModal({ open, tab, onClose, onSwitchTab }) {
   const [loginError, setLoginError]       = useState('');
   const [loginLoading, setLoginLoading]   = useState(false);
 
-  const [forgotEmail, setForgotEmail]     = useState('');
   const [forgotError, setForgotError]     = useState('');
   const [forgotSuccess, setForgotSuccess] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
@@ -37,6 +37,42 @@ export default function AuthModal({ open, tab, onClose, onSwitchTab }) {
   const [regError, setRegError]           = useState('');
   const [regLoading, setRegLoading]       = useState(false);
   const [regSuccess, setRegSuccess]       = useState(false);
+
+  const dialogRef = useRef(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
+  useEffect(() => {
+    if (!open) return;
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const dialog = dialogRef.current;
+    (dialog?.querySelector('input') || dialog)?.focus();
+    function handleKey(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeRef.current();
+      }
+      if (event.key !== 'Tab') return;
+      const controls = [...dialog.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), [tabindex="0"]')];
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKey);
+      previousFocus?.focus();
+    };
+  }, [open]);
 
   if (!open) return null;
 
@@ -101,7 +137,8 @@ export default function AuthModal({ open, tab, onClose, onSwitchTab }) {
     setForgotError('');
     setForgotSuccess('');
 
-    const email = (forgotEmail || loginEmail || '').trim();
+    if (forgotLoading) return;
+    const email = loginEmail.trim();
     if (!email) {
       setForgotError('Please enter your email address.');
       return;
@@ -111,7 +148,6 @@ export default function AuthModal({ open, tab, onClose, onSwitchTab }) {
     try {
       await resetPassword(email);
       setLoginEmail(email);
-      setForgotEmail(email);
       setForgotSuccess(`A password reset link has been sent to ${email}. Check your inbox and follow the instructions.`);
     } catch (err) {
       setForgotError(err.message || 'Unable to send a password reset email.');
@@ -122,7 +158,7 @@ export default function AuthModal({ open, tab, onClose, onSwitchTab }) {
 
   return (
     <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal" role="dialog" aria-modal="true">
+      <div className="modal" ref={dialogRef} role="dialog" aria-modal="true" aria-label={tab === 'register' ? 'Create a BLANE account' : 'Sign in to BLANE'} tabIndex={-1}>
         <button className="modal-close" aria-label="Close modal" onClick={onClose}>✕</button>
 
         <div className="modal-logo">
@@ -149,7 +185,7 @@ export default function AuthModal({ open, tab, onClose, onSwitchTab }) {
             <div className="form-group">
               <label className="form-label" htmlFor="login-email">Email address</label>
               <input
-                className="form-input" type="email" id="login-email" placeholder="you@example.com"
+                className="form-input" type="email" id="login-email" placeholder="you@example.com" autoComplete="email"
                 value={loginEmail} onChange={(e) => {
                   setLoginEmail(e.target.value);
                   if (forgotError) setForgotError('');
@@ -159,21 +195,15 @@ export default function AuthModal({ open, tab, onClose, onSwitchTab }) {
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="login-password">Password</label>
-              <input
-                className="form-input" type="password" id="login-password" placeholder="••••••••"
+              <PasswordInput
+                className="form-input" id="login-password" placeholder="••••••••" autoComplete="current-password"
                 value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)}
               />
             </div>
             <div className="form-forgot">
-              <a href="#" onClick={(e) => {
-                e.preventDefault();
-                setForgotError('');
-                setForgotSuccess('');
-                setForgotEmail(loginEmail || '');
-                void handleForgotPasswordSubmit(e);
-              }}>
+              <button type="button" disabled={forgotLoading} onClick={handleForgotPasswordSubmit}>
                 {forgotLoading ? 'Sending…' : 'Forgot password?'}
-              </a>
+              </button>
             </div>
             <button type="submit" className="btn btn-primary btn-lg form-submit" disabled={loginLoading}>
               {loginLoading ? 'Please wait…' : 'Sign in'}
@@ -191,28 +221,28 @@ export default function AuthModal({ open, tab, onClose, onSwitchTab }) {
             <div className="form-group">
               <label className="form-label" htmlFor="reg-name">Full name</label>
               <input
-                className="form-input" type="text" id="reg-name" placeholder="Juan dela Cruz"
+                className="form-input" type="text" id="reg-name" placeholder="Juan dela Cruz" autoComplete="name"
                 value={regName} onChange={(e) => setRegName(e.target.value)}
               />
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="reg-email">Email address</label>
               <input
-                className="form-input" type="email" id="reg-email" placeholder="you@example.com"
+                className="form-input" type="email" id="reg-email" placeholder="you@example.com" autoComplete="email"
                 value={regEmail} onChange={(e) => setRegEmail(e.target.value)}
               />
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="reg-password">Password</label>
-              <input
-                className="form-input" type="password" id="reg-password" placeholder="Create a password"
+              <PasswordInput
+                className="form-input" id="reg-password" placeholder="Create a password" autoComplete="new-password"
                 value={regPassword} onChange={(e) => setRegPassword(e.target.value)}
               />
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="reg-confirm">Confirm password</label>
-              <input
-                className="form-input" type="password" id="reg-confirm" placeholder="Repeat password"
+              <PasswordInput
+                className="form-input" id="reg-confirm" placeholder="Repeat password" autoComplete="new-password"
                 value={regConfirm} onChange={(e) => setRegConfirm(e.target.value)}
               />
             </div>
@@ -220,8 +250,7 @@ export default function AuthModal({ open, tab, onClose, onSwitchTab }) {
               {regLoading ? 'Please wait…' : 'Create account'}
             </button>
             <p className="form-terms">
-              By registering you agree to our{' '}
-              <a href="#">Terms of Use</a> and <a href="#">Privacy Policy</a>.
+              Review the <a href="#your-data" onClick={onClose}>data and estimate information</a> before creating your account.
             </p>
           </form>
         )}

@@ -1,3 +1,4 @@
+import PasswordInput from '../components/PasswordInput';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -787,10 +788,10 @@ export default function Profile() {
                 <div className={`pf-password-form${passwordOpen ? ' open' : ''}`}>
                   <div className="pf-field">
                     <label className="pf-field-label" htmlFor="pf-pwd-new">New Password</label>
-                    <input
+                    <PasswordInput
                       className="pf-input"
-                      type="password"
-                      id="pf-pwd-new"
+
+                      id="pf-pwd-new" autoComplete="new-password"
                       value={passwordForm.newPwd}
                       onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPwd: e.target.value }))}
                       placeholder="At least 6 characters"
@@ -798,10 +799,10 @@ export default function Profile() {
                   </div>
                   <div className="pf-field">
                     <label className="pf-field-label" htmlFor="pf-pwd-confirm">Confirm New Password</label>
-                    <input
+                    <PasswordInput
                       className="pf-input"
-                      type="password"
-                      id="pf-pwd-confirm"
+
+                      id="pf-pwd-confirm" autoComplete="new-password"
                       value={passwordForm.confirmPwd}
                       onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPwd: e.target.value }))}
                       placeholder="Repeat new password"
@@ -821,20 +822,20 @@ export default function Profile() {
                     <div className="pf-section-icon">⚠️</div>
                     <div>
                       <div className="pf-section-title" style={{ color: '#f87171' }}>Danger Zone</div>
-                      <div className="pf-section-sub">Irreversible account actions</div>
+                      <div className="pf-section-sub">Account support</div>
                     </div>
                   </div>
                 </div>
                 <div className="pf-danger-zone">
                   <div className="pf-danger-title">Delete Account</div>
-                  <div className="pf-danger-sub">Permanently delete your BLANE account and all associated data including your profile, meal plans, and health history. This cannot be undone.</div>
+                  <div className="pf-danger-sub" id="account-deletion-status">Self-service account deletion is not available yet. Use Feedback in the navigation menu to contact the project team about your account.</div>
                   <button
                     className="pf-btn pf-btn-danger"
                     type="button"
-                    onClick={() => alert('Account deletion — contact support or implement via Supabase admin API.')}
+                    disabled aria-describedby="account-deletion-status"
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                    Delete My Account
+                    Account deletion unavailable
                   </button>
                 </div>
               </div>
