@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useIngredientPrices } from '../context/PriceContext';
 import { marketIngredientPriceText } from '../lib/pricing';
+import { fetchMarketSnapshot, getMealPlanRecipeIds, mealPlanMarketIngredients, MARKET_REFRESH_MS, marketDistanceKm } from '../lib/market-refresh';
 import Navbar from '../components/Navbar';
 import MarketsTour from '../components/MarketsTour';
 import { IngSeasonTag } from '../components/SeasonalBadges';
@@ -23,7 +24,7 @@ const DEFAULT_CENTER = { lat: 15.4858, lng: 120.5970 };
 
 const initialLocationState = {
   name: 'Tarlac City, Central Luzon, PH',
-  sub: 'Showing markets within 3 km radius · Last updated just now',
+  sub: 'Choose a hub or update your location to compare market distances',
 };
 
 const TARLAC_LOCATIONS = [
@@ -34,39 +35,30 @@ const TARLAC_LOCATIONS = [
   { name: 'Concepcion', sub: 'East agri-commercial zone', lat: 15.3244, lng: 120.6558 },
 ];
 
-function normalizeIngredientName(name) {
-  return String(name || '').trim().toLowerCase();
-}
-
-function getSavedMealIds() {
-  try {
-    const savedPlan = JSON.parse(localStorage.getItem('blane_meal_plan') || '{}');
-    const selectedDay = Number(localStorage.getItem('blane_meal_plan_day'));
-    const daySlots = Number.isInteger(selectedDay) && Array.isArray(savedPlan[selectedDay])
-      ? savedPlan[selectedDay]
-      : Object.values(savedPlan).flat();
-    return [...new Set(
-      daySlots
-        .map((slot) => slot?.mealId)
-        .filter(Boolean)
-        .map((id) => String(id))
-    )];
-  } catch (error) {
-    console.error('Failed to read saved meal plan:', error);
-    return [];
-  }
-}
-
 export default function Markets() {
   const { records: priceRecords } = useIngredientPrices();
   const { user } = useAuth();
   const [markets, setMarkets] = useState([]);
   const [tourOpen, setTourOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState('All');
+  const [marketSearchInput, setMarketSearchInput] = useState('');
+  const [marketSearch, setMarketSearch] = useState('');
   const [selectedMarketId, setSelectedMarketId] = useState(null);
   const [locationText, setLocationText] = useState(initialLocationState);
+  const [selectedLocation, setSelectedLocation] = useState('');
+  const manualPinRef = useRef(false);
+  const locationRequestRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [userCoords, setUserCoords] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState('');
+  const [lastRefreshedAt, setLastRefreshedAt] = useState(null);
+  const coordsRef = useRef(null);
+  coordsRef.current = userCoords;
+  const refreshRef = useRef(null);
+  const refreshJobRef = useRef(null);
+  const abortRef = useRef(null);
+  refreshRef.current = loadMarkets;
 
   const mapRef = useRef(null);
   const markersLayerRef = useRef(null);
@@ -74,12 +66,33 @@ export default function Markets() {
   const userMarkerRef = useRef(null);
   const userCircleRef = useRef(null);
   const routeRequestRef = useRef(0);
+  const routeIdentityRef = useRef(null);
   const marketRequestRef = useRef(0);
 
   useEffect(() => {
-    if (!user) return;
-    loadMarkets();
-  }, [user]);
+    if (!user?.id) return;
+    refreshRef.current();
+    const refresh = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine !== false) {
+        refreshRef.current({ silent: true });
+      }
+    };
+    const timer = window.setInterval(refresh, MARKET_REFRESH_MS);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    window.addEventListener('blane-prices-updated', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      marketRequestRef.current += 1;
+      abortRef.current?.abort();
+      refreshJobRef.current = null;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
+      window.removeEventListener('blane-prices-updated', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -88,7 +101,12 @@ export default function Markets() {
 
   useEffect(() => {
     function refreshMealPlanIngredients() {
-      if (user) loadMarkets();
+      if (user) {
+        marketRequestRef.current += 1;
+        abortRef.current?.abort();
+        refreshJobRef.current = null;
+        refreshRef.current({ silent: true });
+      }
     }
 
     window.addEventListener('blane-meal-plan-updated', refreshMealPlanIngredients);
@@ -120,12 +138,15 @@ export default function Markets() {
       if (!mapRef.current) initMap();
       else updateMap();
     }
-  }, [loading, activeFilter, markets, selectedMarketId, userCoords]);
+  }, [loading, activeFilter, marketSearch, markets, selectedMarketId, userCoords]);
 
   const filteredMarkets = useMemo(() => {
-    if (activeFilter === 'All') return markets;
-    return markets.filter((market) => market.type === activeFilter.toLowerCase());
-  }, [activeFilter, markets]);
+    const query = marketSearch.trim().toLowerCase();
+    return markets.filter((market) => (
+      (activeFilter === 'All' || market.type === activeFilter.toLowerCase())
+      && (!query || `${market.name} ${market.address}`.toLowerCase().includes(query))
+    ));
+  }, [activeFilter, marketSearch, markets]);
 
   const sortedMarkets = useMemo(() => {
     return [...filteredMarkets].sort((a, b) => a.distance - b.distance);
@@ -135,109 +156,89 @@ export default function Markets() {
     return markets.find((market) => market.id === selectedMarketId) || null;
   }, [markets, selectedMarketId]);
 
-  async function loadMarkets() {
+  function loadMarkets({ silent = false } = {}) {
+    if (refreshJobRef.current) return refreshJobRef.current;
     const requestId = ++marketRequestRef.current;
-    setLoading(true);
-    const { data: marketsData, error: marketsErr } = await supabase
-      .from('markets')
-      .select('*')
-      .order('name');
-
-    if (requestId !== marketRequestRef.current) return;
-    if (marketsErr) {
-      console.error('Failed to load markets:', marketsErr.message);
-      setMarkets([]);
-      setLoading(false);
-      return;
-    }
-
-    const savedMealIds = getSavedMealIds();
-    const { data: mealIngredients, error: mealIngredientsError } = savedMealIds.length
-      ? await supabase
-        .from('recipe_ingredients')
-        .select('*')
-        .in('recipe_id', savedMealIds)
-      : { data: [], error: null };
-
-    if (requestId !== marketRequestRef.current) return;
-    if (mealIngredientsError) {
-      console.error('Failed to load meal plan ingredients:', mealIngredientsError.message);
-    }
-
-    const mealPlanIngredientNames = new Set(
-      (mealIngredients || [])
-        .map((ingredient) => ingredient.name || ingredient.ingredient_name || ingredient.food_name)
-        .map(normalizeIngredientName)
-        .filter(Boolean)
-    );
-
-    const ingredientResults = await Promise.all(
-      (marketsData || []).map(async (market) => {
-        const { data, error } = await supabase
-          .from('market_ingredients')
-          .select('*')
-          .eq('market_id', market.id)
-          .order('name');
-
-        if (error) {
-          console.error(`Failed to load ingredients for ${market.name}:`, error.message);
+    if (!silent) setLoading(true);
+    setRefreshing(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 20000);
+    const job = (async () => {
+      try {
+        const snapshot = await fetchMarketSnapshot(supabase, controller.signal, getMealPlanRecipeIds(localStorage));
+        if (requestId !== marketRequestRef.current) return;
+        const ingredientsByMarket = new Map();
+        for (const item of mealPlanMarketIngredients(snapshot.ingredients, snapshot.recipeIngredients)) {
+          const key = String(item.market_id);
+          if (!ingredientsByMarket.has(key)) ingredientsByMarket.set(key, []);
+          ingredientsByMarket.get(key).push({
+            name: item.name, qty: item.qty, price: item.price == null ? '—' : '₱' + item.price,
+            status: item.status,
+          });
         }
-
-        return { marketId: market.id, ingredients: data || [] };
-      })
-    );
-
-    if (requestId !== marketRequestRef.current) return;
-
-    const ingredientsByMarket = {};
-    const ingredientCatalog = new Map();
-    ingredientResults.forEach(({ marketId, ingredients }) => {
-      ingredientsByMarket[marketId] = ingredients.map((ing) => {
-        const ingredient = {
-          name: ing.name,
-          qty: ing.qty,
-          price: ing.price == null ? '—' : '₱' + ing.price,
-          status: ing.status,
-        };
-
-        const key = normalizeIngredientName(ing.name);
-        if (key && !ingredientCatalog.has(key)) ingredientCatalog.set(key, ingredient.name);
-        return ingredient;
-      });
-    });
-
-    const loaded = (marketsData || []).map((market) => ({
-      id: market.id,
-      name: market.name,
-      type: market.type,
-      icon: market.icon,
-      distance: market.distance_km || 0,
-      open: market.is_open,
-      hours: market.hours || 'Hours unknown',
-      address: market.address || 'Address unavailable',
-      lat: market.lat || DEFAULT_CENTER.lat,
-      lng: market.lng || DEFAULT_CENTER.lng,
-      availableTags: completeMarketIngredients(ingredientsByMarket[market.id] || [], ingredientCatalog, mealPlanIngredientNames)
-        .map((i) => i.name),
-      ingredients: completeMarketIngredients(ingredientsByMarket[market.id] || [], ingredientCatalog, mealPlanIngredientNames),
-    }));
-
-    setMarkets(loaded);
-    setLoading(false);
+        const origin = coordsRef.current || DEFAULT_CENTER;
+        const loaded = snapshot.markets.map((market) => {
+          const ingredients = ingredientsByMarket.get(String(market.id)) || [];
+          const position = { lat: market.lat ?? DEFAULT_CENTER.lat, lng: market.lng ?? DEFAULT_CENTER.lng };
+          return {
+            id: market.id, name: market.name, type: market.type, icon: market.icon,
+            distance: marketDistanceKm(origin, position), open: market.is_open,
+            hours: market.hours || 'Hours unknown', address: market.address || 'Address unavailable',
+            ...position, ingredients,
+            availableTags: ingredients.filter((item) => ['avail', 'limited'].includes(item.status)).map((item) => item.name),
+          };
+        }).sort((a, b) => a.name.localeCompare(b.name));
+        setMarkets((previous) => JSON.stringify(previous) === JSON.stringify(loaded) ? previous : loaded);
+        setLastRefreshedAt(new Date());
+        setRefreshError('');
+      } catch {
+        if (requestId === marketRequestRef.current) {
+          setRefreshError('Market refresh unavailable. Any previously loaded records are still shown; try again when connected.');
+        }
+      } finally {
+        window.clearTimeout(timeout);
+        if (requestId === marketRequestRef.current) {
+          refreshJobRef.current = null;
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
+    })();
+    refreshJobRef.current = job;
+    return job;
   }
 
   function selectPresetLocation(loc) {
-    const coords = { lat: loc.lat, lng: loc.lng, accuracy: 50 };
+    locationRequestRef.current += 1;
+    manualPinRef.current = false;
+    setSelectedLocation(loc.name);
+    const coords = { lat: loc.lat, lng: loc.lng, accuracy: 0 };
     setUserCoords(coords);
-    placeUserMarker(coords, 50);
+    placeUserMarker(coords, 0);
     updateDistances(coords);
     setLocationText({
       name: loc.name,
-      sub: `${loc.sub} · Live distances updated`,
+      sub: `${loc.sub} · Approximate area selected manually`,
     });
     if (mapRef.current) {
       mapRef.current.setView([loc.lat, loc.lng], 14, { animate: true });
     }
+  }
+
+  function chooseManualPoint(latlng) {
+    locationRequestRef.current += 1;
+    manualPinRef.current = false;
+    setSelectedLocation('');
+    const coords = { lat: latlng.lat, lng: latlng.lng, accuracy: 0 };
+    coordsRef.current = coords;
+    setUserCoords(coords);
+    placeUserMarker(coords, 0);
+    updateDistances(coords);
+    setLocationText({
+      name: 'Your pinned location',
+      sub: `Manual pin: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)} · Location set manually`,
+    });
   }
 
   function initMap() {
@@ -254,6 +255,9 @@ export default function Markets() {
       maxZoom: 19,
     }).addTo(mapRef.current);
 
+    mapRef.current.on('click', (event) => {
+      if (manualPinRef.current) chooseManualPoint(event.latlng);
+    });
     markersLayerRef.current = L.layerGroup().addTo(mapRef.current);
     updateMap();
   }
@@ -261,16 +265,22 @@ export default function Markets() {
   function updateMap() {
     if (!mapRef.current || !markersLayerRef.current) return;
 
-    const routeRequestId = ++routeRequestRef.current;
     markersLayerRef.current.clearLayers();
-    if (selectedGuideLineRef.current) {
+    const selectedMarket = filteredMarkets.find((market) => market.id === selectedMarketId);
+    const origin = userCoords || DEFAULT_CENTER;
+    const routeIdentity = selectedMarket ? `${selectedMarket.id}:${origin.lat},${origin.lng}:${selectedMarket.lat},${selectedMarket.lng}` : null;
+    const routeChanged = routeIdentityRef.current !== routeIdentity;
+    if (routeChanged) {
+      routeIdentityRef.current = routeIdentity;
+      routeRequestRef.current += 1;
+    }
+    const routeRequestId = routeRequestRef.current;
+    if (routeChanged && selectedGuideLineRef.current) {
       selectedGuideLineRef.current.remove();
       selectedGuideLineRef.current = null;
     }
 
-    const selectedMarket = filteredMarkets.find((market) => market.id === selectedMarketId);
-    if (selectedMarket) {
-      const origin = userCoords || DEFAULT_CENTER;
+    if (routeChanged && selectedMarket) {
       const routeUrl = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${selectedMarket.lng},${selectedMarket.lat}?overview=full&geometries=geojson`;
 
       fetch(routeUrl)
@@ -293,6 +303,7 @@ export default function Markets() {
         })
         .catch((error) => {
           if (routeRequestId !== routeRequestRef.current) return;
+          routeIdentityRef.current = null;
           console.error('Failed to load driving route:', error.message);
         });
     }
@@ -349,7 +360,7 @@ export default function Markets() {
   useEffect(() => {
     if (!mapRef.current || !selectedMarket) return;
     mapRef.current.setView([selectedMarket.lat, selectedMarket.lng], 15, { animate: true });
-  }, [selectedMarket]);
+  }, [selectedMarket?.id, selectedMarket?.lat, selectedMarket?.lng]);
 
   function placeUserMarker(coords, accuracyMeters) {
     const youIcon = L.divIcon({
@@ -378,10 +389,10 @@ export default function Markets() {
 
     if (userCircleRef.current) {
       userCircleRef.current.setLatLng([coords.lat, coords.lng]);
-      userCircleRef.current.setRadius(accuracyMeters || 50);
+      userCircleRef.current.setRadius(accuracyMeters ?? 50);
     } else {
       userCircleRef.current = L.circle([coords.lat, coords.lng], {
-        radius: accuracyMeters || 50,
+        radius: accuracyMeters ?? 50,
         color: '#2563eb',
         fillColor: '#2563eb',
         fillOpacity: 0.08,
@@ -393,13 +404,14 @@ export default function Markets() {
   function updateDistances(coords) {
     setMarkets((prev) => prev.map((market) => ({
       ...market,
-      distance: haversineKm(coords.lat, coords.lng, market.lat, market.lng),
+      distance: marketDistanceKm(coords, market),
     })));
   }
 
   function locateUser() {
+    const request = ++locationRequestRef.current;
     if (!navigator.geolocation) {
-      window.alert('Your browser does not support geolocation.');
+      setLocationText((previous) => ({ ...previous, sub: 'GPS is unavailable. Choose an area below or pin a location on the map.' }));
       return;
     }
 
@@ -407,6 +419,9 @@ export default function Markets() {
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        if (request !== locationRequestRef.current) return;
+        manualPinRef.current = false;
+        setSelectedLocation('');
         const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
         setUserCoords(coords);
         placeUserMarker(coords, pos.coords.accuracy);
@@ -417,11 +432,12 @@ export default function Markets() {
         });
       },
       (err) => {
+        if (request !== locationRequestRef.current) return;
         let msg = 'Could not get your location.';
-        if (err.code === 1) msg = 'Location permission denied. Showing default area instead.';
-        if (err.code === 2) msg = 'Location unavailable. Showing default area instead.';
-        if (err.code === 3) msg = 'Location request timed out. Showing default area instead.';
-        setLocationText({ name: initialLocationState.name, sub: msg });
+        if (err.code === 1) msg = 'Location permission denied. Choose an area below or pin a location on the map.';
+        if (err.code === 2) msg = 'Location unavailable. Choose an area below or pin a location on the map.';
+        if (err.code === 3) msg = 'Location request timed out. Choose an area below or pin a location on the map.';
+        setLocationText((previous) => ({ ...previous, sub: msg }));
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -434,16 +450,6 @@ export default function Markets() {
     } else {
       mapRef.current.setView([DEFAULT_CENTER.lat, DEFAULT_CENTER.lng], 14, { animate: true });
     }
-  }
-
-  function haversineKm(lat1, lng1, lat2, lng2) {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLng = ((lng2 - lng1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-    return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
   }
 
   function closeTour() {
@@ -468,8 +474,20 @@ export default function Markets() {
               <button className="mk-tour-trigger" type="button" onClick={() => setTourOpen(true)}>
                 <span aria-hidden="true">ⓘ</span> Take a tour
               </button>
-              <span className="mk-live-badge">● Live data</span>
+              <span className="mk-live-badge">{refreshError ? '● Refresh unavailable' : refreshing ? '● Refreshing…' : '● Auto refresh'}</span>
             </div>
+          </div>
+
+          <div className="mk-refresh-status">
+            <p role="status" aria-live="polite">
+              {lastRefreshedAt ? `Market records refreshed ${lastRefreshedAt.toLocaleString('en-PH', { timeZone: 'Asia/Manila', hour12: true })} (Philippine time).` : 'No successful market refresh yet.'}
+              {' '}Checks every 15 seconds while this page is visible.
+            </p>
+            <button className="mk-tour-trigger" type="button" disabled={refreshing} onClick={() => loadMarkets({ silent: true })}>
+              {refreshing ? 'Refreshing…' : 'Refresh markets'}
+            </button>
+            {refreshError && <p className="mk-refresh-error" role="alert">{refreshError}</p>}
+            <p className="mk-refresh-note">Availability is maintained by the project team. This refresh time does not confirm a store’s current stock. Reference prices are estimates; check each source date.</p>
           </div>
 
           <div className="mk-location-bar" data-markets-tour="location">
@@ -494,43 +512,20 @@ export default function Markets() {
             </button>
           </div>
 
-          {/* Quick Location Preset Chips for Ages 8-60 / Defense Demo */}
-          <div data-markets-tour="hubs" style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            flexWrap: 'wrap',
-            marginBottom: '20px',
-            background: '#12261b',
-            border: '1px solid rgba(45, 220, 122, 0.22)',
-            borderRadius: '16px',
-            padding: '12px 16px',
-            boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+          <form className="mk-market-search" role="search" aria-label="Search markets" onSubmit={(event) => {
+            event.preventDefault();
+            setMarketSearch(marketSearchInput);
           }}>
-            <span style={{ fontSize: '13px', fontWeight: 700, color: '#2ddc7a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span>📍 Quick Hub:</span>
-            </span>
-            {TARLAC_LOCATIONS.map((loc) => (
-              <button
-                key={loc.name}
-                type="button"
-                onClick={() => selectPresetLocation(loc)}
-                style={{
-                  background: locationText.name === loc.name ? '#2ddc7a' : 'rgba(255, 255, 255, 0.06)',
-                  color: locationText.name === loc.name ? '#0a1610' : '#d1fae5',
-                  border: locationText.name === loc.name ? '1px solid #ffffff' : '1px solid rgba(45, 220, 122, 0.25)',
-                  borderRadius: '100px',
-                  padding: '7px 14px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.18s ease',
-                }}
-              >
-                {loc.name}
-              </button>
-            ))}
-          </div>
+            <input type="search" aria-label="Market name or address" placeholder="Search market name or address…" value={marketSearchInput} onChange={(event) => {
+              setMarketSearchInput(event.target.value);
+              if (!event.target.value) setMarketSearch('');
+            }} />
+            <button type="submit" className="mk-tour-trigger">Search</button>
+            {(marketSearchInput || marketSearch) && <button type="button" className="mk-tour-trigger" onClick={() => {
+              setMarketSearchInput('');
+              setMarketSearch('');
+            }}>Clear</button>}
+          </form>
 
           <div className="mk-filter-row" data-markets-tour="filters">
             {FILTERS.map((filter) => (
@@ -544,13 +539,22 @@ export default function Markets() {
               </button>
             ))}
             <span className="mk-market-count">
-              <span>{filteredMarkets.length}</span> markets nearby
+              <span>{filteredMarkets.length}</span> {marketSearch ? 'matching markets' : 'markets nearby'}
             </span>
           </div>
 
           <div className="mk-layout">
             <div className="mk-map-wrap" data-markets-tour="map">
               <div id="map"></div>
+              <button className="mk-pin-location-btn" type="button" aria-pressed={selectedLocation === '__pin'} onClick={() => {
+                const pinning = selectedLocation !== '__pin';
+                locationRequestRef.current += 1;
+                manualPinRef.current = pinning;
+                setSelectedLocation(pinning ? '__pin' : '');
+                if (pinning) setLocationText((previous) => ({ ...previous, sub: 'Click a spot on the map to pin your location.' }));
+              }}>
+                📍 {selectedLocation === '__pin' ? 'Click map to pin' : 'Pin location'}
+              </button>
               <div className="mk-map-controls">
                 <button className="mk-map-ctrl-btn" type="button" title="Zoom in" onClick={() => mapRef.current?.zoomIn()}>
                   +
@@ -582,7 +586,7 @@ export default function Markets() {
               ) : sortedMarkets.length === 0 ? (
                 <div className="mk-empty">
                   <span className="mk-empty-icon">🗺️</span>
-                  No markets match this filter.
+                  No markets match your search or filter.
                 </div>
               ) : (
                 sortedMarkets.map((market) => {
@@ -669,7 +673,8 @@ export default function Markets() {
                     </div>
                   </div>
 
-                  <div className="mk-detail-section-title">Ingredient Availability & Prices</div>
+                  <div className="mk-detail-section-title">Meal Plan Ingredients & Prices</div>
+                  <p className="mk-refresh-note">Only ingredients from your selected meal-plan day are shown.</p>
                   <div className="mk-ingredient-table">
                     <div className="mk-ing-row mk-ing-row-header">
                       <span>Ingredient</span>
@@ -678,6 +683,9 @@ export default function Markets() {
                       <span style={{ textAlign: 'center' }}>Status</span>
                       <span style={{ textAlign: 'center' }}>Season</span>
                     </div>
+                    {selectedMarket.ingredients.length === 0 && (
+                      <p className="mk-empty">No matching ingredients for your selected day. Add meals in Meal Plan or choose another market.</p>
+                    )}
                     {selectedMarket.ingredients.map((ing) => (
                       <div key={ing.name} className="mk-ing-row">
                         <div className="mk-ing-row-name">
@@ -708,16 +716,6 @@ export default function Markets() {
       </main>
     </>
   );
-}
-
-function completeMarketIngredients(existingIngredients, ingredientCatalog, mealPlanIngredientNames) {
-  const existingByName = new Map(
-    existingIngredients.map((ingredient) => [normalizeIngredientName(ingredient.name), ingredient])
-  );
-
-  return [...mealPlanIngredientNames]
-    .map((key) => existingByName.get(key))
-    .filter(Boolean);
 }
 
 function GeoMarketScanner({ markets, userCoords, onLocate }) {
