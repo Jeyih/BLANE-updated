@@ -1,6 +1,31 @@
-.meal-now-banner { padding: 12px 24px; color: #d1fae5; background: #143323; font-weight: 600; }
-.quick-meal-action { border: 1px solid #2ddc7a; border-radius: 9px; background: #2ddc7a; color: #06130b; padding: 10px 14px; font-weight: 700; cursor: pointer; }
-.quick-meal-action:disabled { opacity: .55; cursor: default; }
-.recipe-card-footer { flex-wrap: wrap; gap: 10px; }
-.recipe-card-footer .quick-meal-action { flex-basis: 100%; }
-.meal-action-status { color: #d1fae5; padding: 10px 20px; font-size: 13px; }
+.meal-now-banner {
+  padding: 12px 24px;
+  color: #d1fae5;
+  background: #143323;
+  font-weight: 600;
+}
+.quick-meal-action {
+  border: 1px solid #2ddc7a;
+  border-radius: 9px;
+  background: #2ddc7a;
+  color: #06130b;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.quick-meal-action:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.recipe-card-footer {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.recipe-card-footer .quick-meal-action {
+  flex-basis: 100%;
+}
+.meal-action-status {
+  color: #d1fae5;
+  padding: 10px 20px;
+  font-size: 13px;
+}

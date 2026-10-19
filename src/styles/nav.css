@@ -1,13 +1,3 @@
-/* ============================================================
-   BLANE — Shared Navigation Stylesheet
-   Used by: dashboard, mealplan, recipes, markets, profile
-   Standalone: no :root variables, all values literal.
-   All units in px (no rem).
-   ============================================================ */
-
-/* ============================================================
-   TOP NAVBAR
-   ============================================================ */
 .dash-navbar {
   position: fixed;
   top: 0;
@@ -26,7 +16,6 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 }
 
-/* ---- Logo ---- */
 .dash-navbar-logo {
   display: flex;
   align-items: center;
@@ -59,7 +48,13 @@
 }
 
 .dash-navbar-logo-text {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 20px;
   font-weight: 800;
   color: #ffffff;
@@ -70,7 +65,6 @@
   color: #2ddc7a;
 }
 
-/* ---- Nav links ---- */
 .dash-nav-links {
   display: flex;
   align-items: center;
@@ -116,12 +110,10 @@
   flex-shrink: 0;
 }
 
-/* ---- Spacer ---- */
 .dash-navbar-spacer {
   flex: 1;
 }
 
-/* ---- Right side ---- */
 .dash-navbar-right {
   display: flex;
   align-items: center;
@@ -140,7 +132,6 @@
   font-weight: 700;
 }
 
-/* ---- Feedback action ---- */
 .dash-feedback-trigger {
   display: flex;
   align-items: center;
@@ -173,7 +164,6 @@
   display: none;
 }
 
-/* ---- Avatar button ---- */
 .dash-avatar-btn {
   width: 40px;
   height: 40px;
@@ -195,13 +185,18 @@
 }
 
 .dash-avatar-btn span {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 15px;
   font-weight: 700;
   color: #2ddc7a;
 }
 
-/* ---- Dropdown ---- */
 .dash-dropdown {
   position: absolute;
   top: calc(100% + 12px);
@@ -213,7 +208,9 @@
   padding: 8px;
   display: none;
   flex-direction: column;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 16px rgba(45, 220, 122, 0.1);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.5),
+    0 0 16px rgba(45, 220, 122, 0.1);
   z-index: 101;
 }
 
@@ -282,7 +279,6 @@
   margin: 6px 0;
 }
 
-/* ---- Hamburger (mobile) ---- */
 .dash-hamburger {
   display: none;
   background: none;
@@ -299,10 +295,11 @@
   height: 2px;
   background: #e8f5ee;
   border-radius: 2px;
-  transition: transform 0.3s, opacity 0.3s;
+  transition:
+    transform 0.3s,
+    opacity 0.3s;
 }
 
-/* ---- Mobile nav drawer ---- */
 .dash-mobile-nav {
   display: none;
   position: fixed;
@@ -323,9 +320,6 @@
   display: flex;
 }
 
-/* ============================================================
-   RESPONSIVE
-   ============================================================ */
 @media (max-width: 1024px) {
   .dash-nav-links {
     display: none;

@@ -1,53 +1,36 @@
-/* ============================================================
-   BLANE — Global Base Stylesheet
-   Replaces the shared portion of css/style.css: design tokens
-   (:root vars), reset, .container/.section utilities, navbar,
-   mobile menu, and .btn button classes used across every page.
-
-   Page-specific styles (hero, dashboard widgets, etc.) live in
-   their own CSS files under src/styles/, imported only by the
-   page component that needs them.
-   ============================================================ */
-
-/* ============================================================
-   BLANE - Biological Adaptive Nutrition Engine
-   Main Stylesheet
-   NOTE: All units in px (no rem)
-   ============================================================ */
-
-/* ---- Google Fonts Import ---- */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
-/* ---- CSS Variables (Enhanced for Multi-Generational Appeal & Accessibility) ---- */
 :root {
-  --color-bg:           #0a1610;
-  --color-bg-card:      #12261b;
-  --color-bg-surface:   #173023;
-  --color-bg-elevated:  #1d3d2c;
-  --color-primary:      #2ddc7a;
-  --color-primary-light:#4ade80;
-  --color-primary-dim:  #168a4b;
+  --color-bg: #0a1610;
+  --color-bg-card: #12261b;
+  --color-bg-surface: #173023;
+  --color-bg-elevated: #1d3d2c;
+  --color-primary: #2ddc7a;
+  --color-primary-light: #4ade80;
+  --color-primary-dim: #168a4b;
   --color-primary-glow: rgba(45, 220, 122, 0.22);
-  --color-accent:       #f59e0b;
-  --color-accent-blue:  #38bdf8;
+  --color-accent: #f59e0b;
+  --color-accent-blue: #38bdf8;
   --color-accent-coral: #f87171;
-  --color-text-1:       #ffffff;
-  --color-text-2:       #d1fae5;
-  --color-text-3:       #a8b8c4;
-  --color-border:       rgba(45, 220, 122, 0.18);
+  --color-text-1: #ffffff;
+  --color-text-2: #d1fae5;
+  --color-text-3: #a8b8c4;
+  --color-border: rgba(45, 220, 122, 0.18);
   --color-border-hover: rgba(45, 220, 122, 0.45);
-  --font-display:       'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-body:          'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --radius-sm:          8px;
-  --radius-md:          14px;
-  --radius-lg:          22px;
-  --radius-xl:          36px;
-  --shadow-card:        0 8px 24px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(45, 220, 122, 0.08);
-  --shadow-glow:        0 0 24px rgba(45, 220, 122, 0.25);
+  --font-display:
+    'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-xl: 36px;
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(45, 220, 122, 0.08);
+  --shadow-glow: 0 0 24px rgba(45, 220, 122, 0.25);
 }
 
-/* ---- Reset ---- */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -80,7 +63,6 @@ ul {
   list-style: none;
 }
 
-/* ---- Utility ---- */
 .container {
   max-width: 1160px;
   margin: 0 auto;
@@ -128,7 +110,6 @@ ul {
   line-height: 1.7;
 }
 
-/* ---- Glow decoration ---- */
 .glow-blob {
   position: absolute;
   border-radius: 50%;
@@ -137,9 +118,6 @@ ul {
   z-index: 0;
 }
 
-/* ============================================================
-   NAVBAR
-   ============================================================ */
 .navbar {
   position: fixed;
   top: 0;
@@ -147,7 +125,10 @@ ul {
   right: 0;
   z-index: 100;
   padding: 20px 0;
-  transition: background 0.3s ease, padding 0.3s ease, border-color 0.3s ease;
+  transition:
+    background 0.3s ease,
+    padding 0.3s ease,
+    border-color 0.3s ease;
   border-bottom: 1px solid transparent;
 }
 
@@ -165,7 +146,6 @@ ul {
   justify-content: space-between;
 }
 
-/* Logo */
 .logo {
   display: flex;
   align-items: center;
@@ -200,7 +180,6 @@ ul {
   color: var(--color-primary);
 }
 
-/* Nav links */
 .nav-links {
   display: flex;
   align-items: center;
@@ -234,14 +213,12 @@ ul {
   width: 100%;
 }
 
-/* Nav CTA buttons */
 .nav-cta {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-/* Hamburger (mobile) */
 .hamburger {
   display: none;
   background: none;
@@ -258,14 +235,21 @@ ul {
   height: 2px;
   background: var(--color-text-1);
   border-radius: 2px;
-  transition: transform 0.3s, opacity 0.3s;
+  transition:
+    transform 0.3s,
+    opacity 0.3s;
 }
 
-.hamburger.active span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-.hamburger.active span:nth-child(2) { opacity: 0; }
-.hamburger.active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+.hamburger.active span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.hamburger.active span:nth-child(2) {
+  opacity: 0;
+}
+.hamburger.active span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
 
-/* Mobile drawer */
 .mobile-menu {
   display: none;
   flex-direction: column;
@@ -288,15 +272,14 @@ ul {
   transition: color 0.2s;
 }
 
-.mobile-menu a:hover { color: var(--color-primary); }
+.mobile-menu a:hover {
+  color: var(--color-primary);
+}
 
 .mobile-menu .btn {
   margin-top: 12px;
 }
 
-/* ============================================================
-   BUTTONS
-   ============================================================ */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -346,7 +329,3 @@ ul {
   width: 18px;
   height: 18px;
 }
-
-/* ============================================================
-   HERO SECTION
-   ============================================================ */

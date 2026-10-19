@@ -8,8 +8,17 @@ if (process.argv.includes('--inspect')) {
   process.exit(0);
 }
 let previous = [];
-try { previous = JSON.parse(await readFile(new URL('../public/data/retail-prices.json', import.meta.url), 'utf8')).records; } catch { /* Initial import. */ }
+try {
+  previous = JSON.parse(
+    await readFile(new URL('../public/data/retail-prices.json', import.meta.url), 'utf8'),
+  ).records;
+} catch {}
 const data = await fetchRetailPrices(previous);
 await mkdir(new URL('../public/data/', import.meta.url), { recursive: true });
-await writeFile(new URL('../public/data/retail-prices.json', import.meta.url), JSON.stringify(data, null, 2) + '\n');
-console.log(JSON.stringify({ records: data.records.length, warning: data.warning, failures: data.failures }));
+await writeFile(
+  new URL('../public/data/retail-prices.json', import.meta.url),
+  JSON.stringify(data, null, 2) + '\n',
+);
+console.log(
+  JSON.stringify({ records: data.records.length, warning: data.warning, failures: data.failures }),
+);

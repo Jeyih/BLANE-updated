@@ -1,12 +1,3 @@
-/* ============================================================
-   BLANE — Recipe Recommendation Stylesheet
-   Standalone: no :root variables, all values literal.
-   All units in px (no rem).
-   ============================================================ */
-
-/* ============================================================
-   RECOMMENDATION WIDGET WRAPPER
-   ============================================================ */
 .rec-widget {
   background: #0d1a12;
   border: 1px solid rgba(45, 220, 122, 0.12);
@@ -24,12 +15,13 @@
 .rec-widget::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(45, 220, 122, 0.4), transparent);
 }
 
-/* ---- Header ---- */
 .rec-header {
   display: flex;
   align-items: center;
@@ -94,17 +86,19 @@
   background: rgba(45, 220, 122, 0.04);
 }
 
-/* ============================================================
-   TOP 3 CARDS GRID
-   ============================================================ */
 .rec-cards-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 
-.rec-widget > .price-estimate-note { margin: 0 0 18px; }
-.rec-header-sub, .rec-view-all-btn { color: #a9c7b3; }
+.rec-widget > .price-estimate-note {
+  margin: 0 0 18px;
+}
+.rec-header-sub,
+.rec-view-all-btn {
+  color: #a9c7b3;
+}
 
 .rec-card-shell {
   min-width: 0;
@@ -116,7 +110,9 @@
   overflow: hidden;
 }
 
-.rec-card-shell:hover { border-color: rgba(45, 220, 122, 0.4); }
+.rec-card-shell:hover {
+  border-color: rgba(45, 220, 122, 0.4);
+}
 .rec-card-shell .rec-card {
   display: flex;
   flex: 1;
@@ -125,16 +121,24 @@
   border-radius: 0;
   min-width: 0;
 }
-.rec-card-shell .rec-card:hover { transform: none; box-shadow: none; }
-.rec-card-shell .rec-card:focus-visible { outline: 2px solid #2ddc7a; outline-offset: -3px; }
+.rec-card-shell .rec-card:hover {
+  transform: none;
+  box-shadow: none;
+}
+.rec-card-shell .rec-card:focus-visible {
+  outline: 2px solid #2ddc7a;
+  outline-offset: -3px;
+}
 .rec-card-actions {
   margin-top: auto;
   padding: 16px;
   border-top: 1px solid rgba(45, 220, 122, 0.1);
 }
-.rec-card-actions .quick-meal-action { width: 100%; min-height: 42px; }
+.rec-card-actions .quick-meal-action {
+  width: 100%;
+  min-height: 42px;
+}
 
-/* ---- Individual recommendation card ---- */
 .rec-card {
   background: #111f16;
   border: 1px solid rgba(45, 220, 122, 0.1);
@@ -142,19 +146,34 @@
   overflow: hidden;
   cursor: pointer;
   text-decoration: none;
-  transition: border-color 0.22s, transform 0.2s, box-shadow 0.22s;
+  transition:
+    border-color 0.22s,
+    transform 0.2s,
+    box-shadow 0.22s;
   display: flex;
   flex-direction: column;
   animation: rec-fadein 0.4s ease both;
 }
 
-.rec-card:nth-child(1) { animation-delay: 0.05s; }
-.rec-card:nth-child(2) { animation-delay: 0.12s; }
-.rec-card:nth-child(3) { animation-delay: 0.19s; }
+.rec-card:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.rec-card:nth-child(2) {
+  animation-delay: 0.12s;
+}
+.rec-card:nth-child(3) {
+  animation-delay: 0.19s;
+}
 
 @keyframes rec-fadein {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .rec-card:hover {
@@ -163,7 +182,6 @@
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
 }
 
-/* Rank ribbon */
 .rec-card-rank {
   position: absolute;
   top: 10px;
@@ -172,7 +190,6 @@
   z-index: 2;
 }
 
-/* Emoji banner */
 .rec-card-banner {
   height: 80px;
   background: linear-gradient(135deg, #163423, #0d1a12);
@@ -199,7 +216,6 @@
   backdrop-filter: blur(4px);
 }
 
-/* Card body */
 .rec-card-body {
   padding: 16px;
   flex: 1;
@@ -217,7 +233,6 @@
   min-height: 2.6em;
 }
 
-/* Match score row */
 .rec-score-row {
   display: flex;
   align-items: center;
@@ -271,7 +286,6 @@
   transition: width 0.8s ease;
 }
 
-/* Reason text */
 .rec-reason {
   font-size: 12px;
   color: #b4cebd;
@@ -287,7 +301,6 @@
   font-weight: 600;
 }
 
-/* Quick stats row */
 .rec-stats {
   display: flex;
   gap: 6px;
@@ -308,13 +321,23 @@
   font-weight: 600;
 }
 
-.rec-price { display: flex; flex-direction: column; gap: 4px; }
-.rec-price-value { font-size: 16px; font-weight: 700; color: #e8f5ee; }
-.rec-price-note { font-size: 11px; line-height: 1.45; color: #a9c7b3; min-height: 2.9em; }
+.rec-price {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rec-price-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e8f5ee;
+}
+.rec-price-note {
+  font-size: 11px;
+  line-height: 1.45;
+  color: #a9c7b3;
+  min-height: 2.9em;
+}
 
-/* ============================================================
-   LOADING STATE
-   ============================================================ */
 .rec-loading {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -350,13 +373,14 @@
 }
 
 @keyframes rec-shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
-/* ============================================================
-   NO PROFILE STATE
-   ============================================================ */
 .rec-no-profile {
   text-align: center;
   padding: 28px 20px;
@@ -380,9 +404,6 @@
   text-decoration: none;
 }
 
-/* ============================================================
-   RESPONSIVE
-   ============================================================ */
 @media (max-width: 1024px) {
   .rec-cards-grid,
   .rec-loading {
@@ -396,5 +417,8 @@
     grid-template-columns: 1fr;
   }
 
-  .rec-card-banner { height: 70px; font-size: 36px; }
+  .rec-card-banner {
+    height: 70px;
+    font-size: 36px;
+  }
 }

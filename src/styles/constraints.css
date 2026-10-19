@@ -1,12 +1,3 @@
-/* ============================================================
-   BLANE — Constraint-Based Planning Stylesheet
-   Standalone: no :root variables, all values literal.
-   All units in px (no rem).
-   ============================================================ */
-
-/* ============================================================
-   ACTIVE CONSTRAINTS BAR (top of recipes page)
-   ============================================================ */
 .cb-active-bar {
   display: flex;
   align-items: center;
@@ -75,9 +66,6 @@
   font-style: italic;
 }
 
-/* ============================================================
-   VIOLATION BADGE (on recipe card)
-   ============================================================ */
 .cb-violation-badge {
   display: inline-flex;
   align-items: center;
@@ -115,7 +103,6 @@
   border: 1px solid rgba(45, 220, 122, 0.18);
 }
 
-/* Dimmed card overlay for violations */
 .recipe-card.has-violation {
   opacity: 0.82;
 }
@@ -124,7 +111,6 @@
   opacity: 1;
 }
 
-/* Warning stripe on card banner */
 .recipe-card-banner.violation-stripe::before {
   content: '';
   position: absolute;
@@ -140,9 +126,6 @@
   z-index: 1;
 }
 
-/* ============================================================
-   VIOLATION DETAIL PANEL (inside recipe modal)
-   ============================================================ */
 .cb-modal-section {
   margin-bottom: 22px;
 }
@@ -168,7 +151,10 @@
   border-color: rgba(251, 191, 36, 0.18);
 }
 
-.cb-modal-header-icon { font-size: 18px; flex-shrink: 0; }
+.cb-modal-header-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
 
 .cb-modal-header-text {
   flex: 1;
@@ -176,13 +162,20 @@
   line-height: 1.5;
 }
 
-.cb-modal-header.allergy  .cb-modal-header-text { color: #f87171; }
-.cb-modal-header.medical  .cb-modal-header-text { color: #fb923c; }
-.cb-modal-header.dietary  .cb-modal-header-text { color: #fbbf24; }
+.cb-modal-header.allergy .cb-modal-header-text {
+  color: #f87171;
+}
+.cb-modal-header.medical .cb-modal-header-text {
+  color: #fb923c;
+}
+.cb-modal-header.dietary .cb-modal-header-text {
+  color: #fbbf24;
+}
 
-.cb-modal-header-text strong { font-weight: 700; }
+.cb-modal-header-text strong {
+  font-weight: 700;
+}
 
-/* Violation rows */
 .cb-violation-list {
   display: flex;
   flex-direction: column;
@@ -228,13 +221,22 @@
   margin-top: 1px;
 }
 
-.cb-violation-severity.allergy { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
-.cb-violation-severity.dietary { background: rgba(251,191,36,0.1);  color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
-.cb-violation-severity.medical { background: rgba(251,146,60,0.1);  color: #fb923c; border: 1px solid rgba(251,146,60,0.2); }
+.cb-violation-severity.allergy {
+  background: rgba(248, 113, 113, 0.1);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.2);
+}
+.cb-violation-severity.dietary {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+.cb-violation-severity.medical {
+  background: rgba(251, 146, 60, 0.1);
+  color: #fb923c;
+  border: 1px solid rgba(251, 146, 60, 0.2);
+}
 
-/* ============================================================
-   CONSTRAINT FILTER BUTTON (in recipes filter bar)
-   ============================================================ */
 .cb-filter-active-btn {
   display: inline-flex;
   align-items: center;
@@ -263,9 +265,9 @@
   color: #4d6e5a;
 }
 
-/* ============================================================
-   RESPONSIVE
-   ============================================================ */
 @media (max-width: 640px) {
-  .cb-active-bar { padding: 10px 14px; gap: 8px; }
+  .cb-active-bar {
+    padding: 10px 14px;
+    gap: 8px;
+  }
 }

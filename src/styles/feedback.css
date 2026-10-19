@@ -1,12 +1,3 @@
-/* ============================================================
-   BLANE — Real-Time Body Feedback Loop Stylesheet
-   Standalone: no :root variables, all values literal.
-   All units in px (no rem).
-   ============================================================ */
-
-/* ============================================================
-   FEEDBACK WIDGET (inside dashboard grid)
-   ============================================================ */
 .fb-widget {
   background: #0d1a12;
   border: 1px solid rgba(45, 220, 122, 0.12);
@@ -24,7 +15,9 @@
 .fb-widget::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(45, 220, 122, 0.4), transparent);
 }
@@ -56,7 +49,13 @@
 }
 
 .fb-widget-title {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 15px;
   font-weight: 600;
   color: #e8f5ee;
@@ -68,7 +67,6 @@
   margin-top: 2px;
 }
 
-/* Last logged badge */
 .fb-last-logged {
   font-size: 11px;
   color: #4d6e5a;
@@ -85,9 +83,6 @@
   background: rgba(45, 220, 122, 0.08);
 }
 
-/* ============================================================
-   METRIC INPUT GRID
-   ============================================================ */
 .fb-metric-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -130,7 +125,13 @@
   background: none;
   border: none;
   outline: none;
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 22px;
   font-weight: 700;
   color: #e8f5ee;
@@ -144,7 +145,6 @@
   font-size: 20px;
 }
 
-/* Remove spinner arrows */
 .fb-metric-input::-webkit-outer-spin-button,
 .fb-metric-input::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -158,7 +158,6 @@
   font-family: 'DM Sans', sans-serif;
 }
 
-/* Prev value hint */
 .fb-metric-prev {
   font-size: 11px;
   color: #4d6e5a;
@@ -169,14 +168,19 @@
   color: #8aab96;
 }
 
-/* Change indicator arrow */
-.fb-change-up   { color: #f87171; font-size: 11px; }
-.fb-change-down { color: #2ddc7a; font-size: 11px; }
-.fb-change-same { color: #4d6e5a; font-size: 11px; }
+.fb-change-up {
+  color: #f87171;
+  font-size: 11px;
+}
+.fb-change-down {
+  color: #2ddc7a;
+  font-size: 11px;
+}
+.fb-change-same {
+  color: #4d6e5a;
+  font-size: 11px;
+}
 
-/* ============================================================
-   LOG BUTTON
-   ============================================================ */
 .fb-log-btn {
   width: 100%;
   display: flex;
@@ -188,11 +192,19 @@
   border: none;
   border-radius: 12px;
   padding: 12px;
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s, transform 0.15s;
+  transition:
+    background 0.2s,
+    transform 0.15s;
 }
 
 .fb-log-btn:hover {
@@ -212,9 +224,6 @@
   flex-shrink: 0;
 }
 
-/* ============================================================
-   DRIFT WARNING PANEL
-   ============================================================ */
 .fb-drift-panel {
   margin-top: 14px;
   display: flex;
@@ -234,8 +243,14 @@
 }
 
 @keyframes fb-slide-in {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .fb-drift-alert.warning {
@@ -268,9 +283,6 @@
   margin-bottom: 1px;
 }
 
-/* ============================================================
-   RECALC BANNER
-   ============================================================ */
 .fb-recalc-banner {
   display: none;
   align-items: center;
@@ -304,9 +316,6 @@
   font-weight: 600;
 }
 
-/* ============================================================
-   HISTORY SPARKLINE (7-day mini chart)
-   ============================================================ */
 .fb-history-row {
   display: flex;
   gap: 10px;
@@ -351,9 +360,6 @@
   margin-bottom: 2px;
 }
 
-/* ============================================================
-   TODAY STATUS ROW
-   ============================================================ */
 .fb-today-status {
   display: flex;
   gap: 10px;
@@ -385,9 +391,6 @@
   background: rgba(251, 191, 36, 0.06);
 }
 
-/* ============================================================
-   RESPONSIVE
-   ============================================================ */
 @media (max-width: 640px) {
   .fb-metric-grid {
     grid-template-columns: 1fr 1fr;

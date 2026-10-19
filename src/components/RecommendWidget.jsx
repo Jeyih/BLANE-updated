@@ -1,64 +1,57 @@
-/* ============================================================
-   BLANE — Recipe Recommendation Engine (Module 09)
-   Replaces: js/recommend.js entirely + the .rec-widget markup
-   block from dashboard.html.
-
-   Scores all recipes against the user's profile (goal +
-   constraint safety + calorie fit) and shows the top 3 picks.
-   ============================================================ */
+import React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useIngredientPrices } from '../context/PriceContext';
-import { applyDynamicRecipePrices, formatEstimatedPrice as formatPrice, pricingLabel } from '../lib/pricing';
-import { addMealForToday, currentMealType, philippineClock, DEFAULT_SLOTS } from '../lib/meal-experience';
+import {
+  applyDynamicRecipePrices,
+  formatEstimatedPrice as formatPrice,
+  pricingLabel,
+} from '../lib/pricing';
+import {
+  addMealForToday,
+  currentMealType,
+  philippineClock,
+  DEFAULT_SLOTS,
+} from '../lib/meal-experience';
 import useMealClock from '../hooks/useMealClock';
 import PriceEstimateNotice from './PriceEstimateNotice';
 import '../styles/meal-experience.css';
 import '../styles/recommend.css';
-
-// Data-driven metadata is loaded from the database.
 const CONSTRAINT_BLOCKS = {};
 const ALLERGY_KEYS = [];
-const GOAL_IDEALS = {
-  maintain: {
-    minProtein: 15,
-    maxKcal: 550,
-    maxFats: 25,
-    minCarbs: 20,
-  },
-};
-
+const GOAL_IDEALS = { maintain: { minProtein: 15, maxKcal: 550, maxFats: 25, minCarbs: 20 } };
 async function loadRecommendationData() {
   const { data: constraintData, error: constraintErr } = await supabase
     .from('constraint_definitions')
     .select('*')
     .order('sort_order');
-
   if (constraintErr) {
     console.error('Failed to load recommendation constraints:', constraintErr);
   } else {
     Object.keys(CONSTRAINT_BLOCKS).forEach((key) => delete CONSTRAINT_BLOCKS[key]);
     ALLERGY_KEYS.length = 0;
-
     (constraintData || []).forEach((row) => {
       if (row.active === false || !row.key) return;
       const blocked = Array.isArray(row.blocked)
         ? row.blocked.map((item) => item.trim()).filter(Boolean)
         : typeof row.blocked === 'string'
-          ? row.blocked.split(',').map((item) => item.trim()).filter(Boolean)
+          ? row.blocked
+              .split(',')
+              .map((item) => item.trim())
+              .filter(Boolean)
           : [];
-
       CONSTRAINT_BLOCKS[row.key] = blocked;
       if (row.severity === 'allergy') ALLERGY_KEYS.push(row.key);
     });
   }
-
   const { data: goalData, error: goalErr } = await supabase.from('goal_ideals').select('*');
   if (goalErr) {
     console.error('Failed to load goal ideals:', goalErr);
   } else {
-    Object.keys(GOAL_IDEALS).forEach((key) => { if (key !== 'maintain') delete GOAL_IDEALS[key]; });
+    Object.keys(GOAL_IDEALS).forEach((key) => {
+      if (key !== 'maintain') delete GOAL_IDEALS[key];
+    });
     (goalData || []).forEach((row) => {
       if (!row.goal_key) return;
       GOAL_IDEALS[row.goal_key] = {
@@ -71,11 +64,15 @@ async function loadRecommendationData() {
   }
   return !constraintErr && !goalErr;
 }
-
-export default function RecommendWidget({ profile }) {
+function RecommendWidget({ profile }) {
   const now = useMealClock();
   let schedule = DEFAULT_SLOTS;
-  try { const plan = JSON.parse(localStorage.getItem('blane_meal_plan') || '{}'); schedule = plan[philippineClock(now).dayIndex]?.length ? plan[philippineClock(now).dayIndex] : DEFAULT_SLOTS; } catch { /* Use the default meal schedule. */ }
+  try {
+    const plan = JSON.parse(localStorage.getItem('blane_meal_plan') || '{}');
+    schedule = plan[philippineClock(now).dayIndex]?.length
+      ? plan[philippineClock(now).dayIndex]
+      : DEFAULT_SLOTS;
+  } catch {}
   const mealType = currentMealType(now, schedule);
   const [metadataReady, setMetadataReady] = useState(false);
   const [metadataError, setMetadataError] = useState('');
@@ -83,17 +80,24 @@ export default function RecommendWidget({ profile }) {
   const [loading, setLoading] = useState(true);
   const [savedRecipes, setRecipes] = useState([]);
   const { records } = useIngredientPrices();
-  const recipes = useMemo(() => applyDynamicRecipePrices(savedRecipes, records), [savedRecipes, records]);
-  const [top3, setTop3]       = useState([]);
-  const matchesMealType = (recipe) => recipe.type === mealType || mealType === 'Brunch' && recipe.type === 'Breakfast' || mealType === 'Dessert' && recipe.type === 'Snack';
-  // Do not show the previous period's cards while the new ranking is loading.
+  const recipes = useMemo(
+    () => applyDynamicRecipePrices(savedRecipes, records),
+    [savedRecipes, records],
+  );
+  const [top3, setTop3] = useState([]);
+  const matchesMealType = (recipe) =>
+    recipe.type === mealType ||
+    (mealType === 'Brunch' && recipe.type === 'Breakfast') ||
+    (mealType === 'Dessert' && recipe.type === 'Snack');
   const visibleTop3 = top3.filter((item) => matchesMealType(item.recipe));
-
   useEffect(() => {
     let cancelled = false;
     async function loadRecipes() {
       setLoading(true);
-      const { data: recipesData, error: recipesErr } = await supabase.from('recipes').select('*').order('name');
+      const { data: recipesData, error: recipesErr } = await supabase
+        .from('recipes')
+        .select('*')
+        .order('name');
       if (cancelled) return;
       if (recipesErr) {
         console.error('Failed to load recommended recipes:', recipesErr.message);
@@ -101,8 +105,10 @@ export default function RecommendWidget({ profile }) {
         setLoading(false);
         return;
       }
-
-      const { data: ingData, error: ingErr } = await supabase.from('recipe_ingredients').select('*').order('sort_order');
+      const { data: ingData, error: ingErr } = await supabase
+        .from('recipe_ingredients')
+        .select('*')
+        .order('sort_order');
       if (cancelled) return;
       if (ingErr) {
         console.error('Failed to load recipe ingredients:', ingErr.message);
@@ -110,162 +116,297 @@ export default function RecommendWidget({ profile }) {
         setLoading(false);
         return;
       }
-
       const ingByRecipe = {};
       (ingData || []).forEach((ing) => {
         if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
-        ingByRecipe[ing.recipe_id].push({ name: ing.name || ing.ingredient_name || ing.food_name, qty: ing.quantity ?? ing.qty, grams: ing.grams });
+        ingByRecipe[ing.recipe_id].push({
+          name: ing.name || ing.ingredient_name || ing.food_name,
+          qty: ing.quantity ?? ing.qty,
+          grams: ing.grams,
+        });
       });
-
-      setRecipes((recipesData || []).map((r) => ({
-        id: r.id,
-        emoji: r.emoji,
-        name: r.name,
-        type: r.type,
-        diet: r.diet_tags || [],
-        goal: r.goal_tags || [],
-        kcal: r.kcal,
-        cost: r.cost,
-        servings: r.servings || 1,
-        protein: r.protein_g,
-        carbs: r.carbs_g,
-        fats: r.fats_g,
-        ingredients: ingByRecipe[r.id] || [],
-      })));
+      setRecipes(
+        (recipesData || []).map((r) => ({
+          id: r.id,
+          emoji: r.emoji,
+          name: r.name,
+          type: r.type,
+          diet: r.diet_tags || [],
+          goal: r.goal_tags || [],
+          kcal: r.kcal,
+          cost: r.cost,
+          servings: r.servings || 1,
+          protein: r.protein_g,
+          carbs: r.carbs_g,
+          fats: r.fats_g,
+          ingredients: ingByRecipe[r.id] || [],
+        })),
+      );
       setLoading(false);
     }
-
     loadRecipes();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
   useEffect(() => {
     let cancelled = false;
     async function prepareMetadata() {
       const ready = await loadRecommendationData();
-      if (!cancelled) { setMetadataReady(ready); if (!ready) setMetadataError('Your dietary preferences could not be checked. Please reload to get meal recommendations.'); }
+      if (!cancelled) {
+        setMetadataReady(ready);
+        if (!ready)
+          setMetadataError(
+            'Your dietary preferences could not be checked. Please reload to get meal recommendations.',
+          );
+      }
     }
     prepareMetadata();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
   useEffect(() => {
     let cancelled = false;
     if (!metadataReady || !profile || recipes.length === 0) {
       setTop3([]);
       return;
     }
-
     setLoading(true);
     const timer = setTimeout(() => {
       if (cancelled) return;
-      setTop3(scoreAndRankRecipes(profile, recipes.filter((recipe) => recipe.type === mealType || mealType === 'Brunch' && recipe.type === 'Breakfast' || mealType === 'Dessert' && recipe.type === 'Snack')));
+      setTop3(
+        scoreAndRankRecipes(
+          profile,
+          recipes.filter(
+            (recipe) =>
+              recipe.type === mealType ||
+              (mealType === 'Brunch' && recipe.type === 'Breakfast') ||
+              (mealType === 'Dessert' && recipe.type === 'Snack'),
+          ),
+        ),
+      );
       setLoading(false);
     }, 400);
-    return () => { cancelled = true; clearTimeout(timer); };
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [profile, recipes, mealType, metadataReady]);
-
-  return (
-    <div className="rec-widget col-12" data-dashboard-tour="recommendations">
-      <div className="rec-header">
-        <div className="rec-header-left">
-          <div className="rec-header-icon">⭐</div>
-          <div>
-            <div className="rec-header-title">Recommended for {mealType} now</div>
-            <div className="rec-header-sub">Ready for this time of day · Use a meal in one tap</div>
-          </div>
-        </div>
-        <Link to="/recipes" className="rec-view-all-btn">View all recipes →</Link>
-      </div>
-
-      <PriceEstimateNotice />
-      {actionMessage && <p className="meal-action-status" role="status">{actionMessage}</p>}
-      {metadataError ? <p className="meal-action-status">{metadataError}</p> : loading || !metadataReady ? (
-        <SkeletonLoader />
-      ) : !profile?.goal && !profile?.height_cm ? (
-        <div className="rec-no-profile">
-          <span className="rec-no-profile-icon">🍽️</span>
-          <p>Complete your <Link to="/onboarding">health profile</Link> to receive personalised recipe recommendations.</p>
-        </div>
-      ) : (
-        <div className="rec-cards-grid">
-          {visibleTop3.map((item, i) => <RecCard key={item.recipe.id} item={item} rank={i} mealType={mealType} onUse={() => {
-            try { addMealForToday(item.recipe, { type: mealType }); setActionMessage(`Added ${item.recipe.name} to today's ${mealType.toLowerCase()}.`); }
-            catch { setActionMessage('Could not save the meal. Please try again.'); }
-          }} />)}
-          {!visibleTop3.length && <p>No recipe matches your preferences for this meal. <Link to="/recipes">Browse recipes</Link>.</p>}
-        </div>
-      )}
-    </div>
+  return React.createElement(
+    'div',
+    { className: 'rec-widget col-12', 'data-dashboard-tour': 'recommendations' },
+    React.createElement(
+      'div',
+      { className: 'rec-header' },
+      React.createElement(
+        'div',
+        { className: 'rec-header-left' },
+        React.createElement('div', { className: 'rec-header-icon' }, '\u2B50'),
+        React.createElement(
+          'div',
+          null,
+          React.createElement(
+            'div',
+            { className: 'rec-header-title' },
+            'Recommended for ',
+            mealType,
+            ' now',
+          ),
+          React.createElement(
+            'div',
+            { className: 'rec-header-sub' },
+            'Ready for this time of day \xB7 Use a meal in one tap',
+          ),
+        ),
+      ),
+      React.createElement(
+        Link,
+        { to: '/recipes', className: 'rec-view-all-btn' },
+        'View all recipes \u2192',
+      ),
+    ),
+    React.createElement(PriceEstimateNotice, null),
+    actionMessage &&
+      React.createElement('p', { className: 'meal-action-status', role: 'status' }, actionMessage),
+    metadataError
+      ? React.createElement('p', { className: 'meal-action-status' }, metadataError)
+      : loading || !metadataReady
+        ? React.createElement(SkeletonLoader, null)
+        : !profile?.goal && !profile?.height_cm
+          ? React.createElement(
+              'div',
+              { className: 'rec-no-profile' },
+              React.createElement('span', { className: 'rec-no-profile-icon' }, '\u{1F37D}\uFE0F'),
+              React.createElement(
+                'p',
+                null,
+                'Complete your ',
+                React.createElement(Link, { to: '/onboarding' }, 'health profile'),
+                ' to receive personalised recipe recommendations.',
+              ),
+            )
+          : React.createElement(
+              'div',
+              { className: 'rec-cards-grid' },
+              visibleTop3.map((item, i) =>
+                React.createElement(RecCard, {
+                  key: item.recipe.id,
+                  item,
+                  rank: i,
+                  mealType,
+                  onUse: () => {
+                    try {
+                      addMealForToday(item.recipe, { type: mealType });
+                      setActionMessage(
+                        `Added ${item.recipe.name} to today's ${mealType.toLowerCase()}.`,
+                      );
+                    } catch {
+                      setActionMessage('Could not save the meal. Please try again.');
+                    }
+                  },
+                }),
+              ),
+              !visibleTop3.length &&
+                React.createElement(
+                  'p',
+                  null,
+                  'No recipe matches your preferences for this meal. ',
+                  React.createElement(Link, { to: '/recipes' }, 'Browse recipes'),
+                  '.',
+                ),
+            ),
   );
 }
-
 function RecCard({ item, rank, mealType, onUse }) {
-  const ranks  = ['🥇', '🥈', '🥉'];
+  const ranks = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
   const colors = ['#2ddc7a', '#60a5fa', '#a78bfa'];
-  const color  = item.allergyHit ? '#f87171' : item.violations > 0 ? '#fbbf24' : colors[rank];
-  const pct    = Math.min(Math.round((item.score / 70) * 100), 100);
+  const color = item.allergyHit ? '#f87171' : item.violations > 0 ? '#fbbf24' : colors[rank];
+  const pct = Math.min(Math.round((item.score / 70) * 100), 100);
   const circumf = 2 * Math.PI * 13;
   const arcFill = (pct / 100) * circumf;
-  const recipe  = item.recipe;
-
-  return (
-    <div className="rec-card-shell"><Link to={`/recipes?recipe=${encodeURIComponent(recipe.id)}`} className="rec-card" style={{ position: 'relative' }}>
-      <div className="rec-card-banner">
-        {recipe.emoji || '🍲'}
-        <span className="rec-card-rank">{ranks[rank]}</span>
-        <span className="rec-card-type-tag">{recipe.type}</span>
-      </div>
-      <div className="rec-card-body">
-        <div className="rec-card-name">{recipe.name}</div>
-        <div className="rec-score-row">
-          <div className="rec-score-ring">
-            <svg viewBox="0 0 36 36" width="36" height="36">
-              <circle cx="18" cy="18" r="13" fill="none" stroke="#111f16" strokeWidth="4" />
-              <circle cx="18" cy="18" r="13" fill="none" stroke={color} strokeWidth="4"
-                strokeDasharray={arcFill.toFixed(1) + ' ' + circumf.toFixed(1)} strokeLinecap="round"
-                transform="rotate(-90 18 18)" />
-            </svg>
-            <div className="rec-score-center" style={{ color }}>{pct}</div>
-          </div>
-          <div className="rec-score-info">
-            <div className="rec-score-label">Match Score</div>
-            <div className="rec-score-bar-bg">
-              <div className="rec-score-bar-fill" style={{ width: pct + '%', background: color }} />
-            </div>
-          </div>
-        </div>
-        <div className="rec-stats">
-          <span className="rec-stat-chip"><b>{recipe.kcal}</b> kcal</span>
-          <span className="rec-stat-chip"><b>{recipe.protein}g</b> P</span>
-        </div>
-        <div className="rec-price" title={pricingLabel(recipe)}>
-          <span className="rec-price-value">{formatPrice(recipe.cost)}</span>
-          <span className="rec-price-note">{pricingLabel(recipe)}</span>
-        </div>
-        <div className="rec-reason">{item.reason}</div>
-      </div>
-    </Link><div className="rec-card-actions"><button className="quick-meal-action" type="button" onClick={onUse}>Use for today's {mealType.toLowerCase()}</button></div></div>
+  const recipe = item.recipe;
+  return React.createElement(
+    'div',
+    { className: 'rec-card-shell' },
+    React.createElement(
+      Link,
+      {
+        to: `/recipes?recipe=${encodeURIComponent(recipe.id)}`,
+        className: 'rec-card',
+        style: { position: 'relative' },
+      },
+      React.createElement(
+        'div',
+        { className: 'rec-card-banner' },
+        recipe.emoji || '\u{1F372}',
+        React.createElement('span', { className: 'rec-card-rank' }, ranks[rank]),
+        React.createElement('span', { className: 'rec-card-type-tag' }, recipe.type),
+      ),
+      React.createElement(
+        'div',
+        { className: 'rec-card-body' },
+        React.createElement('div', { className: 'rec-card-name' }, recipe.name),
+        React.createElement(
+          'div',
+          { className: 'rec-score-row' },
+          React.createElement(
+            'div',
+            { className: 'rec-score-ring' },
+            React.createElement(
+              'svg',
+              { viewBox: '0 0 36 36', width: '36', height: '36' },
+              React.createElement('circle', {
+                cx: '18',
+                cy: '18',
+                r: '13',
+                fill: 'none',
+                stroke: '#111f16',
+                strokeWidth: '4',
+              }),
+              React.createElement('circle', {
+                cx: '18',
+                cy: '18',
+                r: '13',
+                fill: 'none',
+                stroke: color,
+                strokeWidth: '4',
+                strokeDasharray: arcFill.toFixed(1) + ' ' + circumf.toFixed(1),
+                strokeLinecap: 'round',
+                transform: 'rotate(-90 18 18)',
+              }),
+            ),
+            React.createElement('div', { className: 'rec-score-center', style: { color } }, pct),
+          ),
+          React.createElement(
+            'div',
+            { className: 'rec-score-info' },
+            React.createElement('div', { className: 'rec-score-label' }, 'Match Score'),
+            React.createElement(
+              'div',
+              { className: 'rec-score-bar-bg' },
+              React.createElement('div', {
+                className: 'rec-score-bar-fill',
+                style: { width: pct + '%', background: color },
+              }),
+            ),
+          ),
+        ),
+        React.createElement(
+          'div',
+          { className: 'rec-stats' },
+          React.createElement(
+            'span',
+            { className: 'rec-stat-chip' },
+            React.createElement('b', null, recipe.kcal),
+            ' kcal',
+          ),
+          React.createElement(
+            'span',
+            { className: 'rec-stat-chip' },
+            React.createElement('b', null, recipe.protein, 'g'),
+            ' P',
+          ),
+        ),
+        React.createElement(
+          'div',
+          { className: 'rec-price', title: pricingLabel(recipe) },
+          React.createElement('span', { className: 'rec-price-value' }, formatPrice(recipe.cost)),
+          React.createElement('span', { className: 'rec-price-note' }, pricingLabel(recipe)),
+        ),
+        React.createElement('div', { className: 'rec-reason' }, item.reason),
+      ),
+    ),
+    React.createElement(
+      'div',
+      { className: 'rec-card-actions' },
+      React.createElement(
+        'button',
+        { className: 'quick-meal-action', type: 'button', onClick: onUse },
+        "Use for today's ",
+        mealType.toLowerCase(),
+      ),
+    ),
   );
 }
-
 function SkeletonLoader() {
-  const card = (
-    <div className="rec-skeleton-card">
-      <div className="rec-skeleton-banner"></div>
-      <div className="rec-skeleton-body">
-        <div className="rec-skeleton-line" style={{ width: '80%' }}></div>
-        <div className="rec-skeleton-line" style={{ width: '55%' }}></div>
-        <div className="rec-skeleton-line" style={{ width: '90%', marginTop: '4px' }}></div>
-      </div>
-    </div>
+  const card = React.createElement(
+    'div',
+    { className: 'rec-skeleton-card' },
+    React.createElement('div', { className: 'rec-skeleton-banner' }),
+    React.createElement(
+      'div',
+      { className: 'rec-skeleton-body' },
+      React.createElement('div', { className: 'rec-skeleton-line', style: { width: '80%' } }),
+      React.createElement('div', { className: 'rec-skeleton-line', style: { width: '55%' } }),
+      React.createElement('div', {
+        className: 'rec-skeleton-line',
+        style: { width: '90%', marginTop: '4px' },
+      }),
+    ),
   );
-  return <div className="rec-loading">{card}{card}{card}</div>;
+  return React.createElement('div', { className: 'rec-loading' }, card, card, card);
 }
-
-/* ============================================================
-   SCORING ENGINE (ported unchanged from recommend.js)
-   ============================================================ */
 function scoreAndRankRecipes(profile, recipes) {
   const goal = profile.goal || 'maintain';
   const dietary = profile.dietary_restrictions || [];
@@ -275,19 +416,17 @@ function scoreAndRankRecipes(profile, recipes) {
   const ideals = GOAL_IDEALS[goal] || GOAL_IDEALS.maintain;
   const dailyTarget = computeDailyTarget(profile);
   const perMealKcal = Math.round(dailyTarget / 4);
-
   const scored = (recipes || []).map((recipe) => {
     let score = 0;
     let goalScore = 0;
-
     if (recipe.goal?.includes(goal)) goalScore += 20;
     if (recipe.protein >= ideals.minProtein) goalScore += 8;
     if (recipe.kcal <= ideals.maxKcal) goalScore += 6;
     if (recipe.fats <= ideals.maxFats) goalScore += 3;
     if (recipe.carbs >= ideals.minCarbs) goalScore += 3;
     score += Math.min(40, goalScore);
-
-    let violations = 0, allergyHit = false;
+    let violations = 0,
+      allergyHit = false;
     allConstraints.forEach((key) => {
       const blocked = CONSTRAINT_BLOCKS[key] || [];
       const isAllergy = ALLERGY_KEYS.includes(key);
@@ -301,58 +440,103 @@ function scoreAndRankRecipes(profile, recipes) {
         });
       });
     });
-
     if (allergyHit) score -= 30;
     else if (violations > 0) score -= violations * 20;
-
     const calDiff = Math.abs(recipe.kcal - perMealKcal);
     if (calDiff <= 50) score += 15;
     else if (calDiff <= 120) score += 10;
     else if (calDiff <= 200) score += 5;
-
     if (violations === 0 && allConstraints.length > 0) score += 10;
-
     const reason = generateReason(recipe, goal, violations, perMealKcal, profile);
-
     return { recipe, score: Math.max(0, score), reason, violations, allergyHit };
   });
-
-  scored.sort((a, b) => b.score - a.score || String(a.recipe.id).localeCompare(String(b.recipe.id)));
+  scored.sort(
+    (a, b) => b.score - a.score || String(a.recipe.id).localeCompare(String(b.recipe.id)),
+  );
   return scored.filter((item) => !item.allergyHit && item.violations === 0).slice(0, 3);
 }
-
 function generateReason(recipe, goal, violations, perMealKcal, profile) {
-  if (violations > 0 && ALLERGY_KEYS.some((k) =>
-    (profile.dietary_restrictions || []).includes(k) || (profile.medical_conditions || []).includes(k) || (profile.allergies || []).includes(k)
-  )) {
-    return 'Flagged — contains an ingredient that may conflict with your allergy profile.';
+  if (
+    violations > 0 &&
+    ALLERGY_KEYS.some(
+      (k) =>
+        (profile.dietary_restrictions || []).includes(k) ||
+        (profile.medical_conditions || []).includes(k) ||
+        (profile.allergies || []).includes(k),
+    )
+  ) {
+    return 'Flagged \u2014 contains an ingredient that may conflict with your allergy profile.';
   }
-
   if (goal === 'lose_weight') {
     if (recipe.kcal <= 350 && recipe.protein >= 20) {
-      return 'High-protein at only ' + recipe.kcal + ' kcal — ideal for staying in a calorie deficit while preserving muscle.';
+      return (
+        'High-protein at only ' +
+        recipe.kcal +
+        ' kcal \u2014 ideal for staying in a calorie deficit while preserving muscle.'
+      );
     }
-    return 'At ' + recipe.kcal + ' kcal with ' + recipe.protein + 'g protein, this supports your weight loss goal with good satiety.';
+    return (
+      'At ' +
+      recipe.kcal +
+      ' kcal with ' +
+      recipe.protein +
+      'g protein, this supports your weight loss goal with good satiety.'
+    );
   }
   if (goal === 'gain_muscle') {
-    if (recipe.protein >= 30) return recipe.protein + 'g protein directly fuels muscle protein synthesis — a top pick for your muscle gain goal.';
-    return 'Solid ' + recipe.protein + 'g protein and ' + recipe.carbs + 'g carbs for energy — supports your muscle-building plan.';
+    if (recipe.protein >= 30)
+      return (
+        recipe.protein +
+        'g protein directly fuels muscle protein synthesis \u2014 a top pick for your muscle gain goal.'
+      );
+    return (
+      'Solid ' +
+      recipe.protein +
+      'g protein and ' +
+      recipe.carbs +
+      'g carbs for energy \u2014 supports your muscle-building plan.'
+    );
   }
   if (goal === 'improve_health') {
-    return 'Nutrient-dense Filipino ingredients with ' + recipe.protein + 'g protein and only ' + recipe.fats + 'g fat — great for overall wellness.';
+    return (
+      'Nutrient-dense Filipino ingredients with ' +
+      recipe.protein +
+      'g protein and only ' +
+      recipe.fats +
+      'g fat \u2014 great for overall wellness.'
+    );
   }
   if (goal === 'boost_energy') {
-    return recipe.carbs + 'g of complex carbohydrates gives you sustained energy throughout the day.';
+    return (
+      recipe.carbs + 'g of complex carbohydrates gives you sustained energy throughout the day.'
+    );
   }
   if (goal === 'manage_condition') {
-    return 'Low in fat (' + recipe.fats + 'g) and moderate calories (' + recipe.kcal + ' kcal) — suitable for condition management.';
+    return (
+      'Low in fat (' +
+      recipe.fats +
+      'g) and moderate calories (' +
+      recipe.kcal +
+      ' kcal) \u2014 suitable for condition management.'
+    );
   }
-
   const diff = Math.abs(recipe.kcal - perMealKcal);
-  if (diff <= 80) return 'Nearly matches your per-meal calorie target of ' + perMealKcal + ' kcal — a well-balanced choice.';
-  return 'Balanced macros with ' + recipe.protein + 'g protein, ' + recipe.carbs + 'g carbs, and ' + recipe.fats + 'g fat — fits your maintenance plan.';
+  if (diff <= 80)
+    return (
+      'Nearly matches your per-meal calorie target of ' +
+      perMealKcal +
+      ' kcal \u2014 a well-balanced choice.'
+    );
+  return (
+    'Balanced macros with ' +
+    recipe.protein +
+    'g protein, ' +
+    recipe.carbs +
+    'g carbs, and ' +
+    recipe.fats +
+    'g fat \u2014 fits your maintenance plan.'
+  );
 }
-
 function computeDailyTarget(profile) {
   const h = parseFloat(profile.height_cm) || 170;
   const w = parseFloat(profile.weight_kg) || 70;
@@ -360,6 +544,14 @@ function computeDailyTarget(profile) {
   const sex = profile.sex || 'male';
   const bmr = sex === 'male' ? 10 * w + 6.25 * h - 5 * age + 5 : 10 * w + 6.25 * h - 5 * age - 161;
   const tdee = bmr * 1.55;
-  const adj = { lose_weight:0.85, gain_muscle:1.1, maintain:1.0, improve_health:1.0, boost_energy:1.0, manage_condition:0.9 };
-  return Math.round(tdee * (adj[profile.goal] || 1.0));
+  const adj = {
+    lose_weight: 0.85,
+    gain_muscle: 1.1,
+    maintain: 1,
+    improve_health: 1,
+    boost_energy: 1,
+    manage_condition: 0.9,
+  };
+  return Math.round(tdee * (adj[profile.goal] || 1));
 }
+export { RecommendWidget as default };

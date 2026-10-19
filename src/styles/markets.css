@@ -1,6 +1,6 @@
-/* Market page styles migrated from legacy app */
-
-.mk-main { padding-top: 64px; }
+.mk-main {
+  padding-top: 64px;
+}
 
 .mk-content {
   max-width: 1160px;
@@ -18,7 +18,13 @@
 }
 
 .mk-page-title {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 26px;
   font-weight: 700;
   color: #e8f5ee;
@@ -87,7 +93,13 @@
 }
 
 .mk-location-name {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 14px;
   font-weight: 600;
   color: #e8f5ee;
@@ -110,7 +122,9 @@
   font-size: 13px;
   color: #2ddc7a;
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
   white-space: nowrap;
 }
 
@@ -190,7 +204,9 @@
 .mk-map-wrap::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(45, 220, 122, 0.4), transparent);
   z-index: 2;
@@ -227,7 +243,10 @@
   cursor: pointer;
   color: #8aab96;
   font-size: 16px;
-  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  transition:
+    color 0.2s,
+    border-color 0.2s,
+    background 0.2s;
   backdrop-filter: blur(4px);
 }
 
@@ -277,8 +296,12 @@
   padding-right: 4px;
 }
 
-.mk-list-col::-webkit-scrollbar { width: 4px; }
-.mk-list-col::-webkit-scrollbar-track { background: transparent; }
+.mk-list-col::-webkit-scrollbar {
+  width: 4px;
+}
+.mk-list-col::-webkit-scrollbar-track {
+  background: transparent;
+}
 .mk-list-col::-webkit-scrollbar-thumb {
   background: rgba(45, 220, 122, 0.2);
   border-radius: 2px;
@@ -290,7 +313,9 @@
   border-radius: 16px;
   padding: 16px;
   cursor: pointer;
-  transition: border-color 0.22s, transform 0.18s;
+  transition:
+    border-color 0.22s,
+    transform 0.18s;
   position: relative;
   overflow: hidden;
 }
@@ -298,7 +323,9 @@
 .mk-market-card::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(45, 220, 122, 0.3), transparent);
 }
@@ -333,10 +360,19 @@
   flex-shrink: 0;
 }
 
-.mk-card-info { flex: 1; min-width: 0; }
+.mk-card-info {
+  flex: 1;
+  min-width: 0;
+}
 
 .mk-card-name {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 14px;
   font-weight: 700;
   color: #e8f5ee;
@@ -442,7 +478,9 @@
   margin-top: 20px;
   overflow: hidden;
   max-height: 0;
-  transition: max-height 0.4s ease, opacity 0.3s;
+  transition:
+    max-height 0.4s ease,
+    opacity 0.3s;
   opacity: 0;
 }
 
@@ -491,7 +529,13 @@
 }
 
 .mk-detail-name {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 20px;
   font-weight: 700;
   color: #e8f5ee;
@@ -513,7 +557,9 @@
   color: #4d6e5a;
   cursor: pointer;
   font-size: 18px;
-  transition: color 0.2s, border-color 0.2s;
+  transition:
+    color 0.2s,
+    border-color 0.2s;
   line-height: 1;
 }
 
@@ -554,7 +600,13 @@
 }
 
 .mk-detail-section-title {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 13px;
   font-weight: 600;
   color: #8aab96;
@@ -583,8 +635,12 @@
   padding-right: 10px;
 }
 
-.mk-ingredient-table::-webkit-scrollbar { width: 4px; }
-.mk-ingredient-table::-webkit-scrollbar-track { background: transparent; }
+.mk-ingredient-table::-webkit-scrollbar {
+  width: 4px;
+}
+.mk-ingredient-table::-webkit-scrollbar-track {
+  background: transparent;
+}
 .mk-ingredient-table::-webkit-scrollbar-thumb {
   background: rgba(45, 220, 122, 0.2);
   border-radius: 2px;
@@ -722,22 +778,84 @@
     grid-template-columns: minmax(110px, 1fr) 72px 82px 96px;
   }
 
-  .mk-ing-row-qty { display: none; }
+  .mk-ing-row-qty {
+    display: none;
+  }
 
-  .mk-ing-row-header span:nth-child(2) { display: none; }
+  .mk-ing-row-header span:nth-child(2) {
+    display: none;
+  }
 
   .mk-info-chips {
     gap: 6px;
   }
 }
-.mk-refresh-status { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 20px; color: var(--color-text-2); font-size: 13px; line-height: 1.6; }
-.mk-refresh-status > p:first-child { flex: 1 1 280px; }
-.mk-refresh-status .mk-refresh-note, .mk-refresh-status .mk-refresh-error { flex-basis: 100%; }
-.mk-refresh-error { color: #fca5a5; }
-.mk-refresh-status button:disabled { opacity: .65; cursor: wait; }
+.mk-refresh-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-bottom: 20px;
+  color: var(--color-text-2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.mk-refresh-status > p:first-child {
+  flex: 1 1 280px;
+}
+.mk-refresh-status .mk-refresh-note,
+.mk-refresh-status .mk-refresh-error {
+  flex-basis: 100%;
+}
+.mk-refresh-error {
+  color: #fca5a5;
+}
+.mk-refresh-status button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
 
-.mk-pin-location-btn { position: absolute; top: 16px; left: 16px; z-index: 500; min-height: 42px; max-width: calc(100% - 80px); padding: 10px 14px; border: 1px solid var(--color-border); border-radius: 10px; background: #12261b; color: var(--color-text-2); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
-.mk-pin-location-btn:hover, .mk-pin-location-btn[aria-pressed="true"] { background: var(--color-primary); color: #0a1610; }
-.mk-market-search { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
-.mk-market-search input { flex: 1 1 220px; min-width: 0; min-height: 44px; padding: 10px 14px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-bg-card); color: var(--color-text-1); font: inherit; font-size: 14px; }
-.mk-market-search button { min-height: 44px; }
+.mk-pin-location-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 500;
+  min-height: 42px;
+  max-width: calc(100% - 80px);
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #12261b;
+  color: var(--color-text-2);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.mk-pin-location-btn:hover,
+.mk-pin-location-btn[aria-pressed='true'] {
+  background: var(--color-primary);
+  color: #0a1610;
+}
+.mk-market-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.mk-market-search input {
+  flex: 1 1 220px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg-card);
+  color: var(--color-text-1);
+  font: inherit;
+  font-size: 14px;
+}
+.mk-market-search button {
+  min-height: 44px;
+}

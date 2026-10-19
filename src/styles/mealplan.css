@@ -16,9 +16,7 @@
   margin: 0 auto;
   padding: 36px 32px 80px;
 }
-/* ============================================================
-   PAGE HEADER
-   ============================================================ */
+
 .mp-page-header {
   display: flex;
   align-items: center;
@@ -29,7 +27,13 @@
 }
 
 .mp-page-title {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 26px;
   font-weight: 700;
   color: #e8f5ee;
@@ -68,9 +72,6 @@
   background: rgba(45, 220, 122, 0.18);
 }
 
-/* ============================================================
-   WEEK NAVIGATOR
-   ============================================================ */
 .week-nav {
   display: flex;
   align-items: center;
@@ -96,7 +97,9 @@
   font-size: 18px;
   padding: 6px 10px;
   border-radius: 8px;
-  transition: color 0.2s, background 0.2s;
+  transition:
+    color 0.2s,
+    background 0.2s;
   flex-shrink: 0;
   line-height: 1;
 }
@@ -107,7 +110,13 @@
 }
 
 .week-label {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 14px;
   font-weight: 600;
   color: #e8f5ee;
@@ -171,7 +180,13 @@
 }
 
 .day-num {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 16px;
   font-weight: 700;
   color: #8aab96;
@@ -181,7 +196,6 @@
   color: #2ddc7a;
 }
 
-/* Dot indicator — has meals */
 .day-dot {
   width: 4px;
   height: 4px;
@@ -200,9 +214,6 @@
   background: #fbbf24;
 }
 
-/* ============================================================
-   DAY VIEW LAYOUT
-   ============================================================ */
 .day-view {
   display: grid;
   grid-template-columns: 1fr 340px;
@@ -210,9 +221,6 @@
   align-items: start;
 }
 
-/* ============================================================
-   MEAL SLOTS COLUMN
-   ============================================================ */
 .meal-slots-col {
   display: flex;
   flex-direction: column;
@@ -225,7 +233,6 @@
   gap: 16px;
 }
 
-/* Day summary bar */
 .day-summary-bar {
   background: #12261b;
   border: 1px solid rgba(45, 220, 122, 0.22);
@@ -254,14 +261,24 @@
 }
 
 .day-summary-value {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 22px;
   font-weight: 800;
   color: #ffffff;
 }
 
-.day-summary-value.green  { color: #2ddc7a; }
-.day-summary-value.yellow { color: #f59e0b; }
+.day-summary-value.green {
+  color: #2ddc7a;
+}
+.day-summary-value.yellow {
+  color: #f59e0b;
+}
 
 .day-summary-divider {
   width: 1px;
@@ -299,7 +316,6 @@
   transition: width 0.8s ease;
 }
 
-/* ---- Slot header (time label + type) ---- */
 .slot-header {
   display: flex;
   align-items: center;
@@ -321,7 +337,13 @@
 }
 
 .slot-type-label {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 13px;
   font-weight: 600;
   color: #8aab96;
@@ -338,7 +360,9 @@
   font-size: 16px;
   padding: 4px 6px;
   border-radius: 6px;
-  transition: color 0.2s, background 0.2s;
+  transition:
+    color 0.2s,
+    background 0.2s;
   line-height: 1;
 }
 
@@ -347,9 +371,6 @@
   background: rgba(248, 113, 113, 0.08);
 }
 
-/* ============================================================
-   MEAL CARD
-   ============================================================ */
 .meal-card {
   background: #12261b;
   border: 1px solid rgba(45, 220, 122, 0.22);
@@ -363,13 +384,17 @@
 .meal-card:hover {
   border-color: rgba(45, 220, 122, 0.45);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 16px rgba(45, 220, 122, 0.1);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    0 0 16px rgba(45, 220, 122, 0.1);
 }
 
 .meal-card::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 2px;
   background: linear-gradient(90deg, transparent, rgba(45, 220, 122, 0.5), transparent);
 }
@@ -410,7 +435,13 @@
 .meal-card-name {
   flex: 1;
   min-width: 0;
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 18px;
   font-weight: 700;
   color: #ffffff;
@@ -519,7 +550,6 @@
   content: attr(data-kcal);
 }
 
-/* Override the number span inside badge */
 .meal-kcal-badge > span,
 .meal-kcal-badge > b {
   font-size: 16px;
@@ -528,7 +558,6 @@
   font-family: 'Plus Jakarta Sans', sans-serif;
   line-height: 1;
 }
-
 
 .meal-cost-badge {
   font-size: 12px;
@@ -545,12 +574,13 @@
   text-align: center;
 }
 
-/* Ingredients expandable */
 .meal-card-ingredients {
   padding: 0 18px;
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.35s ease, padding 0.3s;
+  transition:
+    max-height 0.35s ease,
+    padding 0.3s;
 }
 
 .meal-card-ingredients.open {
@@ -704,7 +734,6 @@
   color: #fbbf24;
 }
 
-/* Card action bar */
 .meal-card-actions {
   display: flex;
   flex-wrap: wrap;
@@ -786,13 +815,15 @@
   white-space: nowrap;
   padding: 6px 10px;
   border-radius: 8px;
-  transition: color 0.2s, background 0.2s;
+  transition:
+    color 0.2s,
+    background 0.2s;
   font-family: 'DM Sans', sans-serif;
 }
 
 .toggle-ingredients-btn:hover {
   color: #8aab96;
-  background: rgba(255,255,255,0.04);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .toggle-ingredients-btn svg {
@@ -805,7 +836,6 @@
   transform: rotate(180deg);
 }
 
-/* Empty slot placeholder */
 .empty-slot {
   background: #0d1a12;
   border: 1px dashed rgba(45, 220, 122, 0.18);
@@ -823,7 +853,6 @@
   opacity: 0.5;
 }
 
-/* Add slot button */
 .add-slot-btn {
   display: flex;
   align-items: center;
@@ -847,9 +876,6 @@
   background: rgba(45, 220, 122, 0.04);
 }
 
-/* ============================================================
-   ADD SLOT MODAL
-   ============================================================ */
 .slot-modal-overlay {
   position: fixed;
   inset: 0;
@@ -888,7 +914,13 @@
 }
 
 .slot-modal-title {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 18px;
   font-weight: 700;
   color: #e8f5ee;
@@ -967,9 +999,6 @@
   color: #e8f5ee;
 }
 
-/* ============================================================
-   SWAP MODAL
-   ============================================================ */
 .swap-modal-overlay {
   position: fixed;
   inset: 0;
@@ -1016,7 +1045,13 @@
 }
 
 .swap-modal-title {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 18px;
   font-weight: 700;
   color: #e8f5ee;
@@ -1128,7 +1163,13 @@
 
 .completion-modal-title {
   color: #e8f5ee;
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 18px;
   font-weight: 700;
 }
@@ -1202,7 +1243,13 @@
 }
 
 .swap-option-name {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 15px;
   font-weight: 600;
   color: #e8f5ee;
@@ -1234,9 +1281,6 @@
   justify-content: center;
 }
 
-/* ============================================================
-   GROCERY LIST PANEL (right column)
-   ============================================================ */
 .grocery-panel {
   background: #0d1a12;
   border: 1px solid rgba(45, 220, 122, 0.12);
@@ -1249,7 +1293,9 @@
 .grocery-panel::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 1px;
   border-radius: 20px 20px 0 0;
   background: linear-gradient(90deg, transparent, rgba(45, 220, 122, 0.4), transparent);
@@ -1281,7 +1327,13 @@
 }
 
 .grocery-panel-title {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 15px;
   font-weight: 600;
   color: #e8f5ee;
@@ -1292,7 +1344,13 @@
   color: #060d0a;
   font-size: 11px;
   font-weight: 700;
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   border-radius: 100px;
   padding: 2px 8px;
   min-width: 20px;
@@ -1307,7 +1365,9 @@
   color: #4d6e5a;
   padding: 4px 8px;
   border-radius: 6px;
-  transition: color 0.2s, background 0.2s;
+  transition:
+    color 0.2s,
+    background 0.2s;
   font-family: 'DM Sans', sans-serif;
 }
 
@@ -1316,7 +1376,6 @@
   background: rgba(248, 113, 113, 0.08);
 }
 
-/* Grocery list items */
 .grocery-list {
   display: flex;
   flex-direction: column;
@@ -1416,7 +1475,6 @@
   color: #f87171;
 }
 
-/* Empty grocery state */
 .grocery-empty {
   text-align: center;
   padding: 24px 12px;
@@ -1431,7 +1489,6 @@
   opacity: 0.5;
 }
 
-/* Cost total */
 .grocery-cost-total {
   background: #111f16;
   border: 1px solid rgba(251, 191, 36, 0.15);
@@ -1449,15 +1506,18 @@
 }
 
 .grocery-cost-value {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 18px;
   font-weight: 700;
   color: #fbbf24;
 }
 
-/* ============================================================
-   BUTTONS (page-level, non-shared)
-   ============================================================ */
 .mp-btn {
   display: inline-flex;
   align-items: center;
@@ -1501,9 +1561,6 @@
   height: 15px;
 }
 
-/* ============================================================
-   RESPONSIVE
-   ============================================================ */
 @media (max-width: 1024px) {
   .day-view {
     grid-template-columns: 1fr;

@@ -1,11 +1,3 @@
-/* ============================================================
-   BLANE — Onboarding Page Stylesheet
-   Standalone: no :root variables used, all values are literal.
-   All units in px (no rem).
-   Fonts loaded via style.css @import (shared).
-   ============================================================ */
-
-/* ---- Page shell ---- */
 .onboard-page {
   min-height: 100vh;
   display: flex;
@@ -26,7 +18,6 @@
   transform: translateX(-50%);
 }
 
-/* ---- Top bar ---- */
 .onboard-topbar {
   position: fixed;
   top: 0;
@@ -53,7 +44,6 @@
   font-weight: 600;
 }
 
-/* ---- Progress bar ---- */
 .onboard-progress-wrap {
   width: 100%;
   max-width: 520px;
@@ -82,7 +72,6 @@
   text-align: right;
 }
 
-/* ---- Card ---- */
 .onboard-card {
   background: #0d1a12;
   border: 1px solid rgba(45, 220, 122, 0.12);
@@ -134,7 +123,6 @@
   line-height: 1.6;
 }
 
-/* ---- Step panels ---- */
 .onboard-step {
   display: none;
 }
@@ -143,14 +131,12 @@
   display: block;
 }
 
-/* ---- Two-column input row ---- */
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
 }
 
-/* ---- Select input ---- */
 .form-select {
   background: #111f16;
   border: 1px solid rgba(45, 220, 122, 0.12);
@@ -167,7 +153,9 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234d6e5a' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .form-select:focus {
@@ -180,7 +168,6 @@
   color: #e8f5ee;
 }
 
-/* ---- Goal cards (Step 2) ---- */
 .goal-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -195,7 +182,10 @@
   padding: 18px 14px;
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s, transform 0.2s;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    transform 0.2s;
   user-select: none;
 }
 
@@ -230,7 +220,6 @@
   line-height: 1.4;
 }
 
-/* ---- Tag pills (Steps 3 & 4) ---- */
 .tag-grid {
   display: flex;
   flex-wrap: wrap;
@@ -249,7 +238,10 @@
   font-size: 13px;
   color: #8aab96;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s, color 0.2s;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    color 0.2s;
   user-select: none;
 }
 
@@ -268,7 +260,6 @@
   font-size: 15px;
 }
 
-/* ---- Navigation buttons row ---- */
 .onboard-nav {
   display: flex;
   justify-content: space-between;
@@ -282,7 +273,6 @@
   justify-content: center;
 }
 
-/* ---- Saving overlay ---- */
 .saving-overlay {
   position: fixed;
   inset: 0;
@@ -321,10 +311,11 @@
 }
 
 @keyframes ob-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-/* ---- Responsive ---- */
 @media (max-width: 560px) {
   .onboard-card {
     padding: 28px 20px 24px;

@@ -1,12 +1,3 @@
-/* ============================================================
-   BLANE — Seasonal Availability Engine Stylesheet
-   Standalone: no :root variables, all values literal.
-   All units in px (no rem).
-   ============================================================ */
-
-/* ============================================================
-   SEASON BADGE (on recipe/meal cards)
-   ============================================================ */
 .season-badge {
   display: inline-flex;
   align-items: center;
@@ -44,9 +35,6 @@
   border: 1px solid rgba(96, 165, 250, 0.2);
 }
 
-/* ============================================================
-   INGREDIENT SEASON TAG (inside recipe detail modal)
-   ============================================================ */
 .ing-season-tag {
   display: inline-flex;
   align-items: center;
@@ -77,10 +65,6 @@
   border: 1px solid rgba(96, 165, 250, 0.15);
 }
 
-/* ============================================================
-   SEASONAL ALTERNATIVE BANNER
-   (shown below out-of-season ingredient rows in modal)
-   ============================================================ */
 .seasonal-alt-banner {
   display: flex;
   align-items: flex-start;
@@ -98,17 +82,27 @@
 }
 
 @keyframes sea-fadein {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.seasonal-alt-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.seasonal-alt-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
 
-.seasonal-alt-text strong { color: #fbbf24; font-weight: 600; }
+.seasonal-alt-text strong {
+  color: #fbbf24;
+  font-weight: 600;
+}
 
-/* ============================================================
-   CURRENT SEASON PILL (top of recipes page)
-   ============================================================ */
 .current-season-pill {
   display: inline-flex;
   align-items: center;
@@ -133,29 +127,20 @@
   border-color: rgba(251, 191, 36, 0.25);
 }
 
-/* ============================================================
-   SEASONAL FILTER BUTTON (in recipes filter bar)
-   ============================================================ */
 .rp-filter-btn.seasonal-active {
   background: rgba(45, 220, 122, 0.12);
   border-color: #2ddc7a;
   color: #2ddc7a;
 }
 
-/* ============================================================
-   IN-SEASON HIGHLIGHT on recipe card banner
-   ============================================================ */
 .recipe-card-banner.in-season-glow::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(45,220,122,0.08) 0%, transparent 60%);
+  background: linear-gradient(135deg, rgba(45, 220, 122, 0.08) 0%, transparent 60%);
   pointer-events: none;
 }
 
-/* ============================================================
-   MEAL CARD seasonal row (inside mealplan slot)
-   ============================================================ */
 .meal-season-row {
   display: flex;
   align-items: center;

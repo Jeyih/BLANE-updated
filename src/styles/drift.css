@@ -1,12 +1,3 @@
-/* ============================================================
-   BLANE — Health Drift Detection Stylesheet
-   Standalone: no :root variables, all values literal.
-   All units in px (no rem).
-   ============================================================ */
-
-/* ============================================================
-   DRIFT SECTION WRAPPER
-   ============================================================ */
 .drift-section {
   background: #0d1a12;
   border: 1px solid rgba(45, 220, 122, 0.12);
@@ -24,12 +15,13 @@
 .drift-section::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(45, 220, 122, 0.4), transparent);
 }
 
-/* ---- Header ---- */
 .drift-header {
   display: flex;
   align-items: center;
@@ -59,7 +51,13 @@
 }
 
 .drift-title {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 15px;
   font-weight: 600;
   color: #e8f5ee;
@@ -80,9 +78,6 @@
   color: #4d6e5a;
 }
 
-/* ============================================================
-   OVERALL HEALTH SCORE
-   ============================================================ */
 .drift-score-row {
   display: flex;
   align-items: center;
@@ -116,7 +111,13 @@
 }
 
 .drift-score-num {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 20px;
   font-weight: 800;
   line-height: 1;
@@ -136,7 +137,13 @@
 }
 
 .drift-score-status {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 17px;
   font-weight: 700;
   margin-bottom: 4px;
@@ -148,7 +155,6 @@
   line-height: 1.5;
 }
 
-/* Score bar */
 .drift-score-bar-wrap {
   flex: 1;
   min-width: 120px;
@@ -175,22 +181,20 @@
   transition: width 1s ease;
 }
 
-/* ============================================================
-   METRIC DRIFT CARDS GRID
-   ============================================================ */
 .drift-cards-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 
-/* ---- Individual metric card ---- */
 .drift-card {
   background: #060d0a;
   border: 1px solid rgba(45, 220, 122, 0.1);
   border-radius: 14px;
   padding: 16px;
-  transition: border-color 0.22s, transform 0.2s;
+  transition:
+    border-color 0.22s,
+    transform 0.2s;
   position: relative;
   overflow: hidden;
 }
@@ -200,7 +204,6 @@
   transform: translateY(-2px);
 }
 
-/* Left accent bar */
 .drift-card::after {
   content: '';
   position: absolute;
@@ -212,12 +215,19 @@
   transition: background 0.3s;
 }
 
-.drift-card.status-good::after    { background: #2ddc7a; }
-.drift-card.status-warning::after { background: #fbbf24; }
-.drift-card.status-danger::after  { background: #f87171; }
-.drift-card.status-neutral::after { background: #4d6e5a; }
+.drift-card.status-good::after {
+  background: #2ddc7a;
+}
+.drift-card.status-warning::after {
+  background: #fbbf24;
+}
+.drift-card.status-danger::after {
+  background: #f87171;
+}
+.drift-card.status-neutral::after {
+  background: #4d6e5a;
+}
 
-/* Card header */
 .drift-card-header {
   display: flex;
   align-items: flex-start;
@@ -243,7 +253,6 @@
   letter-spacing: 0.6px;
 }
 
-/* Trend arrow badge */
 .drift-trend-badge {
   display: inline-flex;
   align-items: center;
@@ -290,9 +299,14 @@
   border: 1px solid rgba(251, 191, 36, 0.2);
 }
 
-/* Current value */
 .drift-card-value {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 24px;
   font-weight: 800;
   color: #e8f5ee;
@@ -314,7 +328,6 @@
   line-height: 1.4;
 }
 
-/* Mini chart */
 .drift-chart-wrap {
   height: 40px;
   position: relative;
@@ -328,7 +341,6 @@
   overflow: visible;
 }
 
-/* Risk label */
 .drift-risk-label {
   font-size: 11px;
   font-weight: 600;
@@ -361,9 +373,6 @@
   border: 1px solid rgba(77, 110, 90, 0.25);
 }
 
-/* ============================================================
-   NO DATA STATE
-   ============================================================ */
 .drift-no-data {
   text-align: center;
   padding: 32px 20px;
@@ -387,26 +396,34 @@
   text-decoration: none;
 }
 
-/* ============================================================
-   ANIMATIONS
-   ============================================================ */
 @keyframes drift-fade-in {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .drift-card {
   animation: drift-fade-in 0.4s ease both;
 }
 
-.drift-card:nth-child(1) { animation-delay: 0.05s; }
-.drift-card:nth-child(2) { animation-delay: 0.10s; }
-.drift-card:nth-child(3) { animation-delay: 0.15s; }
-.drift-card:nth-child(4) { animation-delay: 0.20s; }
+.drift-card:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.drift-card:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.drift-card:nth-child(3) {
+  animation-delay: 0.15s;
+}
+.drift-card:nth-child(4) {
+  animation-delay: 0.2s;
+}
 
-/* ============================================================
-   RESPONSIVE
-   ============================================================ */
 @media (max-width: 1024px) {
   .drift-cards-grid {
     grid-template-columns: repeat(2, 1fr);

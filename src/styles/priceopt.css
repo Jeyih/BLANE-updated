@@ -1,12 +1,3 @@
-/* ============================================================
-   BLANE — Price-Aware Meal Optimizer Stylesheet
-   Standalone: no :root variables, all values literal.
-   All units in px (no rem).
-   ============================================================ */
-
-/* ============================================================
-   PRICE OPTIMIZER WRAPPER
-   ============================================================ */
 .po-panel {
   background: #0d1a12;
   border: 1px solid rgba(45, 220, 122, 0.15);
@@ -23,7 +14,6 @@
   background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.5), transparent);
 }
 
-/* ---- Header ---- */
 .po-header {
   display: flex;
   align-items: center;
@@ -76,9 +66,6 @@
   color: #7dd3a7;
 }
 
-/* ============================================================
-   BUDGET INPUT ROW
-   ============================================================ */
 .po-budget-row {
   display: flex;
   align-items: center;
@@ -95,7 +82,9 @@
   border: 1px solid rgba(251, 191, 36, 0.25);
   border-radius: 12px;
   overflow: hidden;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .po-budget-input-wrap:focus-within {
@@ -127,7 +116,9 @@
 }
 
 .po-budget-input::-webkit-outer-spin-button,
-.po-budget-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.po-budget-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
 
 .po-budget-label {
   font-size: 12px;
@@ -146,9 +137,19 @@
   border-radius: 14px;
 }
 
-.po-ai-suggest-row > div:first-child { flex: 1; }
-.po-ai-suggest-title { color: #dbeafe; font-size: 13px; font-weight: 700; }
-.po-ai-suggest-sub { color: #6f8b9e; font-size: 11px; margin-top: 3px; }
+.po-ai-suggest-row > div:first-child {
+  flex: 1;
+}
+.po-ai-suggest-title {
+  color: #dbeafe;
+  font-size: 13px;
+  font-weight: 700;
+}
+.po-ai-suggest-sub {
+  color: #6f8b9e;
+  font-size: 11px;
+  margin-top: 3px;
+}
 .po-ai-suggest-row select {
   background: #111f16;
   border: 1px solid rgba(96, 165, 250, 0.25);
@@ -157,24 +158,83 @@
   padding: 9px 10px;
   font: inherit;
 }
-.po-ai-suggest-row button:disabled { opacity: 0.6; cursor: wait; }
-.po-ai-suggest-error { margin: -8px 24px 18px; color: #fca5a5; font-size: 12px; }
-.po-ai-suggestion { margin: 0 24px 18px; padding: 16px; background: #13241a; border: 1px solid rgba(45, 220, 122, 0.25); border-radius: 14px; }
-.po-ai-suggestion-heading { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
-.po-ai-suggestion-heading strong { display: block; color: #e8f5ee; font-family: 'Syne', sans-serif; font-size: 16px; }
-.po-ai-suggestion-heading span:not(.po-ai-source) { display: block; color: #8aab96; font-size: 12px; margin-top: 4px; }
-.po-ai-source { color: #2ddc7a; font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; white-space: nowrap; }
-.po-ai-suggestion p { color: #b8d1c0; font-size: 12px; line-height: 1.5; margin: 12px 0 8px; }
-.po-ai-macros { color: #fbbf24; font-size: 12px; }
-.po-ai-ingredients { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-.po-ai-ingredients span { background: rgba(45, 220, 122, 0.08); border: 1px solid rgba(45, 220, 122, 0.15); border-radius: 7px; color: #c8e4d0; font-size: 11px; padding: 5px 8px; }
-
-@media (max-width: 640px) {
-  .po-ai-suggest-row { align-items: stretch; flex-direction: column; }
-  .po-ai-suggest-row select, .po-ai-suggest-row button { width: 100%; }
+.po-ai-suggest-row button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.po-ai-suggest-error {
+  margin: -8px 24px 18px;
+  color: #fca5a5;
+  font-size: 12px;
+}
+.po-ai-suggestion {
+  margin: 0 24px 18px;
+  padding: 16px;
+  background: #13241a;
+  border: 1px solid rgba(45, 220, 122, 0.25);
+  border-radius: 14px;
+}
+.po-ai-suggestion-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+.po-ai-suggestion-heading strong {
+  display: block;
+  color: #e8f5ee;
+  font-family: 'Syne', sans-serif;
+  font-size: 16px;
+}
+.po-ai-suggestion-heading span:not(.po-ai-source) {
+  display: block;
+  color: #8aab96;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.po-ai-source {
+  color: #2ddc7a;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+.po-ai-suggestion p {
+  color: #b8d1c0;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 12px 0 8px;
+}
+.po-ai-macros {
+  color: #fbbf24;
+  font-size: 12px;
+}
+.po-ai-ingredients {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.po-ai-ingredients span {
+  background: rgba(45, 220, 122, 0.08);
+  border: 1px solid rgba(45, 220, 122, 0.15);
+  border-radius: 7px;
+  color: #c8e4d0;
+  font-size: 11px;
+  padding: 5px 8px;
 }
 
-/* Per-meal derived budget */
+@media (max-width: 640px) {
+  .po-ai-suggest-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .po-ai-suggest-row select,
+  .po-ai-suggest-row button {
+    width: 100%;
+  }
+}
+
 .po-per-meal-chip {
   display: inline-flex;
   align-items: center;
@@ -195,7 +255,6 @@
   font-size: 14px;
 }
 
-/* Apply btn */
 .po-apply-btn {
   display: inline-flex;
   align-items: center;
@@ -209,7 +268,9 @@
   font-weight: 600;
   color: #060d0a;
   cursor: pointer;
-  transition: background 0.2s, transform 0.15s;
+  transition:
+    background 0.2s,
+    transform 0.15s;
   white-space: nowrap;
 }
 
@@ -224,9 +285,6 @@
   flex-shrink: 0;
 }
 
-/* ============================================================
-   BUDGET SUMMARY BAR
-   ============================================================ */
 .po-summary-bar {
   display: flex;
   align-items: center;
@@ -261,9 +319,15 @@
   line-height: 1;
 }
 
-.po-summary-value.green  { color: #2ddc7a; }
-.po-summary-value.yellow { color: #fbbf24; }
-.po-summary-value.red    { color: #f87171; }
+.po-summary-value.green {
+  color: #2ddc7a;
+}
+.po-summary-value.yellow {
+  color: #fbbf24;
+}
+.po-summary-value.red {
+  color: #f87171;
+}
 
 .po-summary-divider {
   width: 1px;
@@ -272,7 +336,6 @@
   flex-shrink: 0;
 }
 
-/* Budget progress bar */
 .po-budget-progress {
   flex: 2;
   min-width: 120px;
@@ -296,12 +359,11 @@
 .po-budget-bar-fill {
   height: 7px;
   border-radius: 7px;
-  transition: width 0.7s ease, background 0.3s;
+  transition:
+    width 0.7s ease,
+    background 0.3s;
 }
 
-/* ============================================================
-   SORT / VIEW CONTROLS
-   ============================================================ */
 .po-controls {
   display: flex;
   align-items: center;
@@ -375,11 +437,11 @@
   margin-left: 4px;
 }
 
-.po-count-badge span { color: #2ddc7a; font-weight: 700; }
+.po-count-badge span {
+  color: #2ddc7a;
+  font-weight: 700;
+}
 
-/* ============================================================
-   MEAL CARDS LIST
-   ============================================================ */
 .po-meals-list {
   display: grid;
   flex-direction: column;
@@ -391,26 +453,37 @@
   scrollbar-color: rgba(251, 191, 36, 0.2) transparent;
 }
 
-.po-meals-list::-webkit-scrollbar { width: 4px; }
-.po-meals-list::-webkit-scrollbar-track { background: transparent; }
+.po-meals-list::-webkit-scrollbar {
+  width: 4px;
+}
+.po-meals-list::-webkit-scrollbar-track {
+  background: transparent;
+}
 .po-meals-list::-webkit-scrollbar-thumb {
   background: rgba(251, 191, 36, 0.2);
   border-radius: 2px;
 }
 
-/* ---- Meal row card ---- */
 .po-meal-row {
   background: #111f16;
   border: 1px solid rgba(45, 220, 122, 0.1);
   border-radius: 14px;
   overflow: hidden;
-  transition: border-color 0.2s, opacity 0.3s;
+  transition:
+    border-color 0.2s,
+    opacity 0.3s;
   animation: po-fadein 0.3s ease both;
 }
 
 @keyframes po-fadein {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .po-meal-row.over-budget {
@@ -426,7 +499,6 @@
   display: none;
 }
 
-/* Main row */
 .po-meal-main {
   display: flex;
   align-items: center;
@@ -445,7 +517,9 @@
   text-align: center;
 }
 
-.po-meal-rank.top3 { color: #fbbf24; }
+.po-meal-rank.top3 {
+  color: #fbbf24;
+}
 
 .po-meal-emoji {
   font-size: 26px;
@@ -454,7 +528,10 @@
   text-align: center;
 }
 
-.po-meal-info { flex: 1; min-width: 0; }
+.po-meal-info {
+  flex: 1;
+  min-width: 0;
+}
 
 .po-meal-name {
   font-family: 'Syne', sans-serif;

@@ -1,4 +1,5 @@
-export const PRICE_POLL_MS = 15_000;
-export const RETAIL_CACHE_MS = 30_000;
-export const DA_CACHE_MS = 6 * 60 * 60 * 1000;
-export const FORCE_REFRESH_COOLDOWN_MS = 10_000;
+const PRICE_POLL_MS = 15e3;
+const RETAIL_CACHE_MS = 3e4;
+const DA_CACHE_MS = 6 * 60 * 60 * 1e3;
+const FORCE_REFRESH_COOLDOWN_MS = 1e4;
+export { DA_CACHE_MS, FORCE_REFRESH_COOLDOWN_MS, PRICE_POLL_MS, RETAIL_CACHE_MS };

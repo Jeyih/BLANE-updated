@@ -149,7 +149,9 @@
   font: inherit;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s ease, opacity 0.2s ease;
+  transition:
+    background 0.2s ease,
+    opacity 0.2s ease;
 }
 
 .feedback-form-submit:hover:not(:disabled) {
