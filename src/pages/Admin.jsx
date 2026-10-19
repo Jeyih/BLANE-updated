@@ -108,6 +108,7 @@ export default function Admin() {
   const { user, loading, logout } = useAuth();
   const navigate = useNavigate();
 
+  const [adminStatus, setAdminStatus] = useState('checking');
   const [activeTab, setActiveTab] = useState('markets');
   const [markets, setMarkets] = useState([]);
   const [recipes, setRecipes] = useState([]);
@@ -166,30 +167,36 @@ export default function Admin() {
   const [toast, setToast] = useState({ message: '', error: false, visible: false });
 
   useEffect(() => {
-    if (!user || loading) return;
-    if (!isAdmin(user)) return;
-    loadAllData();
+    if (loading) return;
+    if (!user) {
+      setAdminStatus('denied');
+      return;
+    }
+
+    let cancelled = false;
+    setAdminStatus('checking');
+    isAdmin(user)
+      .then((allowed) => {
+        if (!cancelled) setAdminStatus(allowed ? 'allowed' : 'denied');
+      })
+      .catch((error) => {
+        console.error('Unable to verify administrator access:', error);
+        if (!cancelled) setAdminStatus('error');
+      });
+
+    return () => { cancelled = true; };
   }, [user, loading]);
+
+  useEffect(() => {
+    if (!user || loading || adminStatus !== 'allowed') return;
+    loadAllData();
+  }, [user, loading, adminStatus]);
 
   useEffect(() => {
     if (!toast.visible) return;
     const timer = window.setTimeout(() => setToast((prev) => ({ ...prev, visible: false })), 3000);
     return () => window.clearTimeout(timer);
   }, [toast.visible]);
-
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#060d0a', color: '#4d6e5a' }}>
-        Loading admin panel…
-      </div>
-    );
-  }
-
-  if (user && !isAdmin(user)) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  if (!user) return null;
 
   const filteredMarkets = useMemo(() => {
     const query = searchMarkets.toLowerCase();
@@ -325,6 +332,26 @@ export default function Admin() {
     document.addEventListener('keydown', handleFeedbackModalKeyDown);
     return () => document.removeEventListener('keydown', handleFeedbackModalKeyDown);
   }, [feedbackModalOpen]);
+
+  if (loading || adminStatus === 'checking') {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#060d0a', color: '#4d6e5a' }}>
+        Loading admin panel…
+      </div>
+    );
+  }
+
+  if (adminStatus === 'error') {
+    return (
+      <div role="alert" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#060d0a', color: '#fca5a5' }}>
+        Unable to verify administrator access. Please try again later.
+      </div>
+    );
+  }
+
+  if (!user || adminStatus === 'denied') {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   async function loadMarkets() {
     const { data, error } = await supabase.from('markets').select('*').order('name');

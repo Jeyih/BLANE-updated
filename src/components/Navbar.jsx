@@ -49,6 +49,7 @@ export default function Navbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileOpen, setMobileOpen]     = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [userIsAdmin, setUserIsAdmin] = useState(false);
 
   const dropdownRef = useRef(null);
 
@@ -75,6 +76,23 @@ export default function Navbar() {
     return () => { cancelled = true; };
   }, [user]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setUserIsAdmin(false);
+
+    if (!user) return () => { cancelled = true; };
+
+    isAdmin(user)
+      .then((allowed) => {
+        if (!cancelled) setUserIsAdmin(allowed);
+      })
+      .catch((error) => {
+        console.error('Unable to verify administrator access:', error);
+      });
+
+    return () => { cancelled = true; };
+  }, [user]);
+
   /* Close dropdown on outside click (replaces the document click
      listener in old nav.js) */
   useEffect(() => {
@@ -91,8 +109,6 @@ export default function Navbar() {
     await logout();
     navigate('/');
   }
-
-  const userIsAdmin = isAdmin(user);
 
   return (
     <>

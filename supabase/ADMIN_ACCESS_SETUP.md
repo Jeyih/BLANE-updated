@@ -5,8 +5,8 @@ Status: migration prepared locally, not applied to the hosted database. The work
 ## Apply
 
 1. Open the BLANE Supabase project as its database administrator.
-2. Confirm the existing project administrator in `src/lib/admin-auth.js` has a verified account. The migration seeds that existing real account, and deliberately excludes the sample account. If additional administrators are required, have the project owner review their verified user IDs before adding them to the private registry.
-3. Run `migrations/202610180001_admin_catalogue_access.sql` in the SQL editor, or deploy it through the project's authenticated migration workflow. It runs in a transaction and stops if no administrator is found or a catalogue table is missing. Review any error before changing the SQL.
+2. Run `migrations/202610180001_admin_catalogue_access.sql` in the SQL editor, or deploy it through the project's authenticated migration workflow. It runs in a transaction, replaces the former email-based `is_admin()` function if present, and stops if a catalogue table is missing. Review any error before changing the SQL.
+3. Find the verified administrator's user UUID under Supabase Dashboard > Authentication > Users. Add that UUID to `sql/admin_acc.sql` in place of the placeholder, then run the script in the SQL editor. It stores only the user ID in the private registry; no admin email is embedded in the application or migration. Repeat the insert with another verified user ID to grant additional administrators.
 4. Run the read-only verification below as the database administrator. Expect all ten catalogue tables to have RLS enabled and three restrictive guards each. This checks policy presence; the direct-request checks in the next section are also necessary.
 
 ```sql
@@ -39,6 +39,6 @@ Use controlled records in a staging database and ordinary authenticated API requ
 
 ## Permission model
 
-The email list in the frontend controls navigation only. Server authorization comes from a private registry keyed by authenticated user ID. Users cannot modify that registry through the public API. Restrictive insert, update and delete policies prevent legacy permissive policies from allowing ordinary users to edit shared catalogue records. The usual trusted database-owner and service-role privileges remain outside end-user RLS enforcement.
+The frontend checks admin status by calling `blane_is_admin`; that check controls navigation and page access only. Server authorization comes from a private registry keyed by authenticated user ID. Users cannot modify that registry through the public API. Restrictive insert, update and delete policies prevent legacy permissive policies from allowing ordinary users to edit shared catalogue records. The usual trusted database-owner and service-role privileges remain outside end-user RLS enforcement.
 
 This migration covers the shared catalogue tables only. It does not claim a complete database security audit, live stock integration, or a nutrition-validation result.

@@ -9,19 +9,6 @@ create table if not exists blane_private.admin_users (
 revoke all on blane_private.admin_users from public, anon, authenticated;
 alter table blane_private.admin_users enable row level security;
 
--- Preserve the real administrator already configured in src/lib/admin-auth.js.
--- The Sample@admin.com placeholder is deliberately not granted privileges.
-insert into blane_private.admin_users(user_id)
-select id from auth.users
-where lower(email) = 'jelaxamana008@gmail.com' and email_confirmed_at is not null
-on conflict do nothing;
-
-do $$ begin
-  if not exists (select 1 from blane_private.admin_users) then
-    raise exception 'No confirmed administrator found. Verify the existing administrator account before applying this migration.';
-  end if;
-end $$;
-
 create or replace function public.blane_is_admin()
 returns boolean language sql stable security definer set search_path = ''
 as $$
@@ -33,6 +20,15 @@ as $$
 $$;
 revoke all on function public.blane_is_admin() from public, anon;
 grant execute on function public.blane_is_admin() to authenticated;
+
+-- Replace the former email-based allowlist function if it was installed earlier.
+create or replace function public.is_admin()
+returns boolean language sql stable security invoker set search_path = ''
+as $$
+  select public.blane_is_admin();
+$$;
+revoke all on function public.is_admin() from public, anon;
+grant execute on function public.is_admin() to authenticated;
 
 do $$
 declare target text;
@@ -57,6 +53,7 @@ begin
     execute format('drop policy if exists blane_delete_guard on public.%I', target);
     execute format('create policy blane_delete_guard on public.%I as restrictive for delete to public using (coalesce((select public.blane_is_admin()), false))', target);
   end loop;
-end $$;
+end;
+$$;
 
 commit;

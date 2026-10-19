@@ -1,11 +1,10 @@
-export const ADMIN_EMAILS = [
-  'Jelaxamana008@gmail.com',
-  'Sample@admin.com',
-  // add more admin emails here
-];
+import { supabase } from './supabase';
 
-export function isAdmin(user) {
-  if (!user?.email) return false;
-  const email = user.email.toLowerCase();
-  return ADMIN_EMAILS.map((e) => e.toLowerCase()).includes(email);
+export async function isAdmin(user) {
+  if (!user?.id) return false;
+
+  const { data, error } = await supabase.rpc('blane_is_admin');
+  if (error) throw error;
+
+  return data === true;
 }
