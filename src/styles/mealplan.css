@@ -1599,7 +1599,83 @@
   }
 
   .meal-card-top {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: start;
+    gap: 12px;
+    padding: 16px 14px 14px;
+  }
+
+  .meal-card-emoji {
+    grid-column: 1;
+    grid-row: 1;
+    width: 48px;
+    height: 48px;
+    font-size: 26px;
+  }
+
+  .meal-card-info {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+  }
+
+  .meal-card-name-row {
     flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .meal-card-name {
+    flex: 1 1 100%;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    line-height: 1.4;
+  }
+
+  .meal-card-meta {
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .meal-card-right {
+    grid-column: 2;
+    grid-row: 1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    width: 100%;
+    max-width: none;
+    text-align: right;
+  }
+
+  .meal-card-right .price-estimate-note {
+    flex: 1 1 100%;
+    font-size: 11px;
+    text-align: right;
+  }
+
+  .meal-card-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px 12px 14px;
+  }
+
+  .meal-card-actions > button {
+    min-width: 0;
+    justify-content: center;
+    padding: 8px 6px;
+    white-space: normal;
+    text-align: center;
+    font-size: 12px;
+  }
+
+  .ingredient-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .week-label {

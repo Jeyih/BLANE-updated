@@ -320,7 +320,7 @@
   display: flex;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1150px) {
   .dash-nav-links {
     display: none;
   }

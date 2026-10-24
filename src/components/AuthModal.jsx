@@ -95,6 +95,13 @@ function AuthModal({ open, tab, onClose, onSwitchTab }) {
     setRegLoading(true);
     try {
       const data = await register(regName, regEmail, regPassword);
+      if (data.user) {
+        try {
+          localStorage.setItem(`blane_dashboard_tour_new_user_${data.user.id}`, 'true');
+        } catch (storageError) {
+          console.error('Unable to save first-time dashboard tour state.', storageError);
+        }
+      }
       if (data.session) {
         navigate(REDIRECT_AFTER_REGISTER);
       } else {

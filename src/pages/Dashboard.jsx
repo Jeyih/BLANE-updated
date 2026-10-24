@@ -74,7 +74,11 @@ function Dashboard() {
   }, [user]);
   useEffect(() => {
     if (!user?.id) return;
-    setTourOpen(localStorage.getItem(`blane_dashboard_tour_completed_${user.id}`) !== 'true');
+    const newUserKey = `blane_dashboard_tour_new_user_${user.id}`;
+    const completedKey = `blane_dashboard_tour_completed_${user.id}`;
+    const isNewUser = localStorage.getItem(newUserKey) === 'true';
+    localStorage.removeItem(newUserKey);
+    setTourOpen(isNewUser && localStorage.getItem(completedKey) !== 'true');
   }, [user?.id]);
   async function loadProfile() {
     if (!user) return;
@@ -142,19 +146,6 @@ function Dashboard() {
               { className: 'dash-tour-trigger', type: 'button', onClick: () => setTourOpen(true) },
               React.createElement('span', { 'aria-hidden': 'true' }, '\u24D8'),
               ' Take a tour',
-            ),
-            React.createElement(
-              'span',
-              {
-                className: 'widget-badge',
-                style: {
-                  fontSize: 13,
-                  padding: '8px 16px',
-                  background: 'rgba(45, 220, 122, 0.2)',
-                  border: '1px solid #2ddc7a',
-                },
-              },
-              '\u25CF Real-time Adaptive Engine',
             ),
           ),
         ),
@@ -423,7 +414,11 @@ function MealPlanWidget({ profile }) {
     ),
     React.createElement(
       'div',
-      { className: 'meal-tabs', role: 'group', 'aria-label': 'Meal type' },
+      {
+        className: 'meal-tabs' + (visibleMealTypes.length === 1 ? ' single' : ''),
+        role: 'group',
+        'aria-label': 'Meal type',
+      },
       DEFAULT_SLOTS.map((slot) => {
         const index = visibleMealTypes.indexOf(slot.type);
         if (index === -1) return null;

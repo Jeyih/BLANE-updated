@@ -1174,7 +1174,7 @@ function Admin() {
           { className: 'dash-navbar-logo-text' },
           React.createElement('span', null, 'BL'),
           'ANE ',
-          React.createElement('span', { style: { color: '#a78bfa', fontSize: 12 } }, 'ADMIN'),
+          React.createElement('span', { className: 'ad-brand-badge' }, 'ADMIN'),
         ),
       ),
       React.createElement('div', { className: 'dash-navbar-spacer' }),
@@ -1183,7 +1183,7 @@ function Admin() {
         { className: 'dash-navbar-right' },
         React.createElement(
           'span',
-          { className: 'dash-greeting', style: { color: '#8aab96' } },
+          { className: 'dash-greeting ad-nav-account' },
           'Admin: ',
           React.createElement('strong', null, user.email),
         ),
@@ -1191,20 +1191,15 @@ function Admin() {
           Link,
           {
             to: '/dashboard',
-            className: 'dash-dropdown-item',
-            style: { color: '#2ddc7a', padding: '10px 14px' },
+            className: 'dash-dropdown-item ad-nav-back',
           },
-          '\u2190 Back to App',
+          React.createElement('span', { 'aria-hidden': 'true' }, '\u2190'),
+          React.createElement('span', { className: 'ad-nav-back-label' }, 'Back to App'),
         ),
         React.createElement(
           'button',
           {
-            className: 'dash-dropdown-item danger',
-            style: {
-              width: 'auto',
-              border: '1px solid rgba(248,113,113,0.18)',
-              padding: '10px 14px',
-            },
+            className: 'dash-dropdown-item danger ad-nav-signout',
             onClick: handleLogout,
           },
           'Sign out',
@@ -1336,7 +1331,7 @@ function Admin() {
             { className: 'ad-table-wrap' },
             React.createElement(
               'table',
-              { className: 'ad-table' },
+              { className: 'ad-table ad-table-markets' },
               React.createElement(
                 'thead',
                 null,
@@ -1505,7 +1500,7 @@ function Admin() {
             { className: 'ad-table-wrap' },
             React.createElement(
               'table',
-              { className: 'ad-table' },
+              { className: 'ad-table ad-table-recipes' },
               React.createElement(
                 'thead',
                 null,
@@ -1668,7 +1663,7 @@ function Admin() {
             { className: 'ad-table-wrap' },
             React.createElement(
               'table',
-              { className: 'ad-table' },
+              { className: 'ad-table ad-table-fnri' },
               React.createElement(
                 'thead',
                 null,
@@ -1843,7 +1838,7 @@ function Admin() {
             { className: 'ad-table-wrap' },
             React.createElement(
               'table',
-              { className: 'ad-table' },
+              { className: 'ad-table ad-table-options' },
               React.createElement(
                 'thead',
                 null,
@@ -1988,7 +1983,7 @@ function Admin() {
             { className: 'ad-table-wrap' },
             React.createElement(
               'table',
-              { className: 'ad-table' },
+              { className: 'ad-table ad-table-constraints' },
               React.createElement(
                 'thead',
                 null,
@@ -2141,7 +2136,7 @@ function Admin() {
             { className: 'ad-table-wrap' },
             React.createElement(
               'table',
-              { className: 'ad-table' },
+              { className: 'ad-table ad-table-seasons' },
               React.createElement(
                 'thead',
                 null,

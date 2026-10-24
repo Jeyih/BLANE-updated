@@ -1097,6 +1097,9 @@
 .hero {
   padding-bottom: 72px;
 }
+.hero > .container {
+  width: 100%;
+}
 .hero-visual {
   width: 100%;
 }

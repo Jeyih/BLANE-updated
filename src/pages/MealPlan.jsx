@@ -302,43 +302,6 @@ function MealPlan() {
     }
     setDaySlots(newSlots);
   }
-  function exportWeekPlan() {
-    const days2 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    let text = `=== BLANE WEEKLY MEAL PLAN ===
-Week of ${weekLabel}
-
-`;
-    const dayIndices = [1, 2, 3, 4, 5, 6, 0];
-    dayIndices.forEach((dIdx, i) => {
-      text += `--- ${days2[i]} ---
-`;
-      const dayArr = daySlots[dIdx] || [];
-      if (dayArr.length === 0) {
-        text += `  No meals planned.
-`;
-      } else {
-        dayArr.forEach((s) => {
-          const m = getMeal(s.mealId);
-          if (m) {
-            text += `  [${s.type} - ${s.time || 'Meal'}] ${m.name} (${m.kcal} kcal, ${m.protein}g P, ${formatEstimatedPrice(m.cost)} \xB7 ${pricingLabel(m)})
-`;
-          } else {
-            text += `  [${s.type}] No meal assigned
-`;
-          }
-        });
-      }
-      text += `
-`;
-    });
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `BLANE_MealPlan_${new Date().toISOString().split('T')[0]}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
   const slots = daySlots[selectedDayIndex] || [];
   const activeConstraints = getActiveConstraints(profile, constraintDefinitions);
   const today = new Date();
@@ -530,11 +493,6 @@ Week of ${weekLabel}
             'div',
             null,
             React.createElement('h1', { className: 'mp-page-title' }, 'Meal Plan'),
-            React.createElement(
-              'p',
-              { className: 'mp-page-sub' },
-              'Weekly adaptive plan \u2014 updated by BLANE AI',
-            ),
           ),
           React.createElement(
             'div',
@@ -544,11 +502,6 @@ Week of ${weekLabel}
               { className: 'mp-tour-trigger', type: 'button', onClick: () => setTourOpen(true) },
               React.createElement('span', { 'aria-hidden': 'true' }, '\u24D8'),
               ' Take a tour',
-            ),
-            React.createElement(
-              'button',
-              { className: 'mp-btn mp-btn-outline', onClick: exportWeekPlan },
-              'Export Week',
             ),
             React.createElement(
               'button',

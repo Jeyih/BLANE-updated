@@ -36,6 +36,26 @@ import '../styles/recipes.css';
 const TYPE_FILTERS = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert'];
 const DIET_FILTERS = ['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free'];
 const DIFF_COLORS = { easy: '#2ddc7a', medium: '#fbbf24', hard: '#f87171' };
+const DAILY_RECIPE_LIMIT = 13;
+function getLocalDateKey(date = new Date()) {
+  return [date.getFullYear(), date.getMonth() + 1, date.getDate()]
+    .map((part, index) => (index === 0 ? part : String(part).padStart(2, '0')))
+    .join('-');
+}
+function getDailyRecipeOrder(recipes, dateKey) {
+  function hash(value) {
+    let result = 2166136261;
+    for (let index = 0; index < value.length; index++) {
+      result = Math.imul(result ^ value.charCodeAt(index), 16777619);
+    }
+    return result >>> 0;
+  }
+  return [...recipes].sort(
+    (first, second) =>
+      hash(`${dateKey}:${first.id}`) - hash(`${dateKey}:${second.id}`) ||
+      String(first.id).localeCompare(String(second.id)),
+  );
+}
 function Recipes() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -57,6 +77,16 @@ function Recipes() {
   const [search, setSearch] = useState('');
   const [openRecipeId, setOpenRecipeId] = useState(null);
   const [actionMessage, setActionMessage] = useState('');
+  const [todayKey, setTodayKey] = useState(() => getLocalDateKey());
+  useEffect(() => {
+    const now = new Date();
+    const nextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const timeout = setTimeout(
+      () => setTodayKey(getLocalDateKey()),
+      nextDay.getTime() - now.getTime(),
+    );
+    return () => clearTimeout(timeout);
+  }, [todayKey]);
   useEffect(() => {
     loadAll();
   }, [user]);
@@ -151,19 +181,29 @@ function Recipes() {
     setLoading(false);
   }
   const activeConstraints = getActiveConstraints(profile, constraintDefinitions);
-  const filtered = recipes.filter((r) => {
-    const matchType =
-      !typeFilter || (typeFilter === 'Dessert' ? isDessert(r) : r.type === typeFilter);
-    const dietKey = dietFilter ? dietFilter.toLowerCase().replace('-', '_').replace(' ', '_') : '';
-    const matchDiet = !dietFilter || r.diet.includes(dietKey);
-    const q = search.trim().toLowerCase();
-    const matchSearch =
-      !q ||
-      r.name.toLowerCase().includes(q) ||
-      r.type.toLowerCase().includes(q) ||
-      r.ingredients.some((i) => i.name.toLowerCase().includes(q));
-    return matchType && matchDiet && matchSearch;
-  });
+  const filtered = useMemo(
+    () =>
+      recipes.filter((r) => {
+        const matchType =
+          !typeFilter || (typeFilter === 'Dessert' ? isDessert(r) : r.type === typeFilter);
+        const dietKey = dietFilter
+          ? dietFilter.toLowerCase().replace('-', '_').replace(' ', '_')
+          : '';
+        const matchDiet = !dietFilter || r.diet.includes(dietKey);
+        const q = search.trim().toLowerCase();
+        const matchSearch =
+          !q ||
+          r.name.toLowerCase().includes(q) ||
+          r.type.toLowerCase().includes(q) ||
+          r.ingredients.some((i) => i.name.toLowerCase().includes(q));
+        return matchType && matchDiet && matchSearch;
+      }),
+    [recipes, typeFilter, dietFilter, search],
+  );
+  const displayedRecipes = useMemo(
+    () => getDailyRecipeOrder(filtered, todayKey).slice(0, DAILY_RECIPE_LIMIT),
+    [filtered, todayKey],
+  );
   const openRecipe = recipes.find((r) => r.id === openRecipeId);
   const linkedRecipe = searchParams.get('recipe');
   useEffect(() => {
@@ -214,9 +254,11 @@ function Recipes() {
               React.createElement(
                 'span',
                 { style: { color: '#2ddc7a', fontWeight: 700 } },
-                filtered.length,
+                displayedRecipes.length,
               ),
-              ' recipes found',
+              filtered.length > DAILY_RECIPE_LIMIT
+                ? ` of ${filtered.length} recipes found`
+                : ' recipes found',
             ),
           ),
         ),
@@ -308,7 +350,7 @@ function Recipes() {
                       'Try adjusting the filters above.',
                     ),
                   )
-                : filtered.map((recipe) =>
+                : displayedRecipes.map((recipe) =>
                     React.createElement(RecipeCard, {
                       key: recipe.id,
                       recipe,
