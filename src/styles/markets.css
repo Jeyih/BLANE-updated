@@ -192,6 +192,7 @@
 }
 
 .mk-map-wrap {
+  isolation: isolate;
   background: #0d1a12;
   border: 1px solid rgba(45, 220, 122, 0.12);
   border-radius: 20px;
@@ -819,7 +820,7 @@
   position: absolute;
   top: 16px;
   left: 16px;
-  z-index: 500;
+  z-index: 6;
   min-height: 42px;
   max-width: calc(100% - 80px);
   padding: 10px 14px;

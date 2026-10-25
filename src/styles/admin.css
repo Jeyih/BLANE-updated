@@ -902,6 +902,9 @@
     content: 'Carbs';
   }
   .ad-table-fnri tbody td:nth-child(6)::before {
+    content: 'Estimated Price';
+  }
+  .ad-table-fnri tbody td:nth-child(7)::before {
     content: 'Actions';
   }
 

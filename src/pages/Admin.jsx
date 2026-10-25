@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { useIngredientPrices } from '../context/PriceContext';
+import { marketIngredientPriceText } from '../lib/pricing';
 import { isAdmin } from '../lib/admin-auth';
 import { loadConstraintDefinitions } from '../lib/constraints';
 import PriceSourceStatus from '../components/PriceSourceStatus';
@@ -89,7 +91,7 @@ const EMPTY_RECIPE = {
   dietTags: [],
   goalTags: [],
 };
-const EMPTY_RECIPE_ING = { fct_id: '', name: '', grams: '', status: 'avail' };
+const EMPTY_RECIPE_ING = { fct_id: '', name: '', grams: '', quantity: '', status: 'avail' };
 const EMPTY_RECIPE_STEP = { title: '', description: '', timer: '' };
 const EMPTY_FNRI = {
   fct_id: '',
@@ -102,6 +104,7 @@ const EMPTY_FNRI = {
 };
 function Admin() {
   const { user, loading, logout } = useAuth();
+  const { records: priceRecords, referenceData } = useIngredientPrices();
   const navigate = useNavigate();
   const [adminStatus, setAdminStatus] = useState('checking');
   const [activeTab, setActiveTab] = useState('markets');
@@ -882,6 +885,7 @@ function Admin() {
         fct_id: item.fct_id || '',
         name: item.name,
         grams: item.grams?.toString() || '',
+        quantity: item.quantity?.toString() || '',
         status: item.status,
       })),
     );
@@ -1032,7 +1036,14 @@ function Admin() {
       showToast('Error saving recipe: ' + recipeError.message, true);
       return;
     }
-    await supabase.from('recipe_ingredients').delete().eq('recipe_id', id);
+    const { error: ingredientDeleteError } = await supabase
+      .from('recipe_ingredients')
+      .delete()
+      .eq('recipe_id', id);
+    if (ingredientDeleteError) {
+      showToast('Error replacing recipe ingredients: ' + ingredientDeleteError.message, true);
+      return;
+    }
     const ingredientsToInsert = recipeIngredients
       .filter((item) => item.name.trim())
       .map((item, index) => ({
@@ -1040,6 +1051,7 @@ function Admin() {
         fct_id: item.fct_id || null,
         name: item.name.trim(),
         grams: parseFloat(item.grams) || 0,
+        quantity: item.quantity.trim() || null,
         status: item.status,
         sort_order: index + 1,
       }));
@@ -1052,7 +1064,14 @@ function Admin() {
         return;
       }
     }
-    await supabase.from('recipe_steps').delete().eq('recipe_id', id);
+    const { error: stepDeleteError } = await supabase
+      .from('recipe_steps')
+      .delete()
+      .eq('recipe_id', id);
+    if (stepDeleteError) {
+      showToast('Error replacing recipe steps: ' + stepDeleteError.message, true);
+      return;
+    }
     const stepsToInsert = recipeSteps
       .filter((step) => step.title.trim())
       .map((step, index) => ({
@@ -1675,6 +1694,7 @@ function Admin() {
                   React.createElement('th', null, 'Protein'),
                   React.createElement('th', null, 'Fat'),
                   React.createElement('th', null, 'Carbs'),
+                  React.createElement('th', null, 'Estimated Price'),
                   React.createElement('th', null, 'Actions'),
                 ),
               ),
@@ -1685,7 +1705,7 @@ function Admin() {
                   ? React.createElement(
                       'tr',
                       { className: 'ad-empty-row' },
-                      React.createElement('td', { colSpan: '6' }, 'No food items found.'),
+                      React.createElement('td', { colSpan: '7' }, 'No food items found.'),
                     )
                   : filteredFnri.map((item) =>
                       React.createElement(
@@ -1713,6 +1733,17 @@ function Admin() {
                           null,
                           item.available_carbohydrate_g ?? '\u2014',
                           'g',
+                        ),
+                        React.createElement(
+                          'td',
+                          {
+                            title: 'Estimated from the available sourced price references; this is not an FNRI-provided value.',
+                          },
+                          marketIngredientPriceText(
+                            { name: item.food_name },
+                            priceRecords,
+                            referenceData || {},
+                          ),
                         ),
                         React.createElement(
                           'td',
@@ -2819,7 +2850,7 @@ function Admin() {
               {
                 key: idx,
                 className: 'ad-sub-row',
-                style: { gridTemplateColumns: '1fr 80px 90px 32px' },
+                style: { gridTemplateColumns: 'minmax(120px, 1fr) 70px minmax(120px, 1fr) 76px 30px' },
               },
               React.createElement(
                 'div',
@@ -2944,8 +2975,17 @@ function Admin() {
                 className: 'ad-input',
                 type: 'number',
                 placeholder: 'Grams',
+                'aria-label': `Grams for ${ing.name || `ingredient ${idx + 1}`}`,
                 value: ing.grams,
                 onChange: (e) => updateRecipeIngredient(idx, 'grams', e.target.value),
+              }),
+              React.createElement('input', {
+                className: 'ad-input',
+                type: 'text',
+                placeholder: 'Quantity (e.g. 1 cup)',
+                'aria-label': `Recipe quantity for ${ing.name || `ingredient ${idx + 1}`}`,
+                value: ing.quantity,
+                onChange: (e) => updateRecipeIngredient(idx, 'quantity', e.target.value),
               }),
               React.createElement(
                 'select',
