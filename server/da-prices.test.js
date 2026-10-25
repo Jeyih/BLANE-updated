@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import snapshot from '../public/data/ingredient-prices.json';
-import retailSnapshot from '../public/data/retail-prices.json';
+import snapshot from '../public/data/ingredient-prices.json' with { type: 'json' };
+import retailSnapshot from '../public/data/retail-prices.json' with { type: 'json' };
 import { reportLinks, parseDaRows } from './da-prices.js';
 import { handler } from '../netlify/functions/ingredient-prices.mjs';
 test('selects the newest completed report across month and year boundaries', () => {

@@ -1,3 +1,7 @@
+import { generateMealPlan } from '../lib/plan-generation.js';
+import { appliedMeal } from '../lib/portions.js';
+import { localMealStorage as localStorage, sessionMealStorage as sessionStorage, readStoredJson } from '../lib/account-storage.js';
+import { computeDailyTargets, nutritionProfile } from '../../supabase/functions/_shared/nutrition.js';
 import React from 'react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +17,7 @@ import {
   getActiveConstraints,
   getUnmatchedConstraints,
   checkRecipeViolations,
+  canSelectRecipe,
 } from '../lib/constraints';
 import {
   applyDynamicRecipePrices,
@@ -37,22 +42,7 @@ const SLOT_PRESETS = [
   { type: 'Custom', icon: '\u270F\uFE0F', time: 'Your own' },
 ];
 function getCalorieGoal(profile) {
-  if (!profile) return 1840;
-  const h = parseFloat(profile.height_cm) || 170;
-  const w = parseFloat(profile.weight_kg) || 70;
-  const age = parseInt(profile.age) || 25;
-  const sex = profile.sex || 'male';
-  const bmr = sex === 'male' ? 10 * w + 6.25 * h - 5 * age + 5 : 10 * w + 6.25 * h - 5 * age - 161;
-  const tdee = bmr * 1.55;
-  const adj = {
-    lose_weight: 0.85,
-    gain_muscle: 1.1,
-    maintain: 1,
-    improve_health: 1,
-    boost_energy: 1,
-    manage_condition: 0.9,
-  };
-  return Math.round(tdee * (adj[profile.goal] || 1)) || 1840;
+  return computeDailyTargets(profile).calories;
 }
 function getIngredientQuantityLabel(ingredient, optimizedQuantity) {
   const hasQuantity = ingredient.quantity != null && ingredient.quantity !== '';
@@ -69,27 +59,6 @@ function getMealCompletionKey(date, slot, index) {
   ].join('-');
   return `${dateKey}:${index}:${slot.type}:${slot.mealId || 'empty'}`;
 }
-function generateDefaultPlan(recipeList) {
-  if (!recipeList || recipeList.length === 0) return {};
-  const breakfasts = recipeList.filter((r) => r.type === 'Breakfast');
-  const lunches = recipeList.filter((r) => r.type === 'Lunch');
-  const dinners = recipeList.filter((r) => r.type === 'Dinner');
-  const snacks = recipeList.filter((r) => r.type === 'Snack');
-  const defaultSlots = {};
-  for (let day = 0; day < 7; day++) {
-    const bMeal = breakfasts.length ? breakfasts[day % breakfasts.length] : recipeList[0];
-    const lMeal = lunches.length ? lunches[day % lunches.length] : recipeList[1] || recipeList[0];
-    const sMeal = snacks.length ? snacks[day % snacks.length] : null;
-    const dMeal = dinners.length ? dinners[day % dinners.length] : recipeList[2] || recipeList[0];
-    const dayArr = [];
-    if (bMeal) dayArr.push({ type: 'Breakfast', time: '7:00 AM', mealId: bMeal.id });
-    if (lMeal) dayArr.push({ type: 'Lunch', time: '12:00 PM', mealId: lMeal.id });
-    if (sMeal) dayArr.push({ type: 'Snack', time: '3:00 PM', mealId: sMeal.id });
-    if (dMeal) dayArr.push({ type: 'Dinner', time: '6:30 PM', mealId: dMeal.id });
-    defaultSlots[day] = dayArr;
-  }
-  return defaultSlots;
-}
 function MealPlan() {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
@@ -102,6 +71,7 @@ function MealPlan() {
   );
   const [loadingRecipes, setLoadingRecipes] = useState(true);
   const [constraintDefinitions, setConstraintDefinitions] = useState({});
+  const [constraintsReady, setConstraintsReady] = useState(false);
   const [currentWeekOffset, setWeekOffset] = useState(0);
   const [selectedDayIndex, setSelectedDay] = useState(new Date().getDay());
   const [daySlots, setDaySlots] = useState({});
@@ -112,9 +82,7 @@ function MealPlan() {
       return {};
     }
   });
-  const [groceryList, setGroceryList] = useState(() =>
-    JSON.parse(sessionStorage.getItem('blane_grocery') || '[]'),
-  );
+  const [groceryList, setGroceryList] = useState(() => readStoredJson(sessionStorage, 'blane_grocery', []));
   const [openOptimizerId, setOpenOptimizerId] = useState(null);
   const [appliedOptimizations, setAppliedOptimizations] = useState(() => {
     try {
@@ -136,12 +104,12 @@ function MealPlan() {
     loadProfile();
     if (recipes.length === 0) loadRecipes();
     loadConstraintDefinitions().then((definitions) => {
-      if (definitions) setConstraintDefinitions(definitions);
+      if (definitions) { setConstraintDefinitions(definitions); setConstraintsReady(true); }
     });
   }, [user?.id]);
   useEffect(() => {
     if (!user?.id) return;
-    setTourOpen(localStorage.getItem(`blane_mealplan_tour_completed_${user.id}`) !== 'true');
+    setTourOpen(globalThis.localStorage.getItem(`blane_mealplan_tour_completed_${user.id}`) !== 'true');
   }, [user?.id]);
   useEffect(() => {
     localStorage.setItem('blane_meal_plan_day', String(selectedDayIndex));
@@ -254,7 +222,8 @@ function MealPlan() {
         console.error('Error parsing stored meal plan:', e);
       }
     }
-    setDaySlots(generateDefaultPlan(formatted));
+    // Generate only after both profile and constraint metadata are available.
+    setDaySlots({});
   }
   useEffect(() => {
     if (Object.keys(daySlots).length > 0) {
@@ -264,7 +233,7 @@ function MealPlan() {
   }, [daySlots]);
   useEffect(() => {
     const sync = (event) => {
-      if (event?.key && event.key !== 'blane_meal_plan') return;
+      if (event?.key && !localStorage.matches(event.key, 'blane_meal_plan')) return;
       try {
         const plan = JSON.parse(localStorage.getItem('blane_meal_plan') || '{}');
         if (plan && typeof plan === 'object' && !Array.isArray(plan)) setDaySlots(plan);
@@ -277,29 +246,14 @@ function MealPlan() {
     if (!id) return null;
     return recipes.find((m) => m.id === id || String(m.id) === String(id)) || null;
   }
+  const eligibleRecipes = recipes.filter(r => canSelectRecipe(r, profile, constraintDefinitions, constraintsReady));
+  useEffect(() => {
+    if (!profile || !constraintsReady || loadingRecipes || localStorage.getItem('blane_meal_plan')) return;
+    setDaySlots(generateMealPlan(recipes, profile, constraintDefinitions, { ready: constraintsReady }));
+  }, [profile, constraintsReady, loadingRecipes, recipes, constraintDefinitions]);
   function regeneratePlan() {
-    if (recipes.length === 0) return;
-    const newSlots = {};
-    for (let day = 0; day < 7; day++) {
-      const breakfasts = recipes.filter((r) => r.type === 'Breakfast');
-      const lunches = recipes.filter((r) => r.type === 'Lunch');
-      const dinners = recipes.filter((r) => r.type === 'Dinner');
-      const snacks = recipes.filter((r) => r.type === 'Snack');
-      const getRandom = (arr) =>
-        arr.length
-          ? arr[Math.floor(Math.random() * arr.length)]
-          : recipes[Math.floor(Math.random() * recipes.length)];
-      const b = getRandom(breakfasts);
-      const l = getRandom(lunches);
-      const s = getRandom(snacks);
-      const d = getRandom(dinners);
-      newSlots[day] = [
-        { type: 'Breakfast', time: '7:00 AM', mealId: b?.id },
-        { type: 'Lunch', time: '12:00 PM', mealId: l?.id },
-        { type: 'Snack', time: '3:00 PM', mealId: s?.id },
-        { type: 'Dinner', time: '6:30 PM', mealId: d?.id },
-      ].filter((slot) => slot.mealId);
-    }
+    if (eligibleRecipes.length === 0) { alert('No recipes can be selected with the available dietary rules and ingredient data.'); return; }
+    const newSlots = generateMealPlan(recipes, profile, constraintDefinitions, { ready: constraintsReady, random: true });
     setDaySlots(newSlots);
   }
   const slots = daySlots[selectedDayIndex] || [];
@@ -337,13 +291,39 @@ function MealPlan() {
     weekEnd.getFullYear();
   const selectedDate = new Date(base);
   selectedDate.setDate(base.getDate() + ((selectedDayIndex + 6) % 7));
-  const totalKcal = slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.kcal || 0), 0);
-  const totalCost = Math.round(slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.cost || 0), 0));
+  const getDisplayedMeal = id => appliedMeal(getMeal(id), appliedOptimizations[id]);
+  function exportWeekPlan() {
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const lines = ['=== BLANE WEEKLY MEAL PLAN ===', `Week of ${weekLabel}`, '', 'Prices are estimates in Philippine pesos. Actual store totals may vary.', ''];
+    [1, 2, 3, 4, 5, 6, 0].forEach((dayIndex, index) => {
+      lines.push(`--- ${dayNames[index]} ---`);
+      const planned = daySlots[dayIndex] || [];
+      if (!planned.length) lines.push('  No meals planned.');
+      planned.forEach(slot => {
+        const meal = getDisplayedMeal(slot.mealId);
+        lines.push(meal
+          ? `  [${slot.type} - ${slot.time || 'Meal'}] ${meal.name} (${meal.kcal} kcal, ${meal.protein}g P, ${formatEstimatedPrice(meal.cost)} · ${pricingLabel(meal)})`
+          : `  [${slot.type}] No meal assigned`);
+      });
+      lines.push('');
+    });
+    const url = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    const date = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`;
+    link.download = `BLANE_MealPlan_${date}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  const totalKcal = slots.reduce((s, slot) => s + (getDisplayedMeal(slot.mealId)?.kcal || 0), 0);
+  const totalCost = Math.round(slots.reduce((s, slot) => s + (getDisplayedMeal(slot.mealId)?.cost || 0), 0));
   const missingCosts = slots.some(
-    (slot) => !getMeal(slot.mealId) || getMeal(slot.mealId).priceIncomplete,
+    (slot) => !getDisplayedMeal(slot.mealId) || getDisplayedMeal(slot.mealId).priceIncomplete,
   );
   const totalProtein = Math.round(
-    slots.reduce((s, slot) => s + (getMeal(slot.mealId)?.protein || 0), 0),
+    slots.reduce((s, slot) => s + (getDisplayedMeal(slot.mealId)?.protein || 0), 0),
   );
   const calGoal = getCalorieGoal(profile);
   const dayPct = Math.min(Math.round((totalKcal / calGoal) * 100), 100);
@@ -360,6 +340,7 @@ function MealPlan() {
       alert('Please select a meal type.');
       return;
     }
+    if (selectedRecipeForAdd && !canSelectRecipe(getMeal(selectedRecipeForAdd), profile, constraintDefinitions, constraintsReady)) { alert('This recipe cannot be checked against your dietary profile.'); return; }
     let type = slotTypeChoice;
     let time = SLOT_PRESETS.find((p) => p.type === type)?.time || '12:00 PM';
     if (type === 'Custom') {
@@ -393,6 +374,7 @@ function MealPlan() {
       alert('Please select a recipe.');
       return;
     }
+    if (!canSelectRecipe(getMeal(swapChoice), profile, constraintDefinitions, constraintsReady)) { alert('This recipe conflicts with your profile or cannot be fully checked.'); return; }
     setDaySlots((prev) => {
       const next = { ...prev };
       const arr = [...(next[selectedDayIndex] || [])];
@@ -413,6 +395,7 @@ function MealPlan() {
     setCompletionTarget(null);
   }
   function addMealToGrocery(meal) {
+    meal = meal && getDisplayedMeal(meal.id);
     if (!meal || !meal.ingredients) return;
     setGroceryList((prev) => {
       const filtered = prev.filter((g) => g.mealId !== meal.id);
@@ -428,7 +411,7 @@ function MealPlan() {
     });
   }
   function addAllTodayToGrocery() {
-    const todayMeals = slots.map((s) => getMeal(s.mealId)).filter(Boolean);
+    const todayMeals = slots.map((s) => getDisplayedMeal(s.mealId)).filter(Boolean);
     if (todayMeals.length === 0) return;
     setGroceryList((prev) => {
       let current = [...prev];
@@ -455,17 +438,17 @@ function MealPlan() {
   }
   function closeTour() {
     if (user?.id) {
-      localStorage.setItem(`blane_mealplan_tour_completed_${user.id}`, 'true');
+      globalThis.localStorage.setItem(`blane_mealplan_tour_completed_${user.id}`, 'true');
     }
     setTourOpen(false);
   }
   const availableRecipesForAdd = slotTypeChoice
-    ? recipes.filter(
+    ? eligibleRecipes.filter(
         (r) =>
           r.type === slotTypeChoice || slotTypeChoice === 'Custom' || slotTypeChoice === 'Brunch',
       )
-    : recipes;
-  const filteredSwapRecipes = recipes.filter((recipe) => {
+    : eligibleRecipes;
+  const filteredSwapRecipes = eligibleRecipes.filter((recipe) => {
     if (swapTarget?.meal?.id && recipe.id === swapTarget.meal.id) return false;
     const query = swapSearch.trim().toLowerCase();
     if (!query) return true;
@@ -502,6 +485,11 @@ function MealPlan() {
               { className: 'mp-tour-trigger', type: 'button', onClick: () => setTourOpen(true) },
               React.createElement('span', { 'aria-hidden': 'true' }, '\u24D8'),
               ' Take a tour',
+            ),
+            React.createElement(
+              'button',
+              { className: 'mp-btn mp-btn-outline', type: 'button', onClick: exportWeekPlan, disabled: loadingRecipes || !profile },
+              'Export Week',
             ),
             React.createElement(
               'button',
@@ -721,7 +709,7 @@ function MealPlan() {
               ),
               'Add meal slot',
             ),
-            React.createElement(PriceOptimizerPanel, { meals: recipes, profile }),
+            React.createElement(PriceOptimizerPanel, { meals: eligibleRecipes, profile }),
           ),
           React.createElement(
             'div',
@@ -1211,7 +1199,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
       }
       const active = getActiveConstraints(profile, definitions);
       const isAllowed = (meal) =>
-        checkRecipeViolations(meal, active, true, definitions).length === 0;
+        canSelectRecipe(meal, profile, definitions);
       const priceMeal = (meal) => applyDynamicRecipePrices([meal], priceRecords)[0];
       const validate = (meal) =>
         meal.type === suggestionType &&
@@ -1240,7 +1228,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
               },
               body: JSON.stringify({
                 mode: 'suggest',
-                profile,
+                profile: nutritionProfile(profile),
                 budget: perMeal,
                 mealType: suggestionType,
               }),
@@ -1932,6 +1920,7 @@ function SlotCard({
   onAddGrocery,
 }) {
   const meal = getMeal(slot.mealId);
+  const displayedMeal = appliedMeal(meal, appliedOptimization);
   const [ingredientsOpen, setIngredientsOpen] = useState(false);
   const alreadyAdded = meal && groceryList.some((g) => g.mealId === meal.id);
   const seasonScore = meal ? scoreRecipe(meal.ingredients) : null;
@@ -2022,19 +2011,19 @@ function SlotCard({
                   React.createElement(
                     'div',
                     { className: 'macro-chip' },
-                    React.createElement('b', null, meal.protein, 'g'),
+                    React.createElement('b', null, displayedMeal.protein, 'g'),
                     ' Protein',
                   ),
                   React.createElement(
                     'div',
                     { className: 'macro-chip' },
-                    React.createElement('b', null, meal.carbs, 'g'),
+                    React.createElement('b', null, displayedMeal.carbs, 'g'),
                     ' Carbs',
                   ),
                   React.createElement(
                     'div',
                     { className: 'macro-chip' },
-                    React.createElement('b', null, meal.fats, 'g'),
+                    React.createElement('b', null, displayedMeal.fats, 'g'),
                     ' Fats',
                   ),
                   seasonScore && React.createElement(SeasonBadge, { scoreResult: seasonScore }),
@@ -2047,7 +2036,7 @@ function SlotCard({
                 React.createElement(
                   'div',
                   { className: 'meal-kcal-badge' },
-                  React.createElement('span', null, meal.kcal),
+                  React.createElement('span', null, displayedMeal.kcal),
                   React.createElement('small', null, 'kcal'),
                 ),
                 React.createElement(
@@ -2056,7 +2045,7 @@ function SlotCard({
                     className: `meal-cost-badge${!meal.cost ? ' meal-cost-badge--zero' : ''}`,
                     title: pricingLabel(meal),
                   },
-                  formatEstimatedPrice(meal.cost),
+                  formatEstimatedPrice(displayedMeal.cost),
                 ),
                 React.createElement(
                   'div',
@@ -2219,6 +2208,7 @@ function SlotCard({
                 alreadyAdded ? 'Added \u2713' : 'Add to grocery',
               ),
               React.createElement(OptimizeButton, {
+                disabled: violations.length > 0 || !(Number(meal.kcal) > 0),
                 onToggle: () => onSetOpenOptimizer(openOptimizerId === meal.id ? null : meal.id),
               }),
               React.createElement(WhyButton, { meal, profile, violations }),
@@ -2249,7 +2239,7 @@ function SlotCard({
             meal,
             profile,
             totalMealsToday,
-            open: openOptimizerId === meal.id,
+            open: openOptimizerId === meal.id && violations.length === 0 && Number(meal.kcal) > 0,
             onClose: () => onSetOpenOptimizer(null),
             onApplied: onPortionApplied,
             onOriginalMeal,

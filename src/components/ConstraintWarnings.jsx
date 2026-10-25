@@ -36,7 +36,7 @@ function ConstraintActiveBar({ activeConstraints }) {
       'div',
       { className: 'cb-active-chips' },
       activeConstraints.map((key) => {
-        const c = CB_CONSTRAINTS[key];
+        const c = CB_CONSTRAINTS[key] || { severity: 'dietary', icon: '\u26A0', label: key.replace('unmatched:', 'Unverified: ') };
         return React.createElement(
           'span',
           { key, className: 'cb-active-chip ' + c.severity },
@@ -53,7 +53,7 @@ function ViolationBadge({ violations }) {
     return React.createElement(
       'span',
       { className: 'cb-violation-badge safe' },
-      '\u2713 Constraint Safe',
+      '\u2713 No detected conflict',
     );
   }
   const order = { allergy: 0, medical: 1, dietary: 2 };

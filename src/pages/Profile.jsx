@@ -1,3 +1,4 @@
+import { computeDailyTargets, validateMeasurements } from '../../supabase/functions/_shared/nutrition.js';
 import React from 'react';
 import PasswordInput from '../components/PasswordInput';
 import { useEffect, useMemo, useState } from 'react';
@@ -11,13 +12,6 @@ const ACTIVITY_LABELS = {
   moderate: 'Moderately Active',
   very_active: 'Very Active',
   extra_active: 'Extra Active',
-};
-const ACTIVITY_MULT = {
-  sedentary: 1.2,
-  light: 1.375,
-  moderate: 1.55,
-  very_active: 1.725,
-  extra_active: 1.9,
 };
 const EMPTY_PROFILE = {
   full_name: '',
@@ -213,18 +207,10 @@ function Profile() {
         bmiCategory = 'Obese';
         bmiColor = '#f87171';
       }
-      const bmr =
-        sex === 'female'
-          ? 10 * weight + 6.25 * height - 5 * age - 161
-          : 10 * weight + 6.25 * height - 5 * age + 5;
-      const multiplier = ACTIVITY_MULT[profile.activity_level] || 1.55;
-      calorieTdee = Math.round(bmr * multiplier);
-      calorieTarget = calorieTdee;
-      const label = calorieTdee
-        ? 'TDEE: ' + calorieTdee.toLocaleString() + ' kcal/day'
-        : caloriesLabel;
-      if (profile.goal === 'lose_weight') calorieTarget = Math.round(calorieTdee * 0.85);
-      if (profile.goal === 'gain_muscle') calorieTarget = Math.round(calorieTdee * 1.1);
+      const targets = computeDailyTargets(profile);
+      calorieTdee = Math.round(targets.tdee);
+      calorieTarget = targets.calories;
+      const label = "TDEE: " + calorieTdee.toLocaleString() + " kcal/day";
       const bmiMarkerPct = Math.min(Math.max((bmi - 10) / 30, 0), 1) * 100;
       return {
         bmiValue: bmiFixed,
@@ -312,9 +298,9 @@ function Profile() {
   }
   async function saveBasicInfo() {
     const name = basicForm.full_name.trim();
-    const age = parseInt(basicForm.age, 10);
-    const height = parseFloat(basicForm.height_cm);
-    const weight = parseFloat(basicForm.weight_kg);
+    const age = Number(basicForm.age);
+    const height = Number(basicForm.height_cm);
+    const weight = Number(basicForm.weight_kg);
     if (!name) {
       showToast('Please enter your name.', true);
       return;
@@ -331,6 +317,8 @@ function Profile() {
       showToast('Please enter your weight.', true);
       return;
     }
+    const measurementError = validateMeasurements({ age, height_cm: height, weight_kg: weight });
+    if (measurementError) { showToast(measurementError, true); return; }
     setBasicSaving(true);
     const { error } = await supabase
       .from('profiles')

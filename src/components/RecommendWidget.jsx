@@ -1,3 +1,7 @@
+import { loadConstraintDefinitions, CB_CONSTRAINTS, canSelectRecipe } from '../lib/constraints';
+import { asList } from '../lib/constraint-rules.js';
+import { localMealStorage as localStorage, sessionMealStorage as sessionStorage } from '../lib/account-storage.js';
+import { computeDailyTargets } from '../../supabase/functions/_shared/nutrition.js';
 import React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -18,33 +22,9 @@ import useMealClock from '../hooks/useMealClock';
 import PriceEstimateNotice from './PriceEstimateNotice';
 import '../styles/meal-experience.css';
 import '../styles/recommend.css';
-const CONSTRAINT_BLOCKS = {};
-const ALLERGY_KEYS = [];
 const GOAL_IDEALS = { maintain: { minProtein: 15, maxKcal: 550, maxFats: 25, minCarbs: 20 } };
 async function loadRecommendationData() {
-  const { data: constraintData, error: constraintErr } = await supabase
-    .from('constraint_definitions')
-    .select('*')
-    .order('sort_order');
-  if (constraintErr) {
-    console.error('Failed to load recommendation constraints:', constraintErr);
-  } else {
-    Object.keys(CONSTRAINT_BLOCKS).forEach((key) => delete CONSTRAINT_BLOCKS[key]);
-    ALLERGY_KEYS.length = 0;
-    (constraintData || []).forEach((row) => {
-      if (row.active === false || !row.key) return;
-      const blocked = Array.isArray(row.blocked)
-        ? row.blocked.map((item) => item.trim()).filter(Boolean)
-        : typeof row.blocked === 'string'
-          ? row.blocked
-              .split(',')
-              .map((item) => item.trim())
-              .filter(Boolean)
-          : [];
-      CONSTRAINT_BLOCKS[row.key] = blocked;
-      if (row.severity === 'allergy') ALLERGY_KEYS.push(row.key);
-    });
-  }
+  const definitions = await loadConstraintDefinitions();
   const { data: goalData, error: goalErr } = await supabase.from('goal_ideals').select('*');
   if (goalErr) {
     console.error('Failed to load goal ideals:', goalErr);
@@ -62,7 +42,7 @@ async function loadRecommendationData() {
       };
     });
   }
-  return !constraintErr && !goalErr;
+  return Boolean(definitions) && !goalErr;
 }
 function RecommendWidget({ profile }) {
   const now = useMealClock();
@@ -257,6 +237,7 @@ function RecommendWidget({ profile }) {
                   mealType,
                   onUse: () => {
                     try {
+                      if (!canSelectRecipe(item.recipe, profile, CB_CONSTRAINTS, metadataReady)) { setActionMessage('This recipe cannot be selected with the available dietary rules.'); return; }
                       addMealForToday(item.recipe, { type: mealType });
                       setActionMessage(
                         `Added ${item.recipe.name} to today's ${mealType.toLowerCase()}.`,
@@ -409,14 +390,14 @@ function SkeletonLoader() {
 }
 function scoreAndRankRecipes(profile, recipes) {
   const goal = profile.goal || 'maintain';
-  const dietary = profile.dietary_restrictions || [];
-  const medical = profile.medical_conditions || [];
-  const allergies = profile.allergies || [];
+  const dietary = asList(profile.dietary_restrictions);
+  const medical = asList(profile.medical_conditions);
+  const allergies = asList(profile.allergies);
   const allConstraints = [...dietary, ...medical, ...allergies];
   const ideals = GOAL_IDEALS[goal] || GOAL_IDEALS.maintain;
   const dailyTarget = computeDailyTarget(profile);
   const perMealKcal = Math.round(dailyTarget / 4);
-  const scored = (recipes || []).map((recipe) => {
+  const scored = (recipes || []).filter(recipe => canSelectRecipe(recipe, profile, CB_CONSTRAINTS)).map((recipe) => {
     let score = 0;
     let goalScore = 0;
     if (recipe.goal?.includes(goal)) goalScore += 20;
@@ -425,21 +406,7 @@ function scoreAndRankRecipes(profile, recipes) {
     if (recipe.fats <= ideals.maxFats) goalScore += 3;
     if (recipe.carbs >= ideals.minCarbs) goalScore += 3;
     score += Math.min(40, goalScore);
-    let violations = 0,
-      allergyHit = false;
-    allConstraints.forEach((key) => {
-      const blocked = CONSTRAINT_BLOCKS[key] || [];
-      const isAllergy = ALLERGY_KEYS.includes(key);
-      recipe.ingredients.forEach((ing) => {
-        const ingLower = ing.name.toLowerCase();
-        blocked.forEach((b) => {
-          if (ingLower.includes(b) || b.includes(ingLower.split(' ')[0])) {
-            violations++;
-            if (isAllergy) allergyHit = true;
-          }
-        });
-      });
-    });
+    const violations = 0, allergyHit = false;
     if (allergyHit) score -= 30;
     else if (violations > 0) score -= violations * 20;
     const calDiff = Math.abs(recipe.kcal - perMealKcal);
@@ -455,103 +422,11 @@ function scoreAndRankRecipes(profile, recipes) {
   );
   return scored.filter((item) => !item.allergyHit && item.violations === 0).slice(0, 3);
 }
-function generateReason(recipe, goal, violations, perMealKcal, profile) {
-  if (
-    violations > 0 &&
-    ALLERGY_KEYS.some(
-      (k) =>
-        (profile.dietary_restrictions || []).includes(k) ||
-        (profile.medical_conditions || []).includes(k) ||
-        (profile.allergies || []).includes(k),
-    )
-  ) {
-    return 'Flagged \u2014 contains an ingredient that may conflict with your allergy profile.';
-  }
-  if (goal === 'lose_weight') {
-    if (recipe.kcal <= 350 && recipe.protein >= 20) {
-      return (
-        'High-protein at only ' +
-        recipe.kcal +
-        ' kcal \u2014 ideal for staying in a calorie deficit while preserving muscle.'
-      );
-    }
-    return (
-      'At ' +
-      recipe.kcal +
-      ' kcal with ' +
-      recipe.protein +
-      'g protein, this supports your weight loss goal with good satiety.'
-    );
-  }
-  if (goal === 'gain_muscle') {
-    if (recipe.protein >= 30)
-      return (
-        recipe.protein +
-        'g protein directly fuels muscle protein synthesis \u2014 a top pick for your muscle gain goal.'
-      );
-    return (
-      'Solid ' +
-      recipe.protein +
-      'g protein and ' +
-      recipe.carbs +
-      'g carbs for energy \u2014 supports your muscle-building plan.'
-    );
-  }
-  if (goal === 'improve_health') {
-    return (
-      'Nutrient-dense Filipino ingredients with ' +
-      recipe.protein +
-      'g protein and only ' +
-      recipe.fats +
-      'g fat \u2014 great for overall wellness.'
-    );
-  }
-  if (goal === 'boost_energy') {
-    return (
-      recipe.carbs + 'g of complex carbohydrates gives you sustained energy throughout the day.'
-    );
-  }
-  if (goal === 'manage_condition') {
-    return (
-      'Low in fat (' +
-      recipe.fats +
-      'g) and moderate calories (' +
-      recipe.kcal +
-      ' kcal) \u2014 suitable for condition management.'
-    );
-  }
-  const diff = Math.abs(recipe.kcal - perMealKcal);
-  if (diff <= 80)
-    return (
-      'Nearly matches your per-meal calorie target of ' +
-      perMealKcal +
-      ' kcal \u2014 a well-balanced choice.'
-    );
-  return (
-    'Balanced macros with ' +
-    recipe.protein +
-    'g protein, ' +
-    recipe.carbs +
-    'g carbs, and ' +
-    recipe.fats +
-    'g fat \u2014 fits your maintenance plan.'
-  );
+function generateReason(recipe, goal, violations, perMealKcal) {
+  const distance = Math.abs(Number(recipe.kcal) - perMealKcal);
+  return `${recipe.kcal} kcal; ${recipe.protein} g protein, ${recipe.carbs} g carbs and ${recipe.fats} g fat. ${distance <= 80 ? 'Close to' : 'Compared with'} the estimated ${perMealKcal} kcal per-meal target. Ranked using your selected goal and loaded ingredient rules.`;
 }
 function computeDailyTarget(profile) {
-  const h = parseFloat(profile.height_cm) || 170;
-  const w = parseFloat(profile.weight_kg) || 70;
-  const age = parseInt(profile.age) || 25;
-  const sex = profile.sex || 'male';
-  const bmr = sex === 'male' ? 10 * w + 6.25 * h - 5 * age + 5 : 10 * w + 6.25 * h - 5 * age - 161;
-  const tdee = bmr * 1.55;
-  const adj = {
-    lose_weight: 0.85,
-    gain_muscle: 1.1,
-    maintain: 1,
-    improve_health: 1,
-    boost_energy: 1,
-    manage_condition: 0.9,
-  };
-  return Math.round(tdee * (adj[profile.goal] || 1));
+  return computeDailyTargets(profile).calories;
 }
 export { RecommendWidget as default };

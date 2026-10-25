@@ -1,3 +1,4 @@
+import { computeDailyTargets, normalizePortionResult, nutritionProfile } from "../_shared/nutrition.js";
 // ============================================================
 // BLANE — Portion Optimizer Edge Function (Gemini-powered)
 // Receives: { meal, profile, totalMealsToday }
@@ -12,24 +13,8 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const ACTIVITY_MULT: Record<string, number> = {
-  sedentary: 1.2,
-  light: 1.375,
-  moderate: 1.55,
-  very_active: 1.725,
-  extra_active: 1.9,
-};
 
-const GOAL_ADJUST: Record<string, number> = {
-  lose_weight: 0.85,
-  gain_muscle: 1.1,
-  maintain: 1.0,
-  improve_health: 1.0,
-  boost_energy: 1.0,
-  manage_condition: 0.9,
-};
 
-const MACRO_TARGETS = { protein: 0.3, carbs: 0.45, fats: 0.25 };
 const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-2.5-flash-lite"];
 
 function jsonError(message: string, status = 400) {
@@ -39,24 +24,7 @@ function jsonError(message: string, status = 400) {
   });
 }
 
-function computeDailyTargets(profile: any) {
-  const h = Number(profile?.height_cm) || 170;
-  const w = Number(profile?.weight_kg) || 70;
-  const age = Number(profile?.age) || 25;
-  const sex = profile?.sex || "male";
-  const bmr = sex === "male" ? 10 * w + 6.25 * h - 5 * age + 5 : 10 * w + 6.25 * h - 5 * age - 161;
-  const actKey = String(profile?.activity_level || "").toLowerCase();
-  const goalKey = String(profile?.goal || "").toLowerCase();
-  const tdee = bmr * (ACTIVITY_MULT[actKey] || 1.55);
-  const calTarget = Math.round(tdee * (GOAL_ADJUST[goalKey] || 1.0));
 
-  return {
-    calories: calTarget,
-    protein: Math.round((calTarget * MACRO_TARGETS.protein) / 4),
-    carbs: Math.round((calTarget * MACRO_TARGETS.carbs) / 4),
-    fats: Math.round((calTarget * MACRO_TARGETS.fats) / 9),
-  };
-}
 
 function parseFraction(str: string) {
   const fracts: Record<string, number> = { "½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 0.333, "⅔": 0.667 };
@@ -390,7 +358,8 @@ Deno.serve(async (req) => {
       .select("goal, dietary_restrictions, medical_conditions, allergies, height_cm, weight_kg, age, sex, activity_level")
       .eq("id", userData.user.id)
       .maybeSingle();
-    const userProfile = storedProfile || profile || {};
+    const userProfile = nutritionProfile(storedProfile || profile || {});
+    if (!Number.isInteger(Number(totalMealsToday)) || Number(totalMealsToday) < 1 || Number(totalMealsToday) > 24) return jsonError("Invalid meal count", 400);
 
     if (mode === "suggest") {
       const [{ data: fnriFoods, error: fnriError }, { data: constraints, error: constraintsError }] = await Promise.all([
@@ -442,7 +411,7 @@ Deno.serve(async (req) => {
     const scaleFactor = Math.max(0.5, Math.min(2.0, Number(data.scaleFactor) || fallbackScale));
     const optimizedKcal = Math.round(originalKcal * scaleFactor);
 
-    const normalized = {
+    const normalized = normalizePortionResult({
       scaleFactor,
       perMealKcal,
       originalKcal,
@@ -473,7 +442,8 @@ Deno.serve(async (req) => {
       ingredients: Array.isArray(data.ingredients) && data.ingredients.length
         ? data.ingredients.map((ing: any) => scaleIngredient({ name: ing.name, original: ing.original, optimized: ing.optimized }, Number(ing.factor) || scaleFactor))
         : (meal.ingredients || []).map((ing: any) => scaleIngredient(ing, scaleFactor)),
-    };
+    }, meal, userProfile, totalMealsToday);
+    normalized.ingredients = (meal.ingredients || []).map((ing: any) => scaleIngredient(ing, normalized.scaleFactor));
 
     return new Response(JSON.stringify(normalized), {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },

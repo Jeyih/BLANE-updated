@@ -1,3 +1,4 @@
+import { localMealStorage as localStorage, sessionMealStorage as sessionStorage } from '../lib/account-storage.js';
 import React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -26,6 +27,7 @@ import {
   loadConstraintDefinitions,
   getActiveConstraints,
   checkRecipeViolations,
+  canSelectRecipe,
 } from '../lib/constraints';
 import {
   ConstraintActiveBar,
@@ -92,11 +94,11 @@ function Recipes() {
   }, [user]);
   useEffect(() => {
     if (!user?.id) return;
-    setTourOpen(localStorage.getItem(`blane_recipes_tour_completed_${user.id}`) !== 'true');
+    setTourOpen(globalThis.localStorage.getItem(`blane_recipes_tour_completed_${user.id}`) !== 'true');
   }, [user?.id]);
   function closeTour() {
     if (user?.id) {
-      localStorage.setItem(`blane_recipes_tour_completed_${user.id}`, 'true');
+      globalThis.localStorage.setItem(`blane_recipes_tour_completed_${user.id}`, 'true');
     }
     setTourOpen(false);
   }
@@ -358,6 +360,7 @@ function Recipes() {
                       constraintDefinitions,
                       onClick: () => setOpenRecipeId(recipe.id),
                       onUse: () => {
+                        if (!canSelectRecipe(recipe, profile, constraintDefinitions, constraintsReady && !constraintError && !ingredientError)) { setActionMessage("This recipe cannot be fully checked against your profile."); return; }
                         if (
                           checkRecipeViolations(
                             recipe,
@@ -391,6 +394,7 @@ function Recipes() {
           if (linkedRecipe) setSearchParams({});
         },
         onAddToMealPlan: () => {
+          if (!canSelectRecipe(openRecipe, profile, constraintDefinitions, constraintsReady && !constraintError && !ingredientError)) { setActionMessage("This recipe cannot be fully checked against your profile."); return; }
           if (
             checkRecipeViolations(openRecipe, activeConstraints, true, constraintDefinitions).length
           )

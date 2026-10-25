@@ -1,3 +1,4 @@
+import { ingredientStatus, recipeSeasonScore } from './seasonal-core.js';
 import { supabase } from './supabase';
 const DRY_MONTHS = [11, 12, 1, 2, 3, 4, 5];
 function getCurrentMonth() {
@@ -20,65 +21,12 @@ async function loadIngredientSeasons() {
   (data || []).forEach((row) => {
     if (!row.ingredient_name) return;
     const key = row.ingredient_name.toLowerCase().trim();
-    INGREDIENT_DB[key] = { season: row.season || 'both', alt: row.alt || null };
+    INGREDIENT_DB[key] = { season: row.season || 'unknown', alt: row.alt || null };
   });
   return true;
 }
-function getIngredientStatus(name) {
-  const key = name.toLowerCase().trim();
-  const season = getCurrentSeason();
-  let entry = INGREDIENT_DB[key];
-  if (!entry) {
-    const found = Object.keys(INGREDIENT_DB).find(
-      (k) => key.includes(k) || k.includes(key.split(' ')[0]),
-    );
-    if (found) entry = INGREDIENT_DB[found];
-  }
-  if (!entry) return { status: 'year_round', season: 'both', alt: null };
-  if (entry.season === 'both') return { status: 'year_round', season: 'both', alt: entry.alt };
-  if (entry.season === season) return { status: 'in_season', season: entry.season, alt: null };
-  return { status: 'out_of_season', season: entry.season, alt: entry.alt };
-}
-function scoreRecipe(ingredients) {
-  if (!ingredients || ingredients.length === 0) {
-    return {
-      score: 100,
-      label: 'Year-Round',
-      cssClass: 'year-round',
-      inCount: 0,
-      outCount: 0,
-      yrCount: 0,
-    };
-  }
-  let inCount = 0,
-    outCount = 0,
-    yrCount = 0;
-  ingredients.forEach((ing) => {
-    const name = typeof ing === 'string' ? ing : ing.name;
-    const result = getIngredientStatus(name);
-    if (result.status === 'in_season') inCount++;
-    else if (result.status === 'out_of_season') outCount++;
-    else yrCount++;
-  });
-  const total = ingredients.length;
-  const raw = (inCount * 1 + yrCount * 0.8) / total;
-  const score = Math.round(raw * 100);
-  let label, cssClass;
-  if (outCount === 0 && inCount === 0) {
-    label = 'Year-Round';
-    cssClass = 'year-round';
-  } else if (outCount === 0) {
-    label = 'In Season';
-    cssClass = 'in-season';
-  } else if (outCount < total / 2) {
-    label = 'Mostly Season';
-    cssClass = 'partial';
-  } else {
-    label = 'Out of Season';
-    cssClass = 'out-of-season';
-  }
-  return { score, label, cssClass, inCount, outCount, yrCount };
-}
+function getIngredientStatus(name) { return ingredientStatus(name, INGREDIENT_DB, getCurrentMonth()); }
+function scoreRecipe(ingredients) { return recipeSeasonScore(ingredients, getIngredientStatus); }
 export {
   getCurrentMonth,
   getCurrentSeason,

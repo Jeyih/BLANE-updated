@@ -1,3 +1,4 @@
+import { setActiveAccount } from '../lib/account-storage.js';
 import React from 'react';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
@@ -7,11 +8,13 @@ function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: session2 } }) => {
+      setActiveAccount(session2?.user?.id);
       setSession(session2);
       setLoading(false);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (event === 'TOKEN_REFRESHED') return;
+      setActiveAccount(newSession?.user?.id);
       setSession(newSession);
     });
     return () => listener.subscription.unsubscribe();
@@ -46,7 +49,9 @@ function AuthProvider({ children }) {
     return data;
   }
   async function logout() {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    setActiveAccount(null);
   }
   const value = {
     session,
@@ -58,7 +63,7 @@ function AuthProvider({ children }) {
     updatePassword,
     logout,
   };
-  return React.createElement(AuthContext.Provider, { value }, children);
+  return React.createElement(AuthContext.Provider, { value }, React.createElement(React.Fragment, { key: session?.user?.id || 'guest' }, children));
 }
 function useAuth() {
   const ctx = useContext(AuthContext);

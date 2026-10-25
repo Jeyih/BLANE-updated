@@ -153,3 +153,5 @@
   font-size: 11px;
   color: #4d6e5a;
 }
+
+.season-badge.unknown, .ing-season-tag.unknown { color: #b6c3bd; border-color: #53675b; background: rgba(148,163,184,.08); }

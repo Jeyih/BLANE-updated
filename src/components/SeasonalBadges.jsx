@@ -2,6 +2,7 @@ import React from 'react';
 import { getCurrentSeason, getIngredientStatus } from '../lib/seasonal';
 import '../styles/seasonal.css';
 const SEASON_ICONS = {
+  unknown: '\u2753',
   'in-season': '\u{1F33F}',
   partial: '\u{1F324}\uFE0F',
   'out-of-season': '\u{1F327}\uFE0F',
@@ -20,11 +21,13 @@ function SeasonBadge({ scoreResult }) {
 function IngSeasonTag({ ingredientName }) {
   const result = getIngredientStatus(ingredientName);
   const labels = {
+    unknown: 'Season unknown',
     in_season: '\u{1F33F} In Season',
     out_of_season: '\u{1F327}\uFE0F Out of Season',
     year_round: '\u{1F4C5} Year-Round',
   };
   const classes = {
+    unknown: 'unknown',
     in_season: 'in-season',
     out_of_season: 'out-of-season',
     year_round: 'year-round',

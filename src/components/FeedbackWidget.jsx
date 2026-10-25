@@ -1,22 +1,9 @@
+import { computeDailyTargets } from '../../supabase/functions/_shared/nutrition.js';
+import { parseHealthLog } from '../lib/health-log-inputs.js';
 import React from 'react';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import '../styles/feedback.css';
-const ACTIVITY_MULT = {
-  sedentary: 1.2,
-  light: 1.375,
-  moderate: 1.55,
-  very_active: 1.725,
-  extra_active: 1.9,
-};
-const GOAL_ADJUST = {
-  lose_weight: 0.85,
-  gain_muscle: 1.1,
-  maintain: 1,
-  improve_health: 1,
-  boost_energy: 1,
-  manage_condition: 1,
-};
 const DRIFT = { weightGain: 0.5, weightLoss: 1.5, sleepMin: 6, waterMin: 1800, calLowPct: 0.75 };
 function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
   const [logs, setLogs] = useState([]);
@@ -64,14 +51,10 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
     return l.logged_at === d.toISOString().split('T')[0];
   });
   async function handleLogSubmit() {
-    const w = parseFloat(weight) || null;
-    const s = parseFloat(sleep) || null;
-    const wc = parseInt(waterCups) || null;
-    const c = parseInt(calories) || null;
-    if (!w && !s && !wc && !c) {
-      showToast('Please fill in at least one metric.', true);
-      return;
-    }
+    let values;
+    try { values = parseHealthLog({ weight, sleep, waterCups, calories }); }
+    catch (error) { showToast(error.message, true); return; }
+    const w = values.weight_kg;
     setSaving(true);
     const todayStr = new Date().toISOString().split('T')[0];
     const { error } = await supabase
@@ -80,10 +63,7 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
         {
           user_id: profile.id,
           logged_at: todayStr,
-          weight_kg: w,
-          sleep_hours: s,
-          water_ml: wc ? wc * 300 : null,
-          calories_burned: c,
+          ...values,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id,logged_at' },
@@ -95,9 +75,15 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
     }
     let updatedProfile = profile;
     if (w && w !== profile.weight_kg) {
-      await supabase
+      const { error: profileError } = await supabase
         .from('profiles')
         .upsert({ id: profile.id, weight_kg: w, updated_at: new Date().toISOString() });
+      if (profileError) {
+        await loadRecentLogs();
+        setSaving(false);
+        showToast('Health log saved, but profile weight could not be updated. Please retry.', true);
+        return;
+      }
       updatedProfile = { ...profile, weight_kg: w };
       onProfileUpdate?.(updatedProfile);
     }
@@ -425,28 +411,11 @@ function Sparkline({ label, values, color }) {
   );
 }
 function recalculateTargets(profile) {
-  const h = parseFloat(profile.height_cm) || 170;
-  const w = parseFloat(profile.weight_kg) || 70;
-  const age = parseInt(profile.age) || 25;
-  const sex = profile.sex || 'male';
-  const bmr = sex === 'male' ? 10 * w + 6.25 * h - 5 * age + 5 : 10 * w + 6.25 * h - 5 * age - 161;
-  const tdee = Math.round(bmr * (ACTIVITY_MULT[profile.activity_level] || 1.55));
-  const target = Math.round(tdee * (GOAL_ADJUST[profile.goal] || 1));
-  return {
-    tdee,
-    target,
-    protein: Math.round((target * 0.3) / 4),
-    carbs: Math.round((target * 0.45) / 4),
-    fats: Math.round((target * 0.25) / 9),
-  };
+  const result = computeDailyTargets(profile);
+  return { ...result, tdee: Math.round(result.tdee), target: result.calories };
 }
 function computeTDEE(profile) {
-  const h = parseFloat(profile.height_cm) || 170;
-  const w = parseFloat(profile.weight_kg) || 70;
-  const age = parseInt(profile.age) || 25;
-  const sex = profile.sex || 'male';
-  const bmr = sex === 'male' ? 10 * w + 6.25 * h - 5 * age + 5 : 10 * w + 6.25 * h - 5 * age - 161;
-  return Math.round(bmr * (ACTIVITY_MULT[profile.activity_level] || 1.55));
+  return Math.round(computeDailyTargets(profile).tdee);
 }
 function detectDrift(logs, profile) {
   const alerts = [];

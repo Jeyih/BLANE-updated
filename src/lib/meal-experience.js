@@ -1,3 +1,4 @@
+import { localMealStorage as localStorage } from './account-storage.js';
 const DEFAULT_SLOTS = [
   { type: 'Breakfast', time: '7:00 AM' },
   { type: 'Lunch', time: '12:00 PM' },

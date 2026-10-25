@@ -1,3 +1,4 @@
+import { localMealStorage as localStorage, sessionMealStorage as sessionStorage } from '../lib/account-storage.js';
 import React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
@@ -99,7 +100,7 @@ function Markets() {
   }, [user?.id]);
   useEffect(() => {
     if (!user?.id) return;
-    setTourOpen(localStorage.getItem(`blane_markets_tour_completed_${user.id}`) !== 'true');
+    setTourOpen(globalThis.localStorage.getItem(`blane_markets_tour_completed_${user.id}`) !== 'true');
   }, [user?.id]);
   useEffect(() => {
     function refreshMealPlanIngredients() {
@@ -112,7 +113,7 @@ function Markets() {
     }
     window.addEventListener('blane-meal-plan-updated', refreshMealPlanIngredients);
     function handleMealPlanStorage(event) {
-      if (event.key === 'blane_meal_plan' || event.key === 'blane_meal_plan_day') {
+      if (localStorage.matches(event.key, 'blane_meal_plan') || localStorage.matches(event.key, 'blane_meal_plan_day')) {
         refreshMealPlanIngredients();
       }
     }
@@ -450,7 +451,7 @@ function Markets() {
   }
   function closeTour() {
     if (user?.id) {
-      localStorage.setItem(`blane_markets_tour_completed_${user.id}`, 'true');
+      globalThis.localStorage.setItem(`blane_markets_tour_completed_${user.id}`, 'true');
     }
     setTourOpen(false);
   }

@@ -1,3 +1,4 @@
+import { validateMeasurements } from '../../supabase/functions/_shared/nutrition.js';
 import React from 'react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -110,6 +111,8 @@ function Onboarding() {
   function validateStep(step) {
     setError('');
     if (step === 1) {
+      const measurementError = validateMeasurements({ age: form.age, height_cm: form.height, weight_kg: form.weight });
+      if (measurementError) return fail(measurementError);
       if (!form.fullName.trim()) return fail('Please enter your full name.');
       if (!form.age) return fail('Please enter your age.');
       if (!form.sex) return fail('Please select your biological sex.');
@@ -406,7 +409,7 @@ function Onboarding() {
           React.createElement(
             'p',
             { className: 'sub' },
-            'Select all that apply. BLANE will never suggest meals that violate these. Skip if none apply.',
+            'Select your restrictions to guide ingredient checks. Review meal warnings before choosing. Skip if none apply.',
           ),
           React.createElement(
             'div',
@@ -450,7 +453,7 @@ function Onboarding() {
           React.createElement(
             'p',
             { className: 'sub' },
-            'This helps BLANE avoid nutrients that may affect your condition. All data is private and stored securely. Skip if none apply.',
+            'Select conditions to guide configured checks. Seek qualified advice for medical dietary needs. Skip if none apply.',
           ),
           React.createElement(
             'div',
@@ -490,7 +493,7 @@ function Onboarding() {
           React.createElement(
             'p',
             { className: 'sub' },
-            'BLANE will block meals and ingredients containing these. Skip if none apply.',
+            'Select allergies to guide recorded ingredient checks. Verify ingredient labels before eating. Skip if none apply.',
           ),
           React.createElement(
             'div',

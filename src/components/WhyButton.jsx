@@ -1,3 +1,4 @@
+import { nutritionProfile, mealForAi } from '../../supabase/functions/_shared/nutrition.js';
 import React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -13,16 +14,20 @@ async function requestMealExplanation(meal, profile, violations) {
     data: { session },
   } = await supabase.auth.getSession();
   if (!session) throw new Error('Not signed in');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  try {
   const res = await fetch(getExplainMealUrl(), {
     method: 'POST',
+    signal: controller.signal,
     headers: {
       'Content-Type': 'application/json',
       Authorization: 'Bearer ' + session.access_token,
     },
     body: JSON.stringify({
       mealId: meal.id,
-      meal: { ...meal, constraintWarnings: violations },
-      profile,
+      meal: { ...mealForAi(meal), constraintWarnings: violations },
+      profile: nutritionProfile(profile),
       constraintWarnings: violations,
     }),
   });
@@ -67,7 +72,17 @@ async function requestMealExplanation(meal, profile, violations) {
   if (!verdict) throw new Error('AI response did not include a safety verdict.');
   if (!text)
     throw new Error('BLANE AI could not generate an explanation right now. Please try again.');
+  // An AI verdict cannot override a conflict already detected by local rules.
+  if (violations.length && verdict.verdict === 'safe') {
+    verdict = { verdict: 'caution', label: 'Recorded dietary warnings require review.' };
+  }
   return { verdict, text };
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('AI explanation timed out. You can keep using the site and try again.');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 function getMealExplanation(meal, profile, violations) {
   const key = JSON.stringify({ meal, profile, violations });
@@ -101,6 +116,7 @@ function WhyButton({ meal, profile, violations = [] }) {
     setOpen(false);
   }
   useEffect(() => {
+    if (!open) return;
     let active = true;
     setVerdict(null);
     setText('');
@@ -123,7 +139,7 @@ function WhyButton({ meal, profile, violations = [] }) {
     return () => {
       active = false;
     };
-  }, [requestKey, retryCount]);
+  }, [open, requestKey, retryCount]);
   function positionPopover() {
     if (!btnRef.current) return;
     const btnRect = btnRef.current.getBoundingClientRect();

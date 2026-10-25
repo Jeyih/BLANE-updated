@@ -1,3 +1,8 @@
+import { generateMealPlan } from '../lib/plan-generation.js';
+import { appliedMeal } from '../lib/portions.js';
+import { loadConstraintDefinitions } from '../lib/constraints';
+import { localMealStorage as localStorage, sessionMealStorage as sessionStorage } from '../lib/account-storage.js';
+import { computeDailyTargets } from '../../supabase/functions/_shared/nutrition.js';
 import React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -25,43 +30,7 @@ import DriftWidget from '../components/DriftWidget';
 import RecommendWidget from '../components/RecommendWidget';
 import '../styles/dashboard.css';
 function getCalorieGoal(profile) {
-  if (!profile) return 1840;
-  const h = parseFloat(profile.height_cm) || 170;
-  const w = parseFloat(profile.weight_kg) || 70;
-  const age = parseInt(profile.age) || 25;
-  const sex = profile.sex || 'male';
-  const bmr = sex === 'male' ? 10 * w + 6.25 * h - 5 * age + 5 : 10 * w + 6.25 * h - 5 * age - 161;
-  const tdee = bmr * 1.55;
-  const adj = {
-    lose_weight: 0.85,
-    gain_muscle: 1.1,
-    maintain: 1,
-    improve_health: 1,
-    boost_energy: 1,
-    manage_condition: 0.9,
-  };
-  return Math.round(tdee * (adj[profile.goal] || 1)) || 1840;
-}
-function generateDefaultPlan(recipeList) {
-  if (!recipeList || recipeList.length === 0) return {};
-  const breakfasts = recipeList.filter((r) => r.type === 'Breakfast');
-  const lunches = recipeList.filter((r) => r.type === 'Lunch');
-  const dinners = recipeList.filter((r) => r.type === 'Dinner');
-  const snacks = recipeList.filter((r) => r.type === 'Snack');
-  const defaultSlots = {};
-  for (let day = 0; day < 7; day++) {
-    const bMeal = breakfasts.length ? breakfasts[day % breakfasts.length] : recipeList[0];
-    const lMeal = lunches.length ? lunches[day % lunches.length] : recipeList[1] || recipeList[0];
-    const sMeal = snacks.length ? snacks[day % snacks.length] : null;
-    const dMeal = dinners.length ? dinners[day % dinners.length] : recipeList[2] || recipeList[0];
-    const dayArr = [];
-    if (bMeal) dayArr.push({ type: 'Breakfast', time: '7:00 AM', mealId: bMeal.id });
-    if (lMeal) dayArr.push({ type: 'Lunch', time: '12:00 PM', mealId: lMeal.id });
-    if (sMeal) dayArr.push({ type: 'Snack', time: '3:00 PM', mealId: sMeal.id });
-    if (dMeal) dayArr.push({ type: 'Dinner', time: '6:30 PM', mealId: dMeal.id });
-    defaultSlots[day] = dayArr;
-  }
-  return defaultSlots;
+  return computeDailyTargets(profile).calories;
 }
 function Dashboard() {
   const { user } = useAuth();
@@ -76,9 +45,9 @@ function Dashboard() {
     if (!user?.id) return;
     const newUserKey = `blane_dashboard_tour_new_user_${user.id}`;
     const completedKey = `blane_dashboard_tour_completed_${user.id}`;
-    const isNewUser = localStorage.getItem(newUserKey) === 'true';
-    localStorage.removeItem(newUserKey);
-    setTourOpen(isNewUser && localStorage.getItem(completedKey) !== 'true');
+    const isNewUser = globalThis.localStorage.getItem(newUserKey) === 'true';
+    globalThis.localStorage.removeItem(newUserKey);
+    setTourOpen(isNewUser && globalThis.localStorage.getItem(completedKey) !== 'true');
   }, [user?.id]);
   async function loadProfile() {
     if (!user) return;
@@ -97,7 +66,7 @@ function Dashboard() {
   }
   function closeTour() {
     if (user?.id) {
-      localStorage.setItem(`blane_dashboard_tour_completed_${user.id}`, 'true');
+      globalThis.localStorage.setItem(`blane_dashboard_tour_completed_${user.id}`, 'true');
     }
     setTourOpen(false);
   }
@@ -183,7 +152,7 @@ function Dashboard() {
                 'div',
                 { style: { color: '#d1fae5', fontSize: '13px' } },
                 checkinToast ||
-                  'Tap a mood to dynamically tune today\u2019s energy and hydration targets.',
+                  'Select your mood for a brief check-in.',
               ),
             ),
           ),
@@ -195,25 +164,25 @@ function Dashboard() {
                 mood: 'energetic',
                 icon: '\u26A1',
                 label: 'Energetic',
-                note: 'Awesome! Maintaining active energy balance (+100 kcal reserve).',
+                note: 'Energetic selected for this session.',
               },
               {
                 mood: 'great',
                 icon: '\u{1F60A}',
                 label: 'Feeling Great',
-                note: 'Optimal metabolic state! Your current meal plan is fully balanced.',
+                note: 'Feeling great selected for this session.',
               },
               {
                 mood: 'active',
                 icon: '\u{1F4AA}',
                 label: 'Workout Today',
-                note: 'Activity logged! Prioritizing protein recovery in today\u2019s dinner.',
+                note: 'Workout selected. Record your activity in the health log below.',
               },
               {
                 mood: 'tired',
                 icon: '\u{1F634}',
                 label: 'Tired / Low Energy',
-                note: 'Noted! Boosted complex carbs & magnesium-rich ingredients.',
+                note: 'Low energy selected. Review your recent health entries below.',
               },
             ].map((item) =>
               React.createElement(
@@ -277,6 +246,7 @@ function MealPlanWidget({ profile }) {
   const [loading, setLoading] = useState(true);
   const [activeTabIdx, setActiveTabIdx] = useState(0);
   useEffect(() => {
+    let cancelled = false;
     async function loadData() {
       setLoading(true);
       const { data: recipesData } = await supabase.from('recipes').select('*').order('name');
@@ -284,6 +254,7 @@ function MealPlanWidget({ profile }) {
         .from('recipe_ingredients')
         .select('*')
         .order('sort_order');
+      if (cancelled) return;
       const ingByRecipe = {};
       (ingData || []).forEach((ing) => {
         if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
@@ -325,30 +296,37 @@ function MealPlanWidget({ profile }) {
         }
       }
       if (formattedRecipes.length > 0) {
-        const defaultPlan = generateDefaultPlan(formattedRecipes);
+        const definitions = await loadConstraintDefinitions();
+        if (cancelled) return;
+        const defaultPlan = generateMealPlan(formattedRecipes, profile, definitions || {}, { ready: Boolean(definitions) });
         setDaySlots(defaultPlan);
         localStorage.setItem('blane_meal_plan', JSON.stringify(defaultPlan));
       }
       setLoading(false);
     }
-    loadData();
-  }, []);
+    if (profile) loadData();
+    return () => { cancelled = true; };
+  }, [profile]);
   function getMeal(id) {
     if (!id) return null;
-    return recipes.find((r) => r.id === id || String(r.id) === String(id)) || null;
+    let optimizations = {};
+    try { optimizations = JSON.parse(sessionStorage.getItem('blane_optimized_v2') || '{}'); } catch {}
+    return appliedMeal(recipes.find((r) => r.id === id || String(r.id) === String(id)) || null, optimizations[id]);
   }
   useEffect(() => {
     const syncPlan = (event) => {
-      if (event?.key && event.key !== 'blane_meal_plan') return;
+      if (event?.key && !localStorage.matches(event.key, 'blane_meal_plan')) return;
       try {
         const saved = JSON.parse(localStorage.getItem('blane_meal_plan') || '{}');
         if (saved && typeof saved === 'object') setDaySlots(saved);
       } catch {}
     };
     window.addEventListener('blane-meal-plan-updated', syncPlan);
+    window.addEventListener('blane-portions-updated', syncPlan);
     window.addEventListener('storage', syncPlan);
     return () => {
       window.removeEventListener('blane-meal-plan-updated', syncPlan);
+      window.removeEventListener('blane-portions-updated', syncPlan);
       window.removeEventListener('storage', syncPlan);
     };
   }, []);
@@ -372,7 +350,7 @@ function MealPlanWidget({ profile }) {
     setActiveTabIdx(autoIndex);
   }, [autoIndex, clock.dateKey, availableSlotKey]);
   const totalKcal = allPlannedMeals.reduce((acc, item) => acc + item.meal.kcal, 0);
-  const totalProtein = allPlannedMeals.reduce((acc, item) => acc + item.meal.protein, 0);
+  const totalProtein = Math.round(allPlannedMeals.reduce((acc, item) => acc + Number(item.meal.protein || 0), 0) * 10) / 10;
   const totalCost = allPlannedMeals.reduce((acc, item) => acc + (item.meal.cost || 0), 0);
   const missingCosts = allPlannedMeals.some((item) => item.meal.priceIncomplete);
   const calGoal = getCalorieGoal(profile);

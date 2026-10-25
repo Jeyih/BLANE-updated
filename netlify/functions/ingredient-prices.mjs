@@ -1,5 +1,5 @@
-import snapshot from '../../public/data/ingredient-prices.json';
-import retailSnapshot from '../../public/data/retail-prices.json';
+import snapshot from '../../public/data/ingredient-prices.json' with { type: 'json' };
+import retailSnapshot from '../../public/data/retail-prices.json' with { type: 'json' };
 import { fetchDaPrices } from '../../server/da-prices.js';
 import { fetchRetailPrices } from '../../server/retail-prices.js';
 import { createPriceFeed } from '../../server/price-feed.js';

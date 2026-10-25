@@ -1,32 +1,20 @@
+import { sessionMealStorage as sessionStorage, readStoredJson } from '../lib/account-storage.js';
+import { computeDailyTargets as sharedDailyTargets, nutritionProfile, mealForAi, normalizePortionResult } from '../../supabase/functions/_shared/nutrition.js';
 import React from 'react';
 import { useEffect, useState } from 'react';
 import { supabase, SUPABASE_URL } from '../lib/supabase';
 import '../styles/optimizer.css';
 const OPT_MIN_SCALE = 0.5;
 const OPT_MAX_SCALE = 2;
-const MACRO_TARGETS = { protein: 0.3, carbs: 0.45, fats: 0.25 };
-const ACTIVITY_MULT = {
-  sedentary: 1.2,
-  light: 1.375,
-  moderate: 1.55,
-  very_active: 1.725,
-  extra_active: 1.9,
-};
-const GOAL_ADJUST = {
-  lose_weight: 0.85,
-  gain_muscle: 1.1,
-  maintain: 1,
-  improve_health: 1,
-  boost_energy: 1,
-  manage_condition: 1,
-};
-function OptimizeButton({ open, onToggle }) {
+function OptimizeButton({ open, onToggle, disabled = false }) {
   return React.createElement(
     'button',
     {
       className: 'meal-action-btn',
       style: { borderColor: 'rgba(96,165,250,0.25)', color: '#60a5fa' },
       onClick: onToggle,
+      disabled,
+      title: disabled ? 'Resolve dietary warnings or missing nutrition data first.' : 'Adjust portion size',
     },
     React.createElement(
       'svg',
@@ -73,7 +61,9 @@ function PortionOptimizerPanel({
   useEffect(() => {
     if (!open || !meal || !profile || !meal.ingredients) return;
     let cancelled = false;
-    const fallbackResult = optimizeMeal(meal, totalMealsToday || 3, profile);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    const fallbackResult = optimizeMeal(meal, totalMealsToday || 4, profile);
     async function loadAiOptimization() {
       setAiLoading(true);
       setAiError('');
@@ -98,18 +88,21 @@ function PortionOptimizerPanel({
         }
         const res = await fetch(optimizeUrl, {
           method: 'POST',
+          signal: controller.signal,
           headers: {
             'Content-Type': 'application/json',
             Authorization: 'Bearer ' + session.access_token,
           },
-          body: JSON.stringify({ meal, profile, totalMealsToday: totalMealsToday || 3 }),
+          body: JSON.stringify({ meal: mealForAi(meal), profile: nutritionProfile(profile), totalMealsToday: totalMealsToday || 4 }),
         });
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) {
           throw new Error(payload.error || 'BLANE AI could not optimize this meal.');
         }
         if (!cancelled) {
-          setAiResult(payload);
+          const normalized = normalizePortionResult(payload, meal, profile, totalMealsToday || 4);
+          normalized.ingredients = meal.ingredients.map(ing => scaleIngredient(ing, normalized.scaleFactor));
+          setAiResult(normalized);
           setAiMode('ai');
           setAiError('');
         }
@@ -123,16 +116,21 @@ function PortionOptimizerPanel({
           );
         }
       } finally {
+        clearTimeout(timeout);
         if (!cancelled) setAiLoading(false);
       }
     }
     loadAiOptimization();
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
+      controller.abort();
     };
   }, [
     open,
     meal?.id,
+    profile?.age,
+    profile?.sex,
     profile?.height_cm,
     profile?.weight_kg,
     profile?.goal,
@@ -155,7 +153,7 @@ function PortionOptimizerPanel({
       ),
     );
   }
-  const result = aiResult || optimizeMeal(meal, totalMealsToday || 3, profile);
+  const result = aiResult || optimizeMeal(meal, totalMealsToday || 4, profile);
   const scaleClass = result.scaleFactor > 1.05 ? 'over' : result.scaleFactor < 0.95 ? 'under' : '';
   const scaleLabel =
     result.scaleFactor > 1.05
@@ -165,7 +163,7 @@ function PortionOptimizerPanel({
         : '\u2192 ' + result.scaleFactor.toFixed(2) + '\xD7 (Optimal)';
   const pBar = (val, target) => Math.min(Math.round((val / target) * 100), 120);
   function handleApply() {
-    const saved = JSON.parse(sessionStorage.getItem('blane_optimized_v2') || '{}');
+    const saved = readStoredJson(sessionStorage, 'blane_optimized_v2', {});
     saved[meal.id] = {
       scaleFactor: result.scaleFactor,
       ingredients: result.ingredients,
@@ -173,6 +171,7 @@ function PortionOptimizerPanel({
       appliedAt: new Date().toISOString(),
     };
     sessionStorage.setItem('blane_optimized_v2', JSON.stringify(saved));
+    window.dispatchEvent(new Event('blane-portions-updated'));
     setApplied(true);
     setOriginalRestored(false);
     onApplied?.(meal.id, result);
@@ -186,6 +185,7 @@ function PortionOptimizerPanel({
     }
     delete saved[meal.id];
     sessionStorage.setItem('blane_optimized_v2', JSON.stringify(saved));
+    window.dispatchEvent(new Event('blane-portions-updated'));
     setApplied(false);
     setOriginalRestored(true);
     onOriginalMeal?.(meal.id);
@@ -464,7 +464,7 @@ function PortionOptimizerPanel({
         { className: 'opt-apply-row' },
         React.createElement(
           'button',
-          { className: 'opt-btn opt-btn-primary', onClick: handleApply },
+          { className: 'opt-btn opt-btn-primary', onClick: handleApply, disabled: aiLoading },
           React.createElement(
             'svg',
             {
@@ -516,19 +516,7 @@ function PortionOptimizerPanel({
   );
 }
 function computeDailyTargets(profile) {
-  const h = parseFloat(profile.height_cm) || 170;
-  const w = parseFloat(profile.weight_kg) || 70;
-  const age = parseInt(profile.age) || 25;
-  const sex = profile.sex || 'male';
-  const bmr = sex === 'male' ? 10 * w + 6.25 * h - 5 * age + 5 : 10 * w + 6.25 * h - 5 * age - 161;
-  const tdee = bmr * (ACTIVITY_MULT[profile.activity_level] || 1.55);
-  const calTarget = Math.round(tdee * (GOAL_ADJUST[profile.goal] || 1));
-  return {
-    calories: calTarget,
-    protein: Math.round((calTarget * MACRO_TARGETS.protein) / 4),
-    carbs: Math.round((calTarget * MACRO_TARGETS.carbs) / 4),
-    fats: Math.round((calTarget * MACRO_TARGETS.fats) / 9),
-  };
+  return sharedDailyTargets(profile);
 }
 function optimizeMeal(meal, totalMealsToday, profile) {
   const daily = computeDailyTargets(profile);
