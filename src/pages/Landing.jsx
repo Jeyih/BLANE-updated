@@ -806,7 +806,7 @@ function Landing() {
             React.createElement(
               'p',
               null,
-              'Biological Adaptive Nutrition Engine. A capstone project for practical meal planning in Tarlac City.',
+              'Biological Adaptive Nutrition Engine. A capstone project for practical meal planning in local communities.',
             ),
           ),
           React.createElement(

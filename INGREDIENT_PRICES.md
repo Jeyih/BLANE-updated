@@ -32,9 +32,9 @@ All 54 current recipes retain an estimate or labeled subtotal. All 73 recipe ing
 
 Vite and Netlify expose `/.netlify/functions/ingredient-prices`. The frontend checks every 15 seconds while visible and on focus/reconnection. Retailer checks use a shared 30-second cache. DA reports retain a separate six-hour cache. Check prices now requests a fresh source check, subject to a 10-second cooldown. There is no browser/CDN response cache. Failed updates retain original observation dates with a warning. There is no daily cron job.
 
-Update snapshots with `npm run prices:update` and `npm run prices:update-retail`. Regenerate the audit with `node scripts/export-price-evidence.mjs`. Deploy frontend and Netlify function together for hosted dynamic updates. Other static hosts use bundled fallbacks. No database schema migration or private retailer credentials are required.
+Price records and reviewed source/product matching rules are stored in Supabase instead of bundled JSON or JavaScript catalogues. Run the migrations and configure the server-only service-role key described in [PRICE_REFERENCE_SETUP.md](supabase/PRICE_REFERENCE_SETUP.md). Update database snapshots with `npm run prices:update` and `npm run prices:update-retail`. Regenerate the audit with `node scripts/export-price-evidence.mjs`. Deploy frontend and Netlify function together for hosted dynamic updates; there are no bundled price fallbacks.
 
-The reviewed source manifest is `server/retail-source-config.js`; food comparisons are in `src/lib/price-mappings.js`. Checks: `node --test src/lib/pricing.test.js server/da-prices.test.js server/retail-prices.test.js` and `npm run build`.
+The price source and food-matching catalogue is seeded by `supabase/migrations/202610250002_seed_price_reference_data.sql`. Checks: `node --test src/lib/pricing.test.js src/lib/price-reference.test.js src/lib/philippine-portions.test.js server/da-prices.test.js server/retail-prices.test.js server/price-feed.test.js` and `npm run build`.
 
 
 ## Fast automatic price updates

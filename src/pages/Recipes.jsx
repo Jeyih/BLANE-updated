@@ -64,10 +64,10 @@ function Recipes() {
   const [profile, setProfile] = useState(null);
   const [tourOpen, setTourOpen] = useState(false);
   const [savedRecipes, setRecipes] = useState([]);
-  const { records } = useIngredientPrices();
+  const { records, referenceData } = useIngredientPrices();
   const recipes = useMemo(
-    () => applyDynamicRecipePrices(savedRecipes, records),
-    [savedRecipes, records],
+    () => applyDynamicRecipePrices(savedRecipes, records, referenceData || {}),
+    [savedRecipes, records, referenceData],
   );
   const [loading, setLoading] = useState(true);
   const [constraintsReady, setConstraintsReady] = useState(false);
@@ -166,6 +166,7 @@ function Recipes() {
         emoji: r.emoji,
         name: r.name,
         type: r.type,
+        is_dessert: r.is_dessert === true,
         diet: r.diet_tags || [],
         goal: r.goal_tags || [],
         difficulty: r.difficulty,
@@ -798,7 +799,7 @@ function RecipeModal({
             ),
             violations.length
               ? 'Check dietary conflicts'
-              : `Use for today's ${recipe.type === 'Dessert' ? 'snack' : recipe.type.toLowerCase()}`,
+              : `Use for today's ${isDessert(recipe) ? 'snack' : recipe.type.toLowerCase()}`,
           ),
         ),
       ),

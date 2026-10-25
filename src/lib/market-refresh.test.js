@@ -2,32 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   fetchMarketSnapshot,
-  isTarlacCityMarket,
   getMealPlanRecipeIds,
   mealPlanMarketIngredients,
   marketDistanceKm,
 } from './market-refresh.js';
-test('market coverage includes explicit Tarlac City records and excludes other municipalities', () => {
-  const rows = [
-    { id: 'city', address: 'San Roque, Tarlac City, Tarlac' },
-    { id: 'city-variant', address: 'City of Tarlac, Philippines' },
-    { id: 'structured', city: '  TARLAC CITY ', address: 'San Vicente' },
-    { id: 'capas', address: 'Capas, Tarlac' },
-    { id: 'paniqui', address: 'Paniqui, Tarlac' },
-    { id: 'concepcion', address: 'Concepcion, Tarlac' },
-    { id: 'unknown', address: 'Tarlac' },
-    { id: 'brand-only', name: 'Tarlac City Grocery', address: 'Capas, Tarlac' },
-    { id: 'outside-with-reference', municipality: 'Capas', address: 'Road to Tarlac City' },
-    { id: 'missing' },
-  ];
-  assert.deepEqual(rows.filter(isTarlacCityMarket).map(row => row.id), ['city', 'city-variant', 'structured']);
-});
 function clientFor(tables, failures = {}, seen = []) {
   return {
     from(table) {
       let first = 0;
       let last = 999;
-      let mealIds;
+      let recipeIds;
       return {
         select() {
           return this;
@@ -42,7 +26,7 @@ function clientFor(tables, failures = {}, seen = []) {
         },
         in(column, ids) {
           assert.equal(column, 'recipe_id');
-          mealIds = ids;
+          recipeIds = ids;
           return this;
         },
         async abortSignal(signal) {
@@ -52,7 +36,7 @@ function clientFor(tables, failures = {}, seen = []) {
             ? { error: new Error('unavailable') }
             : {
                 data: (tables[table] || [])
-                  .filter((row) => !mealIds || mealIds.includes(String(row.recipe_id)))
+                  .filter((row) => !recipeIds || recipeIds.includes(String(row.recipe_id)))
                   .slice(first, last + 1),
               };
         },
@@ -74,43 +58,58 @@ test('market refresh retrieves later pages of the underlying ingredient catalogu
   assert.equal(snapshot.markets.length, 1);
   assert.ok(seen.some((call) => call.table === 'market_ingredients' && call.first === 1e3));
 });
-test('only selected-day recipes determine which market ingredients are displayed', async () => {
-  const values = {
-    blane_meal_plan_day: '1',
-    blane_meal_plan: JSON.stringify({
-      0: [{ mealId: 'rice-meal' }],
-      1: [{ mealId: 'fish-meal' }, { mealId: 'fish-meal' }],
-    }),
-  };
-  const ids = getMealPlanRecipeIds({ getItem: (key) => values[key] });
-  assert.deepEqual(ids, ['fish-meal']);
+test('market refresh retrieves every market and filters store ingredients by selected-day recipes', async () => {
+  const markets = [
+    { id: 1, name: 'Tarlac City Market', address: 'Tarlac City' },
+    { id: 2, name: 'Capas Grocery', address: 'Capas, Tarlac' },
+  ];
+  const ingredients = [
+    { id: 1, market_id: 1, name: 'Bangus' },
+    { id: 2, market_id: 1, name: 'Carrot' },
+    { id: 3, market_id: 2, name: 'Rice' },
+    { id: 4, market_id: 2, name: 'Pork' },
+  ];
+  const recipeIds = ['fish-meal', 'rice-meal'];
+  const seen = [];
   const snapshot = await fetchMarketSnapshot(
     clientFor({
+      markets,
+      market_ingredients: ingredients,
       recipe_ingredients: [
         { id: 1, recipe_id: 'fish-meal', name: ' Bangus ' },
         { id: 2, recipe_id: 'rice-meal', name: 'Rice' },
+        { id: 3, recipe_id: 'other-day', name: 'Pork' },
       ],
-      market_ingredients: [
-        { id: 1, name: 'BANGUS', status: 'limited' },
-        { id: 2, name: 'Rice', status: 'avail' },
-      ],
-    }),
-    void 0,
-    ids,
+    }, {}, seen),
+    undefined,
+    recipeIds,
+  );
+  assert.deepEqual(snapshot.markets, markets);
+  assert.deepEqual(snapshot.recipeIngredients.map((row) => row.recipe_id), recipeIds);
+  const matchedIngredients = mealPlanMarketIngredients(
+    snapshot.ingredients,
+    snapshot.recipeIngredients,
   );
   assert.deepEqual(
-    mealPlanMarketIngredients(snapshot.ingredients, snapshot.recipeIngredients).map(
-      (row) => row.name,
-    ),
-    ['BANGUS'],
+    matchedIngredients.map((row) => `${row.market_id}:${row.name}`),
+    ['1:Bangus', '2:Rice'],
+  );
+  assert.deepEqual(
+    [...new Set(seen.map((call) => call.table))].sort(),
+    ['market_ingredients', 'markets', 'recipe_ingredients'],
   );
 });
-test('an empty, invalid or unplanned day never falls back to displaying every ingredient', () => {
-  const ingredients = [{ name: 'Rice' }];
-  assert.deepEqual(mealPlanMarketIngredients(ingredients, []), []);
+test('meal plan recipe IDs are read for the selected day and malformed plans are ignored', () => {
+  const values = {
+    blane_meal_plan_day: '1',
+    blane_meal_plan: JSON.stringify({
+      0: [{ mealId: 'breakfast' }],
+      1: [{ mealId: 'lunch' }, { mealId: 'lunch' }, { type: 'Snack' }],
+    }),
+  };
+  assert.deepEqual(getMealPlanRecipeIds({ getItem: (key) => values[key] }), ['lunch']);
   assert.deepEqual(getMealPlanRecipeIds({ getItem: () => '{invalid' }), []);
-  const values = { blane_meal_plan_day: '2', blane_meal_plan: '{"0":[{"mealId":"other-day"}]}' };
-  assert.deepEqual(getMealPlanRecipeIds({ getItem: (key) => values[key] }), []);
+  assert.deepEqual(mealPlanMarketIngredients([{ name: 'Rice' }], []), []);
 });
 test('a later refresh retrieves changed prices, quantities, availability and market closures', async () => {
   const tables = {

@@ -22,27 +22,30 @@ import useMealClock from '../hooks/useMealClock';
 import PriceEstimateNotice from './PriceEstimateNotice';
 import '../styles/meal-experience.css';
 import '../styles/recommend.css';
-const GOAL_IDEALS = { maintain: { minProtein: 15, maxKcal: 550, maxFats: 25, minCarbs: 20 } };
 async function loadRecommendationData() {
   const definitions = await loadConstraintDefinitions();
   const { data: goalData, error: goalErr } = await supabase.from('goal_ideals').select('*');
   if (goalErr) {
     console.error('Failed to load goal ideals:', goalErr);
-  } else {
-    Object.keys(GOAL_IDEALS).forEach((key) => {
-      if (key !== 'maintain') delete GOAL_IDEALS[key];
-    });
-    (goalData || []).forEach((row) => {
-      if (!row.goal_key) return;
-      GOAL_IDEALS[row.goal_key] = {
-        minProtein: row.min_protein || 0,
-        maxKcal: row.max_kcal || 9999,
-        maxFats: row.max_fats || 9999,
-        minCarbs: row.min_carbs || 0,
-      };
-    });
+    return { ready: false, goalIdeals: {} };
   }
-  return Boolean(definitions) && !goalErr;
+  const goalIdeals = Object.fromEntries(
+    (goalData || [])
+      .filter((row) => row.goal_key)
+      .map((row) => [
+        row.goal_key,
+        {
+          minProtein: row.min_protein ?? 0,
+          maxKcal: row.max_kcal ?? 9999,
+          maxFats: row.max_fats ?? 9999,
+          minCarbs: row.min_carbs ?? 0,
+        },
+      ]),
+  );
+  return {
+    ready: Boolean(definitions) && Object.keys(goalIdeals).length > 0,
+    goalIdeals,
+  };
 }
 function RecommendWidget({ profile }) {
   const now = useMealClock();
@@ -56,13 +59,14 @@ function RecommendWidget({ profile }) {
   const mealType = currentMealType(now, schedule);
   const [metadataReady, setMetadataReady] = useState(false);
   const [metadataError, setMetadataError] = useState('');
+  const [goalIdeals, setGoalIdeals] = useState({});
   const [actionMessage, setActionMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [savedRecipes, setRecipes] = useState([]);
-  const { records } = useIngredientPrices();
+  const { records, referenceData } = useIngredientPrices();
   const recipes = useMemo(
-    () => applyDynamicRecipePrices(savedRecipes, records),
-    [savedRecipes, records],
+    () => applyDynamicRecipePrices(savedRecipes, records, referenceData || {}),
+    [savedRecipes, records, referenceData],
   );
   const [top3, setTop3] = useState([]);
   const matchesMealType = (recipe) =>
@@ -132,12 +136,13 @@ function RecommendWidget({ profile }) {
   useEffect(() => {
     let cancelled = false;
     async function prepareMetadata() {
-      const ready = await loadRecommendationData();
+      const metadata = await loadRecommendationData();
       if (!cancelled) {
-        setMetadataReady(ready);
-        if (!ready)
+        setMetadataReady(metadata.ready);
+        setGoalIdeals(metadata.goalIdeals);
+        if (!metadata.ready)
           setMetadataError(
-            'Your dietary preferences could not be checked. Please reload to get meal recommendations.',
+            'Recommendation rules could not be loaded. Please reload before requesting meal recommendations.',
           );
       }
     }
@@ -164,6 +169,7 @@ function RecommendWidget({ profile }) {
               (mealType === 'Brunch' && recipe.type === 'Breakfast') ||
               (mealType === 'Dessert' && recipe.type === 'Snack'),
           ),
+          goalIdeals,
         ),
       );
       setLoading(false);
@@ -172,7 +178,7 @@ function RecommendWidget({ profile }) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [profile, recipes, mealType, metadataReady]);
+  }, [profile, recipes, mealType, metadataReady, goalIdeals]);
   return React.createElement(
     'div',
     { className: 'rec-widget col-12', 'data-dashboard-tour': 'recommendations' },
@@ -388,13 +394,14 @@ function SkeletonLoader() {
   );
   return React.createElement('div', { className: 'rec-loading' }, card, card, card);
 }
-function scoreAndRankRecipes(profile, recipes) {
+function scoreAndRankRecipes(profile, recipes, goalIdeals) {
   const goal = profile.goal || 'maintain';
   const dietary = asList(profile.dietary_restrictions);
   const medical = asList(profile.medical_conditions);
   const allergies = asList(profile.allergies);
   const allConstraints = [...dietary, ...medical, ...allergies];
-  const ideals = GOAL_IDEALS[goal] || GOAL_IDEALS.maintain;
+  const ideals = goalIdeals[goal] || goalIdeals.maintain;
+  if (!ideals) return [];
   const dailyTarget = computeDailyTarget(profile);
   const perMealKcal = Math.round(dailyTarget / 4);
   const scored = (recipes || []).filter(recipe => canSelectRecipe(recipe, profile, CB_CONSTRAINTS)).map((recipe) => {

@@ -1,14 +1,5 @@
 const MARKET_REFRESH_MS = 15e3;
-function isTarlacCityMarket(market) {
-  const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  // An explicit locality takes precedence over mentions elsewhere in an address.
-  const locality = normalize(market.city || market.municipality);
-  if (locality) return locality === 'tarlac city' || locality === 'city of tarlac';
-  // Province-only addresses and store names do not establish city coverage.
-  const address = normalize(market.address);
-  return /\btarlac city\b|\bcity of tarlac\b/.test(address);
-}
-async function readRows(client, table, signal, mealIds) {
+async function readRows(client, table, signal, recipeIds) {
   const rows = [];
   for (let start = 0; ; start += 1e3) {
     let query = client
@@ -16,18 +7,20 @@ async function readRows(client, table, signal, mealIds) {
       .select('*')
       .order('id')
       .range(start, start + 999);
-    if (mealIds) query = query.in('recipe_id', mealIds);
+    if (recipeIds) query = query.in('recipe_id', recipeIds);
     const { data, error } = await query.abortSignal(signal);
     if (error) throw new Error(`Unable to refresh ${table}.`);
     rows.push(...(data || []));
     if (!data || data.length < 1e3) return rows;
   }
 }
-async function fetchMarketSnapshot(client, signal, mealIds = []) {
+async function fetchMarketSnapshot(client, signal, recipeIds = []) {
   const [markets, ingredients, recipeIngredients] = await Promise.all([
     readRows(client, 'markets', signal),
     readRows(client, 'market_ingredients', signal),
-    mealIds.length ? readRows(client, 'recipe_ingredients', signal, mealIds) : Promise.resolve([]),
+    recipeIds.length
+      ? readRows(client, 'recipe_ingredients', signal, recipeIds)
+      : Promise.resolve([]),
   ]);
   return { markets, ingredients, recipeIngredients };
 }
@@ -48,18 +41,18 @@ function getMealPlanRecipeIds(storage) {
     return [];
   }
 }
-function mealPlanMarketIngredients(ingredients, recipeIngredients) {
+function mealPlanMarketIngredients(marketIngredients, recipeIngredients) {
   const normalize = (name) =>
     String(name || '')
       .trim()
       .replace(/\s+/g, ' ')
       .toLowerCase();
-  const needed = new Set(
+  const planned = new Set(
     recipeIngredients
       .map((row) => normalize(row.name || row.ingredient_name || row.food_name))
       .filter(Boolean),
   );
-  return ingredients.filter((row) => needed.has(normalize(row.name)));
+  return marketIngredients.filter((row) => planned.has(normalize(row.name)));
 }
 function marketDistanceKm(origin, destination) {
   const radians = (value) => (value * Math.PI) / 180;
@@ -72,9 +65,8 @@ function marketDistanceKm(origin, destination) {
 }
 export {
   MARKET_REFRESH_MS,
-  isTarlacCityMarket,
   fetchMarketSnapshot,
   getMealPlanRecipeIds,
-  marketDistanceKm,
   mealPlanMarketIngredients,
+  marketDistanceKm,
 };

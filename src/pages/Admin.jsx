@@ -14,7 +14,7 @@ const MARKET_TYPES = [
   { value: 'talipapa', label: 'Talipapa' },
   { value: 'grocery', label: 'Grocery' },
 ];
-const RECIPE_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+const RECIPE_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert'];
 const RECIPE_DIFFICULTY = [
   { value: 'easy', label: 'Easy' },
   { value: 'medium', label: 'Medium' },
@@ -2391,7 +2391,7 @@ function Admin() {
               className: 'ad-input',
               value: marketForm.name,
               onChange: (e) => handleMarketFormChange('name', e.target.value),
-              placeholder: 'e.g. Tarlac City Public Market',
+              placeholder: 'e.g. Public Market',
             }),
           ),
           React.createElement(

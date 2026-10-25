@@ -1,8 +1,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createClient } from '@supabase/supabase-js';
 import { normalizeMarketPrices, priceCoverage, ingredientQuote } from '../src/lib/pricing.js';
-import reference from '../public/data/ingredient-prices.json';
-import retail from '../public/data/retail-prices.json';
+import { groupPriceReferenceRows } from '../src/lib/price-reference.js';
 const env = await readFile(new URL('../.env.local', import.meta.url), 'utf8');
 const value = (name) =>
   env
@@ -29,23 +28,29 @@ async function all(table, order) {
     if (data.length < 1e3) return rows;
   }
 }
-const [foods, recipeIngredients, marketIngredients, markets] = await Promise.all([
+const [foods, recipeIngredients, marketIngredients, markets, referenceRows] = await Promise.all([
   all('fnri_food_composition', 'fct_id'),
   all('recipe_ingredients', 'id'),
   all('market_ingredients', 'id'),
   all('markets', 'id'),
+  all('price_reference_data', 'catalogue'),
 ]);
-const quotes = normalizeMarketPrices(marketIngredients, markets);
-const prices = [...reference.records, ...retail.records];
+const references = groupPriceReferenceRows(referenceRows);
+const quotes = normalizeMarketPrices(marketIngredients, markets, references);
+const prices = [...references.daSnapshot.records, ...references.retailSnapshot.records];
 const recipeNames = [
   ...new Set(recipeIngredients.map((ing) => ing.name || ing.ingredient_name || ing.food_name)),
 ];
-const coverage = priceCoverage(foods, recipeIngredients, prices);
+const coverage = priceCoverage(foods, recipeIngredients, prices, references);
 const marketNames = [...new Set(marketIngredients.map((i) => i.name).filter(Boolean))];
 await mkdir(new URL('../tmp/', import.meta.url), { recursive: true });
 await writeFile(
   new URL('../tmp/ingredient-pricing-audit.json', import.meta.url),
-  JSON.stringify({ foods, recipeIngredients, marketIngredients, markets, quotes }, null, 2),
+  JSON.stringify(
+    { foods, recipeIngredients, marketIngredients, markets, quotes, referenceRows },
+    null,
+    2,
+  ),
 );
 console.log(
   JSON.stringify(
@@ -57,7 +62,7 @@ console.log(
       unverifiedHistoricalQuotes: quotes.length,
       catalogMatched: coverage.priced,
       uniqueMarketIngredients: marketNames.length,
-      missingMarketPrices: marketNames.filter((name) => !ingredientQuote(name, prices)),
+      missingMarketPrices: marketNames.filter((name) => !ingredientQuote(name, prices, references)),
       marketFields: Object.keys(marketIngredients[0] || {}),
       markets: markets.map((m) => ({ name: m.name, address: m.address })),
       sampleMarketRows: marketIngredients.slice(0, 5),

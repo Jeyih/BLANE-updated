@@ -64,10 +64,10 @@ function MealPlan() {
   const [profile, setProfile] = useState(null);
   const [tourOpen, setTourOpen] = useState(false);
   const [savedRecipes, setRecipes] = useState([]);
-  const { records: priceRecords } = useIngredientPrices();
+  const { records: priceRecords, referenceData } = useIngredientPrices();
   const recipes = useMemo(
-    () => applyDynamicRecipePrices(savedRecipes, priceRecords),
-    [savedRecipes, priceRecords],
+    () => applyDynamicRecipePrices(savedRecipes, priceRecords, referenceData || {}),
+    [savedRecipes, priceRecords, referenceData],
   );
   const [loadingRecipes, setLoadingRecipes] = useState(true);
   const [constraintDefinitions, setConstraintDefinitions] = useState({});
@@ -194,6 +194,7 @@ function MealPlan() {
         emoji: r.emoji || '\u{1F372}',
         name: r.name,
         type: r.type,
+        is_dessert: r.is_dessert === true,
         diet: r.diet_tags || [],
         goal: r.goal_tags || [],
         difficulty: r.difficulty || 'medium',
@@ -1134,7 +1135,7 @@ ${text}`,
   );
 }
 function PriceOptimizerPanel({ meals = [], profile }) {
-  const { records: priceRecords } = useIngredientPrices();
+  const { records: priceRecords, referenceData } = useIngredientPrices();
   const [dailyBudget, setDailyBudget] = useState(200);
   const [appliedBudget, setAppliedBudget] = useState(200);
   const [sortMode, setSortMode] = useState('cost');
@@ -1157,8 +1158,11 @@ function PriceOptimizerPanel({ meals = [], profile }) {
     };
   }, [profile, appliedBudget, suggestionType]);
   const liveSuggestion = useMemo(
-    () => (suggestion ? applyDynamicRecipePrices([suggestion], priceRecords)[0] : null),
-    [suggestion, priceRecords],
+    () =>
+      suggestion
+        ? applyDynamicRecipePrices([suggestion], priceRecords, referenceData || {})[0]
+        : null,
+    [suggestion, priceRecords, referenceData],
   );
   const perMeal = appliedBudget / 4;
   const sortedMeals = useMemo(() => {
@@ -1200,7 +1204,8 @@ function PriceOptimizerPanel({ meals = [], profile }) {
       const active = getActiveConstraints(profile, definitions);
       const isAllowed = (meal) =>
         canSelectRecipe(meal, profile, definitions);
-      const priceMeal = (meal) => applyDynamicRecipePrices([meal], priceRecords)[0];
+      const priceMeal = (meal) =>
+        applyDynamicRecipePrices([meal], priceRecords, referenceData || {})[0];
       const validate = (meal) =>
         meal.type === suggestionType &&
         isAffordableMeal(priceMeal(meal), perMeal) &&
@@ -1253,11 +1258,14 @@ function PriceOptimizerPanel({ meals = [], profile }) {
           }
         },
         fallback: () => {
-          const meal = selectRecipeFallback(applyDynamicRecipePrices(meals, priceRecords), {
+          const meal = selectRecipeFallback(
+            applyDynamicRecipePrices(meals, priceRecords, referenceData || {}),
+            {
             mealType: suggestionType,
             budget: perMeal,
             isAllowed,
-          });
+            },
+          );
           return (
             meal && {
               ...meal,

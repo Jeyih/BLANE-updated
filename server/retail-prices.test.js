@@ -8,6 +8,42 @@ import {
 } from './retail-prices.js';
 const html = (product) =>
   `<script type="application/ld+json">${JSON.stringify({ '@graph': [product] })}<\/script>`;
+const duckBreastConfig = {
+  name: 'Duck breast',
+  productName: 'Duck Breast (Dalee)',
+  sellerName: 'The Sausage Guy Panglao',
+  source: 'The Sausage Guy Panglao official shop',
+  url: 'https://www.thesausageguy.shop/panglao/poultry',
+  currency: 'PHP',
+  sourceCountry: 'PH',
+  region: 'Panglao, Bohol / Philippine retailer',
+  unitCode: 'KGM',
+  unitValue: 1,
+};
+const wholeDuckConfig = {
+  name: 'Whole duck',
+  productPattern: 'Whole Duck Headless',
+  priceSectionPattern: '<div class=product-price>[\\s\\S]*?<meta itemprop=priceCurrency content=PHP>',
+  pricePattern: 'class=priceUnit[^>]*>[\\s\\S]*?₱\\s*([\\d,]+(?:\\.\\d+)?)\\s*\\/kg',
+  description: 'Whole Duck Headless — whole-bird retailer reference',
+  source: 'GERALD.ph official online store',
+  url: 'https://shop.gerald.ph/whole-duck',
+  currency: 'PHP',
+  sourceCountry: 'PH',
+  region: 'Philippines / online store',
+  note: 'Whole bird includes bones and skin; edible breast yield is not measured.',
+};
+const tocinoConfig = {
+  name: 'Beef, sweet cured',
+  productPattern: '^beef tocino 500\\s*g$',
+  basis: '500 g',
+  description: 'Beef Tocino 500g — retailer product reference',
+  source: 'Monterey Community Market, Quezon City',
+  url: 'https://montereycommunityonlinemarket.com.ph/product/beef-tocino-500g/',
+  currency: 'PHP',
+  sourceCountry: 'PH',
+  region: 'NCR',
+};
 test('exact Philippine duck-breast quote requires matching product, seller, currency and kg basis', () => {
   const product = {
     '@type': 'Product',
@@ -24,7 +60,7 @@ test('exact Philippine duck-breast quote requires matching product, seller, curr
       },
     },
   };
-  const record = parseDuckBreastPrice(html(product));
+  const record = parseDuckBreastPrice(html(product), duckBreastConfig);
   assert.equal(record.price, 900);
   assert.equal(record.estimateType, 'product');
   assert.equal(record.availability, 'Listed in stock');
@@ -50,16 +86,16 @@ test('exact Philippine duck-breast quote requires matching product, seller, curr
   ]) {
     const changed = structuredClone(product);
     mutate(changed);
-    assert.throws(() => parseDuckBreastPrice(html(changed)));
+    assert.throws(() => parseDuckBreastPrice(html(changed), duckBreastConfig));
   }
 });
 test('whole-duck benchmark uses the displayed PHP/kg rate, not the bag total', () => {
   const page =
     '<h1>Whole Duck Headless</h1><div class=product-price><span class=priceUnit>2.4 kg per bag<br> \u20B1 598 /kg</span><span itemprop=price content=1435>1435</span><meta itemprop=priceCurrency content=PHP>';
-  assert.equal(parseWholeDuckPrice(page).price, 598);
-  assert.throws(() => parseWholeDuckPrice(page.replace('PHP', 'USD')));
-  assert.throws(() => parseWholeDuckPrice(page.replace('/kg', '/pc')));
-  assert.throws(() => parseWholeDuckPrice(page.replace('598', '0')));
+  assert.equal(parseWholeDuckPrice(page, wholeDuckConfig).price, 598);
+  assert.throws(() => parseWholeDuckPrice(page.replace('PHP', 'USD'), wholeDuckConfig));
+  assert.throws(() => parseWholeDuckPrice(page.replace('/kg', '/pc'), wholeDuckConfig));
+  assert.throws(() => parseWholeDuckPrice(page.replace('598', '0'), wholeDuckConfig));
 });
 test('retail pack price converts to PHP/kg and keeps traceable source information', () => {
   const row = parseRetailPrice(
@@ -75,12 +111,13 @@ test('retail pack price converts to PHP/kg and keeps traceable source informatio
         },
       ],
     }),
+    tocinoConfig,
   );
   assert.equal(row.price, 805);
   assert.equal(row.packPrice, 402.5);
   assert.equal(row.sourceType, 'retailer');
   assert.equal(row.kind, 'reference');
-  assert.ok(row.sourceUrl.startsWith('https://montereycommunityonlinemarket.com.ph/'));
+  assert.equal(row.sourceUrl, tocinoConfig.url);
 });
 test('reviewed retailer product identity and pack basis are enforced', () => {
   const config = {
@@ -89,6 +126,10 @@ test('reviewed retailer product identity and pack basis are enforced', () => {
     basis: '500 g',
     raw: true,
     partial: true,
+    source: 'Official retailer',
+    region: 'Philippines / online store',
+    currency: 'PHP',
+    sourceCountry: 'PH',
   };
   const [record] = productRecords(
     config,
@@ -114,6 +155,10 @@ test('fresh commodity quotes verify the labelled kg basis as well as product ide
     title: 'Q Garlic Native',
     basis: '1 kg',
     requireNetWeight: true,
+    source: 'Metro',
+    region: 'Philippines / online store',
+    currency: 'PHP',
+    sourceCountry: 'PH',
   };
   const description = '<td>Net Weight:</td><td>1KG</td>';
   assert.equal(
@@ -157,6 +202,7 @@ test('does not import an unrelated product, pack size, currency, or invalid pric
     assert.throws(() =>
       parseRetailPrice(
         html({ '@type': 'Product', name, offers: { priceCurrency: currency, price } }),
+        tocinoConfig,
       ),
     );
   }

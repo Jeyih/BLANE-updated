@@ -1,9 +1,5 @@
 import { ingredientKey, parsePriceQuantity } from '../src/lib/pricing.js';
-import { METRO_SOURCES, SHOPIFY_SOURCES } from './retail-source-config.js';
-const TOCINO_URL = 'https://montereycommunityonlinemarket.com.ph/product/beef-tocino-500g/';
-const DUCK_URL = 'https://shop.gerald.ph/whole-duck';
-const DUCK_BREAST_URL = 'https://www.thesausageguy.shop/panglao/poultry';
-function parseDuckBreastPrice(html) {
+function parseDuckBreastPrice(html, config) {
   const products = [];
   function walk(value) {
     if (!value || typeof value !== 'object') return;
@@ -20,35 +16,35 @@ function parseDuckBreastPrice(html) {
       walk(JSON.parse(json));
     } catch {}
   }
-  const product = products.find((p) => p.name === 'Duck Breast (Dalee)');
+  const product = products.find((p) => p.name === config.productName);
   const offer = product?.offers;
   const spec = offer?.priceSpecification;
   if (
-    offer?.priceCurrency !== 'PHP' ||
-    spec?.priceCurrency !== 'PHP' ||
-    spec.referenceQuantity?.unitCode !== 'KGM' ||
-    Number(spec.referenceQuantity?.value) !== 1 ||
-    offer.seller?.name !== 'The Sausage Guy Panglao' ||
+    offer?.priceCurrency !== config.currency ||
+    spec?.priceCurrency !== config.currency ||
+    spec.referenceQuantity?.unitCode !== config.unitCode ||
+    Number(spec.referenceQuantity?.value) !== Number(config.unitValue) ||
+    offer.seller?.name !== config.sellerName ||
     Number(offer.price) !== Number(spec.price) ||
     !Number.isFinite(Number(spec.price)) ||
     Number(spec.price) <= 0
   ) {
-    throw new Error('Duck-breast product, seller or PHP/kg quote changed.');
+    throw new Error('Reviewed duck-breast product, seller or PHP/kg quote changed.');
   }
   return {
-    name: 'Duck breast',
-    key: ingredientKey('Duck breast'),
+    name: config.name,
+    key: ingredientKey(config.name),
     description: product.name,
     price: Number(spec.price),
     unit: 'kg',
     kind: 'reference',
     sourceType: 'retailer',
     verified: true,
-    currency: 'PHP',
-    sourceCountry: 'PH',
-    region: 'Panglao, Bohol / Philippine retailer',
-    source: 'The Sausage Guy Panglao official shop',
-    sourceUrl: DUCK_BREAST_URL,
+    currency: config.currency,
+    sourceCountry: config.sourceCountry,
+    region: config.region,
+    source: config.source,
+    sourceUrl: config.url,
     observedAt: new Date(Date.now() + 8 * 36e5).toISOString().slice(0, 10),
     estimateType: 'product',
     availability:
@@ -57,35 +53,35 @@ function parseDuckBreastPrice(html) {
         : 'Stock status not confirmed',
   };
 }
-function parseWholeDuckPrice(html) {
+function parseWholeDuckPrice(html, config) {
   const section = html.match(
-    /<div class=product-price>[\s\S]*?<meta itemprop=priceCurrency content=PHP>/,
+    new RegExp(config.priceSectionPattern),
   )?.[0];
-  const price = section?.match(/class=priceUnit[^>]*>[\s\S]*?₱\s*([\d,]+(?:\.\d+)?)\s*\/kg/);
-  if (!/Whole Duck Headless/.test(html) || !price)
-    throw new Error('Whole duck identity or PHP/kg price changed.');
+  const price = section?.match(new RegExp(config.pricePattern));
+  if (!new RegExp(config.productPattern).test(html) || !price)
+    throw new Error('Reviewed whole-duck identity or PHP/kg price changed.');
   const amount = Number(price[1].replace(/,/g, ''));
   if (!Number.isFinite(amount) || amount <= 0) throw new Error('Invalid whole-duck price.');
   return {
-    name: 'Whole duck',
-    key: ingredientKey('Whole duck'),
+    name: config.name,
+    key: ingredientKey(config.name),
     price: amount,
     unit: 'kg',
-    description: 'Whole Duck Headless \u2014 whole-bird retailer reference',
+    description: config.description,
     kind: 'reference',
     sourceType: 'retailer',
     verified: true,
-    currency: 'PHP',
-    sourceCountry: 'PH',
-    source: 'GERALD.ph official online store',
-    sourceUrl: DUCK_URL,
-    region: 'Philippines / online store',
+    currency: config.currency,
+    sourceCountry: config.sourceCountry,
+    source: config.source,
+    sourceUrl: config.url,
+    region: config.region,
     observedAt: new Date(Date.now() + 8 * 36e5).toISOString().slice(0, 10),
     estimateType: 'product reference',
-    notes: 'Whole bird includes bones and skin; edible breast yield is not measured.',
+    notes: config.note,
   };
 }
-function parseRetailPrice(html) {
+function parseRetailPrice(html, config) {
   const products = [];
   function walk(value) {
     if (!value || typeof value !== 'object') return;
@@ -102,7 +98,7 @@ function parseRetailPrice(html) {
       walk(JSON.parse(json));
     } catch {}
   }
-  const product = products.find((p) => /^beef tocino 500\s*g$/i.test(p.name?.trim()));
+  const product = products.find((p) => new RegExp(config.productPattern, 'i').test(p.name?.trim()));
   const offers = product
     ? (Array.isArray(product.offers) ? product.offers : [product.offers]).flatMap((offer2) => {
         if (!offer2) return [];
@@ -115,24 +111,31 @@ function parseRetailPrice(html) {
       })
     : [];
   const offer = offers.find(
-    (o) => o?.priceCurrency === 'PHP' && Number.isFinite(Number(o.price)) && Number(o.price) > 0,
+    (o) =>
+      o?.priceCurrency === config.currency &&
+      Number.isFinite(Number(o.price)) &&
+      Number(o.price) > 0,
   );
-  if (!offer) throw new Error('Retail product, pack size, or PHP price could not be verified.');
+  if (!offer)
+    throw new Error('Reviewed retail product, pack size, or price could not be verified.');
+  const basis = parsePriceQuantity(config.basis);
+  if (!basis || basis.unit !== 'kg')
+    throw new Error('Reviewed retailer pack basis is invalid.');
   return {
-    name: 'Beef, sweet cured',
-    key: ingredientKey('Beef, sweet cured'),
-    description: 'Beef Tocino 500g \u2014 retailer product reference',
-    price: Number(offer.price) / 0.5,
+    name: config.name,
+    key: ingredientKey(config.name),
+    description: config.description,
+    price: Number(offer.price) / basis.amount,
     unit: 'kg',
     packPrice: Number(offer.price),
-    packQuantity: '500 g',
+    packQuantity: config.basis,
     kind: 'reference',
     sourceType: 'retailer',
-    region: 'NCR',
-    currency: 'PHP',
-    sourceCountry: 'PH',
-    source: 'Monterey Community Market, Quezon City',
-    sourceUrl: TOCINO_URL,
+    region: config.region,
+    currency: config.currency,
+    sourceCountry: config.sourceCountry,
+    source: config.source,
+    sourceUrl: config.url,
     observedAt: new Date(Date.now() + 8 * 36e5).toISOString().slice(0, 10),
   };
 }
@@ -168,11 +171,10 @@ function productRecords(config, product, packPrice, source, url, description = '
     kind: 'reference',
     sourceType: 'retailer',
     verified: true,
-    currency: 'PHP',
-    sourceCountry: 'PH',
-    region:
-      config.host === 'jelexie.ph' ? 'Tarlac brand / online store' : 'Philippines / online store',
-    source,
+    currency: config.currency,
+    sourceCountry: config.sourceCountry,
+    region: config.region,
+    source: config.source || source,
     sourceUrl: url,
     observedAt: new Date(Date.now() + 8 * 36e5).toISOString().slice(0, 10),
     estimateType: config.raw ? 'raw' : config.note ? 'product reference' : 'product',
@@ -187,7 +189,15 @@ function productRecords(config, product, packPrice, source, url, description = '
       .join(' '),
   }));
 }
-async function fetchRetailPrices(previousRecords = []) {
+async function fetchRetailPrices(previousRecords = [], referenceData) {
+  const metroSources = referenceData?.metroSources;
+  const shopifySources = referenceData?.shopifySources;
+  const specials = referenceData?.retailSpecials;
+  if (!Array.isArray(metroSources) || !Array.isArray(shopifySources) || !specials)
+    throw new Error('Retailer product catalogue is unavailable.');
+  for (const key of ['tocino', 'whole_duck', 'duck_breast']) {
+    if (!specials[key]) throw new Error(`Retailer source configuration is missing: ${key}.`);
+  }
   const records = [];
   const warnings = [];
   async function get(url) {
@@ -205,11 +215,11 @@ async function fetchRetailPrices(previousRecords = []) {
     warnings.push(`${config.names[0]}: source refresh unavailable (${error.message}).`);
   }
   const metroUrl = new URL('https://shopmetro.ph/wp-json/wc/store/v1/products');
-  metroUrl.searchParams.set('include', METRO_SOURCES.map((c) => c.id).join(','));
+  metroUrl.searchParams.set('include', metroSources.map((c) => c.id).join(','));
   metroUrl.searchParams.set('per_page', '100');
   try {
     const products = await (await get(metroUrl.href)).json();
-    for (const config of METRO_SOURCES) {
+    for (const config of metroSources) {
       try {
         const product = products.find((p) => p.id === config.id);
         if (!product || product.prices?.currency_code !== 'PHP' || product.prices.price_range)
@@ -221,7 +231,7 @@ async function fetchRetailPrices(previousRecords = []) {
             config,
             product.name,
             price,
-            'Metro official online store',
+            config.source,
             product.permalink,
             product.description,
           ).map((p) => ({
@@ -234,12 +244,12 @@ async function fetchRetailPrices(previousRecords = []) {
       }
     }
   } catch (error) {
-    for (const config of METRO_SOURCES) fallback(config, error);
+    for (const config of metroSources) fallback(config, error);
   }
   let index = 0;
   async function worker() {
-    while (index < SHOPIFY_SOURCES.length) {
-      const config = SHOPIFY_SOURCES[index++];
+    while (index < shopifySources.length) {
+      const config = shopifySources[index++];
       try {
         const url = `https://${config.host}/products/${config.handle}`;
         const data = await (await get(`${url}.js`)).json();
@@ -264,23 +274,28 @@ async function fetchRetailPrices(previousRecords = []) {
   }
   await Promise.all([worker(), worker(), worker()]);
   try {
-    records.push(parseWholeDuckPrice(await (await get(DUCK_URL)).text()));
+    const config = specials.whole_duck;
+    records.push(parseWholeDuckPrice(await (await get(config.url)).text(), config));
   } catch (error) {
-    fallback({ names: ['Whole duck'] }, error);
+    fallback(specials.whole_duck, error);
   }
   try {
-    records.push(parseDuckBreastPrice(await (await get(DUCK_BREAST_URL)).text()));
+    const config = specials.duck_breast;
+    records.push(parseDuckBreastPrice(await (await get(config.url)).text(), config));
   } catch (error) {
-    fallback({ names: ['Duck breast'] }, error);
+    fallback(specials.duck_breast, error);
   }
   try {
     records.push({
-      ...parseRetailPrice(await (await get(TOCINO_URL)).text()),
+      ...parseRetailPrice(
+        await (await get(specials.tocino.url)).text(),
+        specials.tocino,
+      ),
       verified: true,
       estimateType: 'product',
     });
   } catch (error) {
-    fallback({ names: ['Beef, sweet cured'] }, error);
+    fallback(specials.tocino, error);
   }
   if (!records.length) throw new Error('No verified retailer prices could be loaded.');
   return {
@@ -293,9 +308,6 @@ async function fetchRetailPrices(previousRecords = []) {
   };
 }
 export {
-  DUCK_BREAST_URL,
-  DUCK_URL,
-  TOCINO_URL,
   decodeProductName,
   fetchRetailPrices,
   parseDuckBreastPrice,

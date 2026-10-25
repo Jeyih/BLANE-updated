@@ -1,18 +1,17 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { ingredientPriceAudit, formatPrice } from '../src/lib/pricing.js';
+import { groupPriceReferenceRows } from '../src/lib/price-reference.js';
 const db = JSON.parse(
   await readFile(new URL('../tmp/ingredient-pricing-audit.json', import.meta.url), 'utf8'),
 );
-const snapshots = await Promise.all(
-  ['ingredient-prices', 'retail-prices'].map(async (name) =>
-    JSON.parse(await readFile(new URL(`../public/data/${name}.json`, import.meta.url), 'utf8')),
-  ),
-);
-const records = snapshots.flatMap((s) => s.records);
+const references = groupPriceReferenceRows(db.referenceRows);
+const records = [...references.daSnapshot.records, ...references.retailSnapshot.records];
 const names = [
   ...new Set([...db.recipeIngredients, ...db.marketIngredients].map((i) => i.name).filter(Boolean)),
 ].sort();
-const rows = names.map((name) => ingredientPriceAudit(name, db.recipeIngredients, records));
+const rows = names.map((name) =>
+  ingredientPriceAudit(name, db.recipeIngredients, records, references),
+);
 const counts = {};
 for (const row of rows) counts[row.evidence.label] = (counts[row.evidence.label] || 0) + 1;
 const date = new Date(Date.now() + 8 * 36e5).toISOString().slice(0, 10);

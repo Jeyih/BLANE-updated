@@ -90,11 +90,11 @@ test('one-click meal selection preserves other meals, custom times and other day
     'Repeated tap replaces the slot instead of duplicating it',
   );
 });
-test('desserts are discoverable without changing their original nutritional meal type', () => {
-  const dessert = { name: 'Cassava Cake', type: 'Snack', ingredients: [] };
+test('dessert records use their database meal type and are added to the snack slot', () => {
+  const dessert = { name: 'Cassava Cake', type: 'Snack', is_dessert: true, ingredients: [] };
   assert.equal(isDessert(dessert), true);
   assert.equal(isDessert({ name: 'Chicken Curry', type: 'Lunch', ingredients: [] }), false);
-  assert.equal(dessert.type, 'Snack');
+  assert.equal(isDessert({ name: 'Old dessert', type: 'Dessert' }), true);
   let value = 'broken data';
   const storage = {
     getItem: () => value,
@@ -103,7 +103,7 @@ test('desserts are discoverable without changing their original nutritional meal
     },
   };
   addMealForToday(
-    { id: 'cake', type: 'Dessert' },
+    { id: 'cake', type: 'Snack', is_dessert: true },
     { date: new Date('2026-10-14T07:00:00Z'), storage },
   );
   assert.equal(JSON.parse(value)[3].find((s) => s.type === 'Snack').mealId, 'cake');

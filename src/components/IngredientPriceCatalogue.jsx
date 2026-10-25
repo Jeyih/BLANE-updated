@@ -4,14 +4,14 @@ import { useIngredientPrices } from '../context/PriceContext';
 import { formatPrice, priceCoverage, ingredientPriceAudit } from '../lib/pricing';
 const PAGE_SIZE = 50;
 function IngredientPriceCatalogue() {
-  const { records, foods, recipeIngredients, loading } = useIngredientPrices();
+  const { records, foods, recipeIngredients, referenceData, loading } = useIngredientPrices();
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState('recipes');
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(0);
   const coverage = useMemo(
-    () => priceCoverage(foods, recipeIngredients, records),
-    [foods, recipeIngredients, records],
+    () => priceCoverage(foods, recipeIngredients, records, referenceData || {}),
+    [foods, recipeIngredients, records, referenceData],
   );
   const rows = useMemo(
     () =>
@@ -78,7 +78,12 @@ function IngredientPriceCatalogue() {
     const csv = [
       header,
       ...selected.map((food) => {
-        const audit = ingredientPriceAudit(food.food_name, recipeIngredients, records);
+        const audit = ingredientPriceAudit(
+          food.food_name,
+          recipeIngredients,
+          records,
+          referenceData || {},
+        );
         const source = audit.quote?.records[0];
         return [
           food.food_name,
@@ -320,7 +325,7 @@ function IngredientPriceCatalogue() {
                       null,
                       food.quote
                         ? food.quote.records[0].kind === 'local'
-                          ? `Tarlac recorded quotes (${food.quote.records.length})`
+                          ? `Local recorded quotes (${food.quote.records.length})`
                           : React.createElement(
                               'a',
                               {
@@ -383,7 +388,7 @@ function IngredientPriceCatalogue() {
           React.createElement(
             'p',
             null,
-            'Retail product prices are reference estimates, not confirmed prices at every Tarlac market. Old market entries without a verified source are excluded from pricing.',
+            'Retail product prices are reference estimates, not confirmed prices at every listed market. Old market entries without a verified source are excluded from pricing.',
           ),
           React.createElement(
             'p',

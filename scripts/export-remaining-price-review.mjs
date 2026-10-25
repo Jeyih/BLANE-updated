@@ -1,14 +1,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { ingredientPriceAudit } from '../src/lib/pricing.js';
+import { groupPriceReferenceRows } from '../src/lib/price-reference.js';
 const db = JSON.parse(
   await readFile(new URL('../tmp/ingredient-pricing-audit.json', import.meta.url), 'utf8'),
 );
-const feeds = await Promise.all(
-  ['ingredient-prices', 'retail-prices'].map(async (name) =>
-    JSON.parse(await readFile(new URL(`../public/data/${name}.json`, import.meta.url), 'utf8')),
-  ),
-);
-const records = feeds.flatMap((feed) => feed.records);
+const references = groupPriceReferenceRows(db.referenceRows);
+const records = [...references.daSnapshot.records, ...references.retailSnapshot.records];
 const resolved = new Set([
   'Garlic bulb',
   'Onion, Bombay bulb',
@@ -21,7 +18,7 @@ const audits = [
   ...new Set([...db.recipeIngredients, ...db.marketIngredients].map((i) => i.name).filter(Boolean)),
 ]
   .sort()
-  .map((name) => ingredientPriceAudit(name, db.recipeIngredients, records))
+  .map((name) => ingredientPriceAudit(name, db.recipeIngredients, records, references))
   .filter((audit) => audit.evidence.needsReview || resolved.has(audit.name));
 if (audits.length !== 52)
   throw new Error(`Expected the original 52 ingredients, found ${audits.length}.`);

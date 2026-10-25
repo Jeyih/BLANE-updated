@@ -3,15 +3,15 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { useAuth } from './AuthContext';
 import { supabase } from '../lib/supabase';
 import { loadPriceCatalogue, isSourcedPrice } from '../lib/pricing';
-import snapshot from '../../public/data/ingredient-prices.json';
-import retailSnapshot from '../../public/data/retail-prices.json';
+import { loadPriceReferenceData } from '../lib/price-reference.js';
 import { PRICE_POLL_MS } from '../lib/price-refresh-policy';
 const PriceContext = createContext(null);
 function PriceProvider({ children }) {
   const { user } = useAuth();
   const [state, setState] = useState({
-    records: [...snapshot.records, ...retailSnapshot.records],
-    report: snapshot.report,
+    records: [],
+    report: null,
+    referenceData: null,
     foods: [],
     recipeIngredients: [],
     loading: true,
@@ -20,6 +20,7 @@ function PriceProvider({ children }) {
   const requestRef = useRef(0);
   const inFlightRef = useRef(null);
   const catalogueRef = useRef(null);
+  const referenceDataRef = useRef(null);
   const refresh = useCallback(
     (options = {}) => {
       const { force = false, silent = false, reloadCatalogue = false } = options;
@@ -29,7 +30,8 @@ function PriceProvider({ children }) {
       if (!silent) setState((prev) => ({ ...prev, loading: true }));
       const job = (async () => {
         const cachedCatalogue = catalogueRef.current;
-        const [reference, catalogue] = await Promise.allSettled([
+        const cachedReferences = referenceDataRef.current;
+        const [reference, catalogue, priceReferences] = await Promise.allSettled([
           fetch(`/.netlify/functions/ingredient-prices${force ? '?refresh=1' : ''}`, {
             cache: 'no-store',
             signal: AbortSignal.timeout(26e3),
@@ -44,15 +46,28 @@ function PriceProvider({ children }) {
               ? Promise.resolve(cachedCatalogue.data)
               : loadPriceCatalogue(supabase)
             : Promise.resolve({ foods: [], recipeIngredients: [] }),
+          cachedReferences && !reloadCatalogue
+            ? Promise.resolve(cachedReferences)
+            : loadPriceReferenceData(supabase),
         ]);
         if (request !== requestRef.current) return;
         if (catalogue.status === 'fulfilled')
           catalogueRef.current = { userId, data: catalogue.value };
         const feed = reference.status === 'fulfilled' ? reference.value : null;
+        const dbReferences = priceReferences.status === 'fulfilled' ? priceReferences.value : null;
+        if (dbReferences) referenceDataRef.current = dbReferences;
+        const dbRecords = dbReferences
+          ? [...dbReferences.daSnapshot.records, ...dbReferences.retailSnapshot.records]
+          : null;
         const warnings = [
           reference.status === 'fulfilled'
             ? feed.warning
-            : 'Live refresh unavailable; showing the last imported DA and retailer quotes.',
+            : dbRecords
+              ? 'Live refresh unavailable; showing the last database-saved DA and retailer quotes.'
+              : 'Live refresh unavailable; sourced prices could not be loaded.',
+          priceReferences.status === 'rejected'
+            ? 'Database price references could not be loaded.'
+            : '',
           catalogue.status === 'rejected'
             ? 'Ingredient catalogue could not be loaded; coverage is unavailable.'
             : '',
@@ -62,8 +77,11 @@ function PriceProvider({ children }) {
             ? JSON.stringify(feed.records.filter(isSourcedPrice)) === JSON.stringify(prev.records)
               ? prev.records
               : feed.records.filter(isSourcedPrice)
-            : prev.records,
-          report: feed?.report || prev.report,
+            : dbRecords
+              ? dbRecords.filter(isSourcedPrice)
+              : prev.records,
+          report: feed?.report || dbReferences?.daSnapshot.report || prev.report,
+          referenceData: dbReferences || prev.referenceData,
           foods: catalogue.status === 'fulfilled' ? catalogue.value.foods : prev.foods,
           recipeIngredients:
             catalogue.status === 'fulfilled'

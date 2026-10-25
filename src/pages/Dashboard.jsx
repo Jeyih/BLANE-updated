@@ -237,10 +237,10 @@ function Dashboard() {
 function MealPlanWidget({ profile }) {
   const now = useMealClock();
   const [savedRecipes, setRecipes] = useState([]);
-  const { records } = useIngredientPrices();
+  const { records, referenceData } = useIngredientPrices();
   const recipes = useMemo(
-    () => applyDynamicRecipePrices(savedRecipes, records),
-    [savedRecipes, records],
+    () => applyDynamicRecipePrices(savedRecipes, records, referenceData || {}),
+    [savedRecipes, records, referenceData],
   );
   const [daySlots, setDaySlots] = useState({});
   const [loading, setLoading] = useState(true);

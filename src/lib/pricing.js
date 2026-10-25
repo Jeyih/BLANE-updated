@@ -1,49 +1,12 @@
-import {
-  RAW_DA_MAPPINGS,
-  DA_NAME_MAPPINGS,
-  PARTIAL_RAW_FOODS,
-  COMPARABLE_PRICE_MAPPINGS,
-} from './price-mappings.js';
-import { documentedPurchaseAmount, FNRI_PORTION_DEFINITIONS } from './philippine-portions.js';
-const ALIASES = {
-  malunngay: 'malunggay leaves',
-  malunggay: 'malunggay leaves',
-  'moringa leaves': 'malunggay leaves',
-  bigas: 'white rice',
-  rice: 'white rice',
-  'uncooked rice': 'white rice',
-  munggo: 'mungbean',
-  monggo: 'mungbean',
-  'mung beans': 'mungbean',
-  milkfish: 'bangus',
-  liempo: 'pork belly',
-  kasim: 'pork shoulder',
-  eggs: 'egg',
-  'chicken egg': 'egg',
-  talong: 'eggplant',
-  kamatis: 'tomato',
-  tomatoes: 'tomato',
-  kalabasa: 'squash',
-  'bitter gourd': 'ampalaya',
-  'string beans': 'sitaw',
-  'yardlong beans': 'sitaw',
-  carrots: 'carrot',
-  sayote: 'chayote',
-  potatoes: 'potato',
-  'white potato': 'potato',
-  luya: 'ginger',
-  saba: 'banana saba',
-  'native garlic': 'local garlic',
-  'white sugar': 'refined sugar',
-};
-function ingredientKey(name) {
+import { documentedPurchaseAmount } from './philippine-portions.js';
+function ingredientKey(name, aliases = {}) {
   const key = String(name || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
-  return ALIASES[key] || key;
+  return aliases[key] || key;
 }
 const formatPrice = (v) =>
   Number.isFinite(v) && v > 0 ? `\u20B1${v.toFixed(2)}` : 'Price unavailable';
@@ -84,18 +47,19 @@ function isSourcedPrice(record) {
     return false;
   }
 }
-function matchingReferences(name, prices) {
-  const key = ingredientKey(name);
+function matchingReferences(name, prices, referenceData = {}) {
+  const aliases = referenceData.aliases || {};
+  const key = ingredientKey(name, aliases);
   const sourced = prices.filter(isSourcedPrice);
-  const direct = sourced.filter((p) => (p.key || ingredientKey(p.name)) === key);
+  const direct = sourced.filter((p) => (p.key || ingredientKey(p.name, aliases)) === key);
   if (direct.length) {
     const official = direct.filter((p) => p.sourceType !== 'retailer');
     return [...official, ...direct.filter((p) => p.sourceType === 'retailer')];
   }
-  const comparable = COMPARABLE_PRICE_MAPPINGS[name];
+  const comparable = referenceData.comparablePriceMappings?.[name];
   if (comparable) {
     const benchmarks = sourced.filter(
-      (p) => (p.key || ingredientKey(p.name)) === ingredientKey(comparable.name),
+      (p) => (p.key || ingredientKey(p.name, aliases)) === ingredientKey(comparable.name, aliases),
     );
     if (benchmarks.length)
       return benchmarks.map((p) => ({
@@ -105,15 +69,16 @@ function matchingReferences(name, prices) {
         notes: `Comparable-product estimate: ${comparable.note} ${p.notes || ''}`.trim(),
       }));
   }
-  const mapped = RAW_DA_MAPPINGS[name] || DA_NAME_MAPPINGS[name];
+  const rawMapping = referenceData.rawDaMappings?.[name];
+  const mapped = rawMapping || referenceData.daNameMappings?.[name];
   if (!mapped) return [];
   return sourced
-    .filter((p) => (p.key || ingredientKey(p.name)) === ingredientKey(mapped))
+    .filter((p) => (p.key || ingredientKey(p.name, aliases)) === ingredientKey(mapped, aliases))
     .map((p) => ({
       ...p,
-      estimateType: RAW_DA_MAPPINGS[name] ? 'raw' : 'product reference',
-      partial: PARTIAL_RAW_FOODS.has(name),
-      notes: RAW_DA_MAPPINGS[name]
+      estimateType: rawMapping ? 'raw' : 'product reference',
+      partial: referenceData.partialRawFoods?.has(name) || false,
+      notes: rawMapping
         ? 'Raw-ingredient estimate; weight-based costs assume equal raw/cooked weight. Cooking yield, oil, sugar, wrappers, labour and fuel are excluded.'
         : `${mapped} reference used; the exact variety is not specified in the recipe.`,
     }));
@@ -190,13 +155,13 @@ function parseRecipeQuantity(value) {
       .join(' '),
   };
 }
-function normalizeMarketPrices(rows, markets) {
+function normalizeMarketPrices(rows, markets, referenceData = {}) {
+  const aliases = referenceData.aliases || {};
   const byId = new Map(markets.map((m) => [String(m.id), m]));
   return rows.flatMap((row) => {
     const market = byId.get(String(row.market_id));
     if (
       !market ||
-      !/tarlac/i.test(`${market.address || ''} ${market.name || ''}`) ||
       row.status === 'unavail'
     )
       return [];
@@ -207,11 +172,11 @@ function normalizeMarketPrices(rows, markets) {
     return [
       {
         name: row.name,
-        key: ingredientKey(row.name),
+        key: ingredientKey(row.name, aliases),
         price: price / basis.amount,
         unit: basis.unit,
         kind: 'local',
-        region: 'Tarlac',
+        region: market.address || market.name || 'Local market',
         source: market.name,
         sourceUrl: null,
         observedAt: row.updated_at || null,
@@ -219,12 +184,12 @@ function normalizeMarketPrices(rows, markets) {
     ];
   });
 }
-async function loadMarketIngredientPrices(supabase) {
+async function loadMarketIngredientPrices(supabase, referenceData = {}) {
   const [ingredients, markets] = await Promise.all([
     loadAllPriceRows(supabase, 'market_ingredients', '*', 'id'),
     loadAllPriceRows(supabase, 'markets', 'id,name,address', 'id'),
   ]);
-  return normalizeMarketPrices(ingredients, markets);
+  return normalizeMarketPrices(ingredients, markets, referenceData);
 }
 async function loadAllPriceRows(supabase, table, columns = '*', order = 'id') {
   const rows = [];
@@ -246,8 +211,8 @@ async function loadPriceCatalogue(supabase) {
   ]);
   return { foods, recipeIngredients };
 }
-function ingredientQuote(name, prices) {
-  const matches = matchingReferences(name, prices);
+function ingredientQuote(name, prices, referenceData = {}) {
+  const matches = matchingReferences(name, prices, referenceData);
   const official = matches.filter((p) => p.sourceType !== 'retailer');
   const selected = official.length ? official : matches;
   if (!selected.length) return null;
@@ -259,8 +224,8 @@ function ingredientQuote(name, prices) {
     records,
   };
 }
-function marketIngredientPriceText(ingredient, records) {
-  const quote = ingredientQuote(ingredient.name, records);
+function marketIngredientPriceText(ingredient, records, referenceData = {}) {
+  const quote = ingredientQuote(ingredient.name, records, referenceData);
   return quote
     ? `${quote.records[0].estimateType === 'comparable' ? 'Comparable estimate' : 'Estimated reference'} ${formatPrice(quote.price)} / ${quote.unit}`
     : 'Sourced price unavailable';
@@ -310,11 +275,12 @@ function priceEvidence(records = []) {
     reason: 'A price for the matching listed product; local branch price may differ.',
   };
 }
-function ingredientPriceAudit(name, ingredients, records) {
-  const quote = ingredientQuote(name, records);
+function ingredientPriceAudit(name, ingredients, records, referenceData = {}) {
+  const aliases = referenceData.aliases || {};
+  const quote = ingredientQuote(name, records, referenceData);
   const usages = ingredients
-    .filter((i) => ingredientKey(i.name) === ingredientKey(name))
-    .map((i) => priceIngredient(i, records));
+    .filter((i) => ingredientKey(i.name, aliases) === ingredientKey(name, aliases))
+    .map((i) => priceIngredient(i, records, referenceData));
   const evidenceRecords = usages.length
     ? usages.flatMap((i) => i.priceRecords)
     : quote?.records || [];
@@ -358,13 +324,15 @@ function ingredientPriceAudit(name, ingredients, records) {
     conversionNotes: [...new Set(evidenceRecords.map((p) => p.conversionNote).filter(Boolean))],
   };
 }
-function priceCoverage(foods, recipeIngredients, records) {
+function priceCoverage(foods, recipeIngredients, records, referenceData = {}) {
+  const aliases = referenceData.aliases || {};
   const usedIds = new Set(recipeIngredients.map((i) => String(i.fct_id)).filter(Boolean));
-  const usedNames = new Set(recipeIngredients.map((i) => ingredientKey(i.name)));
+  const usedNames = new Set(recipeIngredients.map((i) => ingredientKey(i.name, aliases)));
   const catalogue = foods.map((food) => ({
     ...food,
-    ...ingredientPriceAudit(food.food_name, recipeIngredients, records),
-    inRecipes: usedIds.has(String(food.fct_id)) || usedNames.has(ingredientKey(food.food_name)),
+    ...ingredientPriceAudit(food.food_name, recipeIngredients, records, referenceData),
+    inRecipes:
+      usedIds.has(String(food.fct_id)) || usedNames.has(ingredientKey(food.food_name, aliases)),
   }));
   const recipeNames = [...new Set(recipeIngredients.map((i) => i.name).filter(Boolean))];
   return {
@@ -372,20 +340,28 @@ function priceCoverage(foods, recipeIngredients, records) {
     total: catalogue.length,
     priced: catalogue.filter((i) => i.quote).length,
     recipeUnique: recipeNames.length,
-    recipePriced: recipeNames.filter((name) => ingredientQuote(name, records)).length,
+    recipePriced: recipeNames.filter((name) => ingredientQuote(name, records, referenceData)).length,
     recipeEntries: recipeIngredients.length,
-    recipeEntriesPriced: recipeIngredients.filter((i) => priceIngredient(i, records).cost !== null)
+    recipeEntriesPriced: recipeIngredients.filter(
+      (i) => priceIngredient(i, records, referenceData).cost !== null,
+    )
       .length,
   };
 }
-function priceIngredient(ingredient, prices) {
+function priceIngredient(ingredient, prices, referenceData = {}) {
   const quantity = parseRecipeQuantity(ingredient.quantity || ingredient.qty);
   const grams = Number(ingredient.grams);
   const weight = Number.isFinite(grams) && grams > 0 ? { amount: grams / 1e3, unit: 'kg' } : null;
   const name = ingredient.name || ingredient.ingredient_name || ingredient.food_name;
-  const references = matchingReferences(name, prices);
+  const references = matchingReferences(name, prices, referenceData);
   const matches = references.flatMap((p) => {
-    const documented = documentedPurchaseAmount(name, grams, p);
+    const documented = documentedPurchaseAmount(
+      name,
+      grams,
+      p,
+      referenceData.fnriPortions,
+      referenceData.fnriPortionMeta || {},
+    );
     if (documented) {
       const notes = String(p.notes || '')
         .replace(
@@ -404,7 +380,7 @@ function priceIngredient(ingredient, prices) {
             notes,
             estimateType: 'FNRI portion reference',
             conversionSourceUrl: documented.sourceUrl,
-            conversionDefinitionsUrl: FNRI_PORTION_DEFINITIONS,
+            conversionDefinitionsUrl: referenceData.fnriPortionMeta?.definitionsUrl || null,
             conversionNote: `DOST-FNRI reference for ${documented.sourceName}: ${documented.apGrams} g as purchased / ${documented.epGrams} g edible portion. Recipe ${grams} g EP uses ${(documented.amount * 1e3).toFixed(2)} g AP for costing. Preparation costs are excluded.`,
             purchaseGrams: documented.amount * 1e3,
           },
@@ -446,9 +422,11 @@ function priceIngredient(ingredient, prices) {
     priceRecords: candidates.length ? candidates.map((p) => p.record) : references,
   };
 }
-function applyDynamicRecipePrices(recipes, prices) {
+function applyDynamicRecipePrices(recipes, prices, referenceData = {}) {
   return recipes.map((recipe) => {
-    const ingredients = (recipe.ingredients || []).map((ing) => priceIngredient(ing, prices || []));
+    const ingredients = (recipe.ingredients || []).map((ing) =>
+      priceIngredient(ing, prices || [], referenceData),
+    );
     const complete = ingredients.length > 0 && ingredients.every((ing) => ing.cost !== null);
     const servings = Math.max(1, Number(recipe.servings) || 1);
     const cost = complete

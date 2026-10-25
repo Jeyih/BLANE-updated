@@ -1,14 +1,13 @@
-import { localMealStorage as localStorage, sessionMealStorage as sessionStorage } from '../lib/account-storage.js';
 import React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { localMealStorage as localStorage } from '../lib/account-storage.js';
 import { useIngredientPrices } from '../context/PriceContext';
 import { marketIngredientPriceText } from '../lib/pricing';
 import {
   fetchMarketSnapshot,
-  isTarlacCityMarket,
   getMealPlanRecipeIds,
   mealPlanMarketIngredients,
   MARKET_REFRESH_MS,
@@ -26,13 +25,12 @@ const TYPE_META = {
   talipapa: { label: 'Talipapa', color: '#fbbf24' },
   grocery: { label: 'Grocery', color: '#a78bfa' },
 };
-const DEFAULT_CENTER = { lat: 15.4858, lng: 120.597 };
 const initialLocationState = {
-  name: 'Tarlac City, Central Luzon, PH',
-  sub: 'Update your location to compare distances to Tarlac City markets',
+  name: 'Location not set',
+  sub: 'Set or pin your location to compare distances to markets',
 };
 function Markets() {
-  const { records: priceRecords } = useIngredientPrices();
+  const { records: priceRecords, referenceData } = useIngredientPrices();
   const { user } = useAuth();
   const [markets, setMarkets] = useState([]);
   const [tourOpen, setTourOpen] = useState(false);
@@ -93,19 +91,21 @@ function Markets() {
   }, [user?.id]);
   useEffect(() => {
     function refreshMealPlanIngredients() {
-      if (user) {
-        marketRequestRef.current += 1;
-        abortRef.current?.abort();
-        refreshJobRef.current = null;
-        refreshRef.current({ silent: true });
-      }
+      if (!user) return;
+      marketRequestRef.current += 1;
+      abortRef.current?.abort();
+      refreshJobRef.current = null;
+      refreshRef.current({ silent: true });
     }
-    window.addEventListener('blane-meal-plan-updated', refreshMealPlanIngredients);
     function handleMealPlanStorage(event) {
-      if (localStorage.matches(event.key, 'blane_meal_plan') || localStorage.matches(event.key, 'blane_meal_plan_day')) {
+      if (
+        localStorage.matches(event.key, 'blane_meal_plan') ||
+        localStorage.matches(event.key, 'blane_meal_plan_day')
+      ) {
         refreshMealPlanIngredients();
       }
     }
+    window.addEventListener('blane-meal-plan-updated', refreshMealPlanIngredients);
     window.addEventListener('storage', handleMealPlanStorage);
     return () => {
       window.removeEventListener('blane-meal-plan-updated', refreshMealPlanIngredients);
@@ -134,9 +134,15 @@ function Markets() {
         (!query || `${market.name} ${market.address}`.toLowerCase().includes(query)),
     );
   }, [activeFilter, marketSearch, markets]);
-  const sortedMarkets = useMemo(() => {
-    return [...filteredMarkets].sort((a, b) => a.distance - b.distance);
-  }, [filteredMarkets]);
+  const sortedMarkets = useMemo(
+    () =>
+      [...filteredMarkets].sort((a, b) =>
+        userCoords
+          ? (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY)
+          : a.name.localeCompare(b.name),
+      ),
+    [filteredMarkets, userCoords],
+  );
   const selectedMarket = useMemo(() => {
     return markets.find((market) => market.id === selectedMarketId) || null;
   }, [markets, selectedMarketId]);
@@ -172,21 +178,28 @@ function Markets() {
               status: item.status,
             });
         }
-        const origin = coordsRef.current || DEFAULT_CENTER;
+        const origin = coordsRef.current;
         const loaded = snapshot.markets
-          .filter(isTarlacCityMarket)
           .map((market) => {
             const ingredients = ingredientsByMarket.get(String(market.id)) || [];
-            const position = {
-              lat: market.lat ?? DEFAULT_CENTER.lat,
-              lng: market.lng ?? DEFAULT_CENTER.lng,
-            };
+            const lat = Number(market.lat);
+            const lng = Number(market.lng);
+            const hasPosition =
+              market.lat != null &&
+              market.lng != null &&
+              String(market.lat).trim() !== '' &&
+              String(market.lng).trim() !== '' &&
+              Number.isFinite(lat) &&
+              Number.isFinite(lng) &&
+              Math.abs(lat) <= 90 &&
+              Math.abs(lng) <= 180;
+            const position = hasPosition ? { lat, lng } : { lat: null, lng: null };
             return {
               id: market.id,
-              name: market.name,
+              name: market.name || 'Unnamed market',
               type: market.type,
               icon: market.icon,
-              distance: marketDistanceKm(origin, position),
+              distance: origin && hasPosition ? marketDistanceKm(origin, position) : null,
               open: market.is_open,
               hours: market.hours || 'Hours unknown',
               address: market.address || 'Address unavailable',
@@ -238,9 +251,13 @@ function Markets() {
   function initMap() {
     const container = document.getElementById('map');
     if (!container || container._leaflet_id) return;
+    const firstLocatedMarket = markets.find(
+      (market) => Number.isFinite(market.lat) && Number.isFinite(market.lng),
+    );
+    const center = userCoords || firstLocatedMarket || { lat: 0, lng: 0 };
     mapRef.current = L.map('map', { zoomControl: false }).setView(
-      [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng],
-      14,
+      [center.lat, center.lng],
+      userCoords || firstLocatedMarket ? 14 : 2,
     );
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
@@ -256,8 +273,8 @@ function Markets() {
     if (!mapRef.current || !markersLayerRef.current) return;
     markersLayerRef.current.clearLayers();
     const selectedMarket2 = filteredMarkets.find((market) => market.id === selectedMarketId);
-    const origin = userCoords || DEFAULT_CENTER;
-    const routeIdentity = selectedMarket2
+    const origin = userCoords;
+    const routeIdentity = selectedMarket2 && origin
       ? `${selectedMarket2.id}:${origin.lat},${origin.lng}:${selectedMarket2.lat},${selectedMarket2.lng}`
       : null;
     const routeChanged = routeIdentityRef.current !== routeIdentity;
@@ -270,7 +287,7 @@ function Markets() {
       selectedGuideLineRef.current.remove();
       selectedGuideLineRef.current = null;
     }
-    if (routeChanged && selectedMarket2) {
+    if (routeChanged && selectedMarket2 && origin) {
       const routeUrl = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${selectedMarket2.lng},${selectedMarket2.lat}?overview=full&geometries=geojson`;
       fetch(routeUrl)
         .then((response) => {
@@ -304,12 +321,13 @@ function Markets() {
         });
     }
     filteredMarkets.forEach((market) => {
+      if (!Number.isFinite(market.lat) || !Number.isFinite(market.lng)) return;
       const meta = TYPE_META[market.type] || TYPE_META.grocery;
       const marker = L.marker([market.lat, market.lng], {
         icon: buildMarketDivIcon(market, meta),
       }).addTo(markersLayerRef.current);
       marker.bindPopup(
-        `<div style="font-family:DM Sans,sans-serif;min-width:160px;"><div style="font-weight:700;font-size:13px;margin-bottom:3px;">${market.icon} ${market.name}</div><div style="font-size:11px;color:#666;">${meta.label} \xB7 ${market.distance} km \xB7 ` +
+        `<div style="font-family:DM Sans,sans-serif;min-width:160px;"><div style="font-weight:700;font-size:13px;margin-bottom:3px;">${market.icon} ${market.name}</div><div style="font-size:11px;color:#666;">${meta.label} \xB7 ${market.distance == null ? 'Set location' : `${market.distance} km`} \xB7 ` +
           (market.open
             ? '<span style="color:#16a34a;">Open</span>'
             : '<span style="color:#dc2626;">Closed</span>') +
@@ -337,7 +355,7 @@ function Markets() {
     setSelectedMarketId((prev) => (prev === id ? null : id));
   }
   useEffect(() => {
-    if (!mapRef.current || !selectedMarket) return;
+    if (!mapRef.current || !selectedMarket || !Number.isFinite(selectedMarket.lat) || !Number.isFinite(selectedMarket.lng)) return;
     mapRef.current.setView([selectedMarket.lat, selectedMarket.lng], 15, { animate: true });
   }, [selectedMarket?.id, selectedMarket?.lat, selectedMarket?.lng]);
   function placeUserMarker(coords, accuracyMeters) {
@@ -423,7 +441,19 @@ function Markets() {
     if (userCoords) {
       mapRef.current.setView([userCoords.lat, userCoords.lng], 15, { animate: true });
     } else {
-      mapRef.current.setView([DEFAULT_CENTER.lat, DEFAULT_CENTER.lng], 14, { animate: true });
+      const located = markets.filter(
+        (market) => Number.isFinite(market.lat) && Number.isFinite(market.lng),
+      );
+      if (located.length === 1) {
+        mapRef.current.setView([located[0].lat, located[0].lng], 14, { animate: true });
+      } else if (located.length > 1) {
+        mapRef.current.fitBounds(
+          L.latLngBounds(located.map((market) => [market.lat, market.lng])),
+          { padding: [36, 36], maxZoom: 14, animate: true },
+        );
+      } else {
+        mapRef.current.setView([0, 0], 2, { animate: true });
+      }
     }
   }
   function closeTour() {
@@ -457,7 +487,7 @@ function Markets() {
             React.createElement(
               'p',
               { className: 'mk-page-sub' },
-              'Find markets and meal-plan ingredients within Tarlac City only',
+              'Browse all markets and see which selected-day meal ingredients each store carries.',
             ),
           ),
           React.createElement(
@@ -606,7 +636,7 @@ function Markets() {
             { className: 'mk-market-count' },
             React.createElement('span', null, filteredMarkets.length),
             ' ',
-            marketSearch ? 'matching Tarlac City markets' : 'Tarlac City markets',
+            marketSearch ? 'matching markets' : 'markets',
           ),
         ),
         React.createElement(
@@ -703,7 +733,7 @@ function Markets() {
                     'div',
                     { className: 'mk-empty' },
                     React.createElement('span', { className: 'mk-empty-icon' }, '\u{1F5FA}\uFE0F'),
-                    'No Tarlac City markets match your search or filter.',
+                    'No markets match your search or filter.',
                   )
                 : sortedMarkets.map((market) => {
                     const meta = TYPE_META[market.type] || TYPE_META.grocery;
@@ -735,8 +765,7 @@ function Markets() {
                               'span',
                               { className: 'mk-distance' },
                               '\u{1F4CD} ',
-                              market.distance,
-                              ' km',
+                              market.distance == null ? 'Set location' : `${market.distance} km`,
                             ),
                           ),
                         ),
@@ -840,8 +869,13 @@ function Markets() {
                         }),
                         React.createElement('circle', { cx: '12', cy: '10', r: '3' }),
                       ),
-                      React.createElement('strong', null, selectedMarket.distance, ' km'),
-                      ' away',
+                      React.createElement(
+                        'strong',
+                        null,
+                        selectedMarket.distance == null
+                          ? 'Set location'
+                          : `${selectedMarket.distance} km away`,
+                      ),
                     ),
                     React.createElement(
                       'div',
@@ -888,7 +922,7 @@ function Markets() {
                   React.createElement(
                     'p',
                     { className: 'mk-refresh-note' },
-                    'Only ingredients from your selected meal-plan day are shown.',
+                    'Only ingredients used by meals on the selected day and listed by this market are shown.',
                   ),
                   React.createElement(
                     'div',
@@ -906,7 +940,7 @@ function Markets() {
                       React.createElement(
                         'p',
                         { className: 'mk-empty' },
-                        'No matching ingredients for your selected day. Add meals in Meal Plan or choose another market.',
+                        'No ingredients for the selected day are listed by this market.',
                       ),
                     selectedMarket.ingredients.map((ing) =>
                       React.createElement(
@@ -922,7 +956,7 @@ function Markets() {
                         React.createElement(
                           'div',
                           { className: 'mk-ing-row-price' },
-                          marketIngredientPriceText(ing, priceRecords),
+                          marketIngredientPriceText(ing, priceRecords, referenceData || {}),
                         ),
                         React.createElement(
                           'div',
@@ -1188,7 +1222,7 @@ function GeoMarketScanner({ markets, userCoords, onLocate }) {
                       React.createElement(
                         'div',
                         { className: 'gm-result-ing-price' },
-                        marketIngredientPriceText(ing, priceRecords),
+                        marketIngredientPriceText(ing, priceRecords, referenceData || {}),
                       ),
                       React.createElement(
                         'span',

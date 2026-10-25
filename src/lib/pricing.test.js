@@ -1,17 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  applyDynamicRecipePrices,
+  applyDynamicRecipePrices as applyRecipes,
   normalizeMarketPrices,
   parsePriceQuantity,
   parseRecipeQuantity,
-  priceIngredient,
+  priceIngredient as priceIngredientImpl,
   loadAllPriceRows,
-  priceCoverage,
-  marketIngredientPriceText,
-  ingredientQuote,
+  priceCoverage as priceCoverageImpl,
+  marketIngredientPriceText as marketIngredientPriceTextImpl,
+  ingredientQuote as ingredientQuoteImpl,
   priceEvidence,
-  ingredientPriceAudit,
+  ingredientPriceAudit as ingredientPriceAuditImpl,
 } from './pricing.js';
 const reference = (name, price, unit = 'kg') => ({
   name,
@@ -21,6 +21,71 @@ const reference = (name, price, unit = 'kg') => ({
   region: 'NCR',
   sourceUrl: 'https://www.da.gov.ph/report.pdf',
 });
+const referenceData = {
+  aliases: {
+    malunngay: 'malunggay leaves',
+    malunggay: 'malunggay leaves',
+    'moringa leaves': 'malunggay leaves',
+    kamatis: 'tomato',
+    eggs: 'egg',
+  },
+  rawDaMappings: {
+    'Egg, chicken, whole, boiled': 'Egg',
+    'Carrot, boiled': 'Carrot',
+    'Potato, boiled': 'Potato',
+    'Rice, well-milled, boiled': 'White rice',
+    'Rice, well-milled, fried': 'White rice',
+  },
+  daNameMappings: { 'Onion, Bombay bulb': 'Red onion', 'Garlic bulb': 'Local garlic' },
+  comparablePriceMappings: {
+    'Pork, suckling, leg': {
+      name: 'Pork shoulder',
+      note: 'Regular pork shoulder (kasim) benchmark; not a verified suckling-pig leg price.',
+    },
+    'Duck liver': {
+      name: 'Chicken liver',
+      note: 'Ordinary chicken-liver benchmark; not a verified duck-liver price.',
+    },
+    'Lima bean pod, boiled': {
+      name: 'Baguio beans',
+      note: 'Fresh green-bean pod benchmark; not a verified lima-bean pod price. Cooking yield is excluded.',
+    },
+    'Quail meat': {
+      name: 'Whole chicken',
+      note: 'Local poultry benchmark using whole chicken; not a verified quail price. Species and edible yields differ.',
+    },
+    'Duck breast': {
+      name: 'Whole duck',
+      note: 'Whole-duck benchmark including bone and other cuts; not a verified boneless breast price. Edible yield is excluded.',
+    },
+  },
+  partialRawFoods: new Set(['Rice, well-milled, fried']),
+  fnriPortions: {
+    'Carrot, boiled': { apGrams: 51, epGrams: 45 },
+  },
+  fnriPortionMeta: {
+    sourceUrl: 'https://marfel.fnri.dost.gov.ph/marfel-food-exchange-list?category=-1&page=1',
+    definitionsUrl: 'https://marfel.fnri.dost.gov.ph/marfel-faqs',
+  },
+};
+function applyDynamicRecipePrices(recipes, prices, references = referenceData) {
+  return applyRecipes(recipes, prices, references);
+}
+function priceIngredient(ingredient, prices, references = referenceData) {
+  return priceIngredientImpl(ingredient, prices, references);
+}
+function priceCoverage(foods, recipeIngredients, prices, references = referenceData) {
+  return priceCoverageImpl(foods, recipeIngredients, prices, references);
+}
+function marketIngredientPriceText(ingredient, prices, references = referenceData) {
+  return marketIngredientPriceTextImpl(ingredient, prices, references);
+}
+function ingredientQuote(name, prices, references = referenceData) {
+  return ingredientQuoteImpl(name, prices, references);
+}
+function ingredientPriceAudit(name, ingredients, prices, references = referenceData) {
+  return ingredientPriceAuditImpl(name, ingredients, prices, references);
+}
 test('exact ingredient quotes supersede comparable benchmarks and remain dynamic', () => {
   const benchmark = reference('Whole duck', 598);
   const actual = {
@@ -86,7 +151,7 @@ test('converts weight, liquids, pieces, and fractions without guessing cup weigh
   for (const value of ['1 cup', 'to taste', '0 g', '1/0 kg', '', null])
     assert.equal(parsePriceQuantity(value), null);
 });
-test('reads admin price/qty rows and excludes non-Tarlac, unavailable, and zero quotes', () => {
+test('reads admin price/qty rows and excludes unavailable and zero quotes in every location', () => {
   const rows = normalizeMarketPrices(
     [
       { market_id: 1, name: 'Tomato', qty: '500 g', price: 60, status: 'avail' },
@@ -96,12 +161,14 @@ test('reads admin price/qty rows and excludes non-Tarlac, unavailable, and zero 
     ],
     [
       { id: 1, name: 'Public Market', address: 'Tarlac City' },
-      { id: 2, name: 'NCR store' },
+      { id: 2, name: 'Capas Grocery', address: 'Capas, Tarlac' },
     ],
   );
-  assert.equal(rows.length, 1);
+  assert.equal(rows.length, 2);
   assert.equal(rows[0].price, 120);
   assert.equal(rows[0].unit, 'kg');
+  assert.equal(rows[1].price, 30);
+  assert.equal(rows[1].region, 'Capas, Tarlac');
 });
 test('approximate household recipe quantities support cups, compound spoons, and pieces', () => {
   assert.equal(parseRecipeQuantity('~scant 1/2 cup').amount, 0.12);

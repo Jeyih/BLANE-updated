@@ -57,24 +57,54 @@ test('manual checks bypass normal caches, coalesce concurrent requests and enfor
   assert.equal(calls, 2);
 });
 test('a failed check retains the latest successful price and its original observation date', async () => {
+  const originalError = console.error;
+  console.error = () => {};
   let time = 1e5,
     fail = false;
-  const get = createPriceFeed({
-    daSnapshot,
-    retailSnapshot,
-    now: () => time,
-    loadDa: async () => daSnapshot,
-    loadRetail: async () => {
-      if (fail) throw Error('Offline');
-      return { records: [{ ...retailSnapshot.records[0], price: 45 }] };
-    },
-  });
-  await get();
-  fail = true;
-  time += 3e4;
-  const fallback = await get();
-  assert.equal(fallback.records[1].price, 45);
-  assert.equal(fallback.records[1].observedAt, '2026-10-14');
-  assert.equal(fallback.status, 'cached');
-  assert.match(fallback.warning, /Retail refresh unavailable/);
+  try {
+    const get = createPriceFeed({
+      daSnapshot,
+      retailSnapshot,
+      now: () => time,
+      loadDa: async () => daSnapshot,
+      loadRetail: async () => {
+        if (fail) throw Error('Offline');
+        return { records: [{ ...retailSnapshot.records[0], price: 45 }] };
+      },
+    });
+    await get();
+    fail = true;
+    time += 3e4;
+    const fallback = await get();
+    assert.equal(fallback.records[1].price, 45);
+    assert.equal(fallback.records[1].observedAt, '2026-10-14');
+    assert.equal(fallback.status, 'cached');
+    assert.match(fallback.warning, /Retail refresh unavailable/);
+  } finally {
+    console.error = originalError;
+  }
+});
+
+test('a failed database save does not publish an unpersisted quote as successful', async () => {
+  const originalError = console.error;
+  console.error = () => {};
+  try {
+    const get = createPriceFeed({
+      daSnapshot,
+      retailSnapshot,
+      loadDa: async () => daSnapshot,
+      loadRetail: async () => ({
+        records: [{ ...retailSnapshot.records[0], price: 99 }],
+      }),
+      saveRetail: async () => {
+        throw new Error('Database write failed');
+      },
+    });
+    const result = await get();
+    assert.equal(result.records[1].price, retailSnapshot.records[0].price);
+    assert.equal(result.status, 'cached');
+    assert.match(result.warning, /Retail refresh unavailable/);
+  } finally {
+    console.error = originalError;
+  }
 });

@@ -4,9 +4,23 @@ import {
   DA_CACHE_MS,
   FORCE_REFRESH_COOLDOWN_MS,
 } from '../src/lib/price-refresh-policy.js';
-function createPriceFeed({ daSnapshot, retailSnapshot, loadDa, loadRetail, now = Date.now }) {
-  const da = { data: daSnapshot, checkedAt: null, pending: null, failed: false };
-  const retail = { data: retailSnapshot, checkedAt: null, pending: null, failed: false };
+function createPriceFeed({
+  daSnapshot,
+  retailSnapshot,
+  loadDa,
+  loadRetail,
+  saveDa,
+  saveRetail,
+  now = Date.now,
+}) {
+  const da = { data: daSnapshot, checkedAt: null, pending: null, failed: false, save: saveDa };
+  const retail = {
+    data: retailSnapshot,
+    checkedAt: null,
+    pending: null,
+    failed: false,
+    save: saveRetail,
+  };
   async function update(slot, loader, ttl, force) {
     if (slot.pending) return slot.pending;
     const age = slot.checkedAt === null ? Infinity : now() - slot.checkedAt;
@@ -16,12 +30,15 @@ function createPriceFeed({ daSnapshot, retailSnapshot, loadDa, loadRetail, now =
       .then((data) => {
         if (!Array.isArray(data.records) || !data.records.length)
           throw new Error('Empty source response');
-        slot.data = data;
-        slot.failed = false;
-        return data;
+        return Promise.resolve(slot.save?.(data)).then(() => {
+          slot.data = data;
+          slot.failed = false;
+          return data;
+        });
       })
-      .catch(() => {
+      .catch((error) => {
         slot.failed = true;
+        console.error('Price reference refresh failed:', error);
         return slot.data;
       })
       .finally(() => {

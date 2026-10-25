@@ -64,21 +64,13 @@ function currentMealType(date = new Date(), slots = DEFAULT_SLOTS) {
   return available[timedSlotIndex(available, date)].type;
 }
 function isDessert(recipe) {
-  return (
-    recipe.type === 'Dessert' ||
-    /cassava cake|bibingka|polvoron|banana cue|turon|camote cue|sweet potato.*sugar|banana.*sugar|puto|champorado|suman|ginataang monggo|biko|leche flan|halo.?halo/i.test(
-      recipe.name || '',
-    ) ||
-    recipe.ingredients?.some((i) =>
-      /rice cake|cookies, polvoron|banana, saba, w\/ sugar|sweet potato, w\/ sugar/i.test(i.name),
-    )
-  );
+  return recipe.is_dessert === true || recipe.type === 'Dessert';
 }
 function addMealForToday(
   recipe,
   {
     date = new Date(),
-    type = recipe.type === 'Dessert' ? 'Snack' : recipe.type,
+    type = isDessert(recipe) ? 'Snack' : recipe.type,
     storage = localStorage,
   } = {},
 ) {

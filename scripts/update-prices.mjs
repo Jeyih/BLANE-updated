@@ -1,9 +1,12 @@
-import { mkdir, writeFile } from 'node:fs/promises';
 import { fetchDaPrices } from '../server/da-prices.js';
-const data = await fetchDaPrices();
-await mkdir(new URL('../public/data/', import.meta.url), { recursive: true });
-await writeFile(
-  new URL('../public/data/ingredient-prices.json', import.meta.url),
-  JSON.stringify(data, null, 2) + '\n',
-);
-console.log(`Imported ${data.records.length} prices for ${data.report.label} (NCR reference).`);
+import {
+  createPriceReferenceClient,
+  loadReferenceData,
+  savePriceSnapshot,
+} from './price-reference-db.mjs';
+
+const client = await createPriceReferenceClient();
+const references = await loadReferenceData(client);
+const data = await fetchDaPrices(references);
+await savePriceSnapshot(client, 'da_price', data.records, data.report);
+console.log(`Saved ${data.records.length} DA prices for ${data.report.label} to Supabase.`);

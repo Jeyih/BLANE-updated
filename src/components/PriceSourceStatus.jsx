@@ -50,7 +50,7 @@ function PriceSourceStatus({ showCatalog = false }) {
     React.createElement(
       'p',
       null,
-      'DA NCR averages and Philippine store listings are reference estimates. Jelexie is a Tarlac brand; other listings are not confirmed Tarlac market quotes.',
+      'DA NCR averages and Philippine store listings are reference estimates. Retail references are not confirmed quotes from every listed market.',
     ),
     React.createElement(
       'p',
