@@ -8,6 +8,7 @@ import { useIngredientPrices } from '../context/PriceContext';
 import { marketIngredientPriceText } from '../lib/pricing';
 import {
   fetchMarketSnapshot,
+  isTarlacCityMarket,
   getMealPlanRecipeIds,
   mealPlanMarketIngredients,
   MARKET_REFRESH_MS,
@@ -28,20 +29,8 @@ const TYPE_META = {
 const DEFAULT_CENTER = { lat: 15.4858, lng: 120.597 };
 const initialLocationState = {
   name: 'Tarlac City, Central Luzon, PH',
-  sub: 'Choose a hub or update your location to compare market distances',
+  sub: 'Update your location to compare distances to Tarlac City markets',
 };
-const TARLAC_LOCATIONS = [
-  {
-    name: 'Tarlac City Public Market',
-    sub: 'Poblacion, Central Tarlac City',
-    lat: 15.4858,
-    lng: 120.597,
-  },
-  { name: 'San Roque', sub: 'Commercial center district', lat: 15.472, lng: 120.605 },
-  { name: 'Capas Hub', sub: 'Southern market corridor', lat: 15.3333, lng: 120.5894 },
-  { name: 'Paniqui Hub', sub: 'Northern trading hub', lat: 15.6667, lng: 120.5833 },
-  { name: 'Concepcion', sub: 'East agri-commercial zone', lat: 15.3244, lng: 120.6558 },
-];
 function Markets() {
   const { records: priceRecords } = useIngredientPrices();
   const { user } = useAuth();
@@ -185,6 +174,7 @@ function Markets() {
         }
         const origin = coordsRef.current || DEFAULT_CENTER;
         const loaded = snapshot.markets
+          .filter(isTarlacCityMarket)
           .map((market) => {
             const ingredients = ingredientsByMarket.get(String(market.id)) || [];
             const position = {
@@ -230,19 +220,6 @@ function Markets() {
     })();
     refreshJobRef.current = job;
     return job;
-  }
-  function selectPresetLocation(loc) {
-    locationRequestRef.current += 1;
-    manualPinRef.current = false;
-    setSelectedLocation(loc.name);
-    const coords = { lat: loc.lat, lng: loc.lng, accuracy: 0 };
-    setUserCoords(coords);
-    placeUserMarker(coords, 0);
-    updateDistances(coords);
-    setLocationText({ name: loc.name, sub: `${loc.sub} \xB7 Approximate area selected manually` });
-    if (mapRef.current) {
-      mapRef.current.setView([loc.lat, loc.lng], 14, { animate: true });
-    }
   }
   function chooseManualPoint(latlng) {
     locationRequestRef.current += 1;
@@ -404,7 +381,7 @@ function Markets() {
     if (!navigator.geolocation) {
       setLocationText((previous) => ({
         ...previous,
-        sub: 'GPS is unavailable. Choose an area below or pin a location on the map.',
+        sub: 'GPS is unavailable. Pin a location on the map.',
       }));
       return;
     }
@@ -431,11 +408,11 @@ function Markets() {
         if (request !== locationRequestRef.current) return;
         let msg = 'Could not get your location.';
         if (err.code === 1)
-          msg = 'Location permission denied. Choose an area below or pin a location on the map.';
+          msg = 'Location permission denied. Pin a location on the map.';
         if (err.code === 2)
-          msg = 'Location unavailable. Choose an area below or pin a location on the map.';
+          msg = 'Location unavailable. Pin a location on the map.';
         if (err.code === 3)
-          msg = 'Location request timed out. Choose an area below or pin a location on the map.';
+          msg = 'Location request timed out. Pin a location on the map.';
         setLocationText((previous) => ({ ...previous, sub: msg }));
       },
       { enableHighAccuracy: true, timeout: 1e4, maximumAge: 0 },
@@ -480,7 +457,7 @@ function Markets() {
             React.createElement(
               'p',
               { className: 'mk-page-sub' },
-              'Find local markets and ingredients \u2014 Tarlac City, Central Luzon',
+              'Find markets and meal-plan ingredients within Tarlac City only',
             ),
           ),
           React.createElement(
@@ -629,7 +606,7 @@ function Markets() {
             { className: 'mk-market-count' },
             React.createElement('span', null, filteredMarkets.length),
             ' ',
-            marketSearch ? 'matching markets' : 'markets nearby',
+            marketSearch ? 'matching Tarlac City markets' : 'Tarlac City markets',
           ),
         ),
         React.createElement(
@@ -643,6 +620,7 @@ function Markets() {
               'button',
               {
                 className: 'mk-pin-location-btn',
+                'data-markets-tour': 'pin',
                 type: 'button',
                 'aria-pressed': selectedLocation === '__pin',
                 onClick: () => {
@@ -725,7 +703,7 @@ function Markets() {
                     'div',
                     { className: 'mk-empty' },
                     React.createElement('span', { className: 'mk-empty-icon' }, '\u{1F5FA}\uFE0F'),
-                    'No markets match your search or filter.',
+                    'No Tarlac City markets match your search or filter.',
                   )
                 : sortedMarkets.map((market) => {
                     const meta = TYPE_META[market.type] || TYPE_META.grocery;

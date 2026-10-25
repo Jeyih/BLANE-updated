@@ -2,10 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   fetchMarketSnapshot,
+  isTarlacCityMarket,
   getMealPlanRecipeIds,
   mealPlanMarketIngredients,
   marketDistanceKm,
 } from './market-refresh.js';
+test('market coverage includes explicit Tarlac City records and excludes other municipalities', () => {
+  const rows = [
+    { id: 'city', address: 'San Roque, Tarlac City, Tarlac' },
+    { id: 'city-variant', address: 'City of Tarlac, Philippines' },
+    { id: 'structured', city: '  TARLAC CITY ', address: 'San Vicente' },
+    { id: 'capas', address: 'Capas, Tarlac' },
+    { id: 'paniqui', address: 'Paniqui, Tarlac' },
+    { id: 'concepcion', address: 'Concepcion, Tarlac' },
+    { id: 'unknown', address: 'Tarlac' },
+    { id: 'brand-only', name: 'Tarlac City Grocery', address: 'Capas, Tarlac' },
+    { id: 'outside-with-reference', municipality: 'Capas', address: 'Road to Tarlac City' },
+    { id: 'missing' },
+  ];
+  assert.deepEqual(rows.filter(isTarlacCityMarket).map(row => row.id), ['city', 'city-variant', 'structured']);
+});
 function clientFor(tables, failures = {}, seen = []) {
   return {
     from(table) {

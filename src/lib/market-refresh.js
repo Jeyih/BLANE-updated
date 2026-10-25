@@ -1,4 +1,13 @@
 const MARKET_REFRESH_MS = 15e3;
+function isTarlacCityMarket(market) {
+  const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  // An explicit locality takes precedence over mentions elsewhere in an address.
+  const locality = normalize(market.city || market.municipality);
+  if (locality) return locality === 'tarlac city' || locality === 'city of tarlac';
+  // Province-only addresses and store names do not establish city coverage.
+  const address = normalize(market.address);
+  return /\btarlac city\b|\bcity of tarlac\b/.test(address);
+}
 async function readRows(client, table, signal, mealIds) {
   const rows = [];
   for (let start = 0; ; start += 1e3) {
@@ -63,6 +72,7 @@ function marketDistanceKm(origin, destination) {
 }
 export {
   MARKET_REFRESH_MS,
+  isTarlacCityMarket,
   fetchMarketSnapshot,
   getMealPlanRecipeIds,
   marketDistanceKm,
