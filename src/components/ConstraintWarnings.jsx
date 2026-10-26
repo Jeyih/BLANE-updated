@@ -1,6 +1,7 @@
 import React from 'react';
 import { CB_CONSTRAINTS } from '../lib/constraints';
 import '../styles/constraints.css';
+import { mealReviewBadge } from '../lib/meal-review';
 function ConstraintActiveBar({ activeConstraints }) {
   if (activeConstraints.length === 0) {
     return React.createElement(
@@ -48,12 +49,13 @@ function ConstraintActiveBar({ activeConstraints }) {
     ),
   );
 }
-function ViolationBadge({ violations }) {
+function ViolationBadge({ violations, aiVerdict }) {
   if (violations.length === 0) {
+    const badge = mealReviewBadge(violations, aiVerdict);
     return React.createElement(
       'span',
-      { className: 'cb-violation-badge safe' },
-      '\u2713 No detected conflict',
+      { className: 'cb-violation-badge ' + badge.className, title: 'Stored rule checks are limited. Review ingredients, portions and any AI cautions; this is not medical clearance.', role: 'status' },
+      badge.text,
     );
   }
   const order = { allergy: 0, medical: 1, dietary: 2 };

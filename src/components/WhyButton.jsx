@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, SUPABASE_URL } from '../lib/supabase';
 import '../styles/explainai.css';
+import { mealReviewKey } from '../lib/meal-review';
 function getExplainMealUrl() {
   return SUPABASE_URL.replace('.supabase.co', '.functions.supabase.co') + '/explain-meal';
 }
@@ -85,7 +86,7 @@ async function requestMealExplanation(meal, profile, violations) {
   }
 }
 function getMealExplanation(meal, profile, violations) {
-  const key = JSON.stringify({ meal, profile, violations });
+  const key = mealReviewKey(meal, profile, violations);
   if (!explanationCache.has(key)) {
     const request = requestMealExplanation(meal, profile, violations).catch((error) => {
       explanationCache.delete(key);
@@ -95,7 +96,7 @@ function getMealExplanation(meal, profile, violations) {
   }
   return explanationCache.get(key);
 }
-function WhyButton({ meal, profile, violations = [] }) {
+function WhyButton({ meal, profile, violations = [], onReview }) {
   const [open, setOpen] = useState(false);
   const [verdict, setVerdict] = useState(null);
   const [text, setText] = useState('');
@@ -107,7 +108,9 @@ function WhyButton({ meal, profile, violations = [] }) {
   const popoverRef = useRef(null);
   const contentRef = useRef(null);
   const aiStatus = ['safe', 'caution', 'avoid'].includes(verdict?.verdict) ? verdict.verdict : null;
-  const requestKey = JSON.stringify({ meal, profile, violations });
+  const requestKey = mealReviewKey(meal, profile, violations);
+  const onReviewRef = useRef(onReview);
+  onReviewRef.current = onReview;
   function toggle() {
     if (error) setRetryCount((count) => count + 1);
     setOpen((wasOpen) => !wasOpen);
@@ -127,6 +130,7 @@ function WhyButton({ meal, profile, violations = [] }) {
         if (!active) return;
         setVerdict(result.verdict);
         setText(result.text);
+        onReviewRef.current?.(result.verdict);
       })
       .catch((err) => {
         if (!active) return;
@@ -232,7 +236,7 @@ function WhyButton({ meal, profile, violations = [] }) {
                   React.createElement(
                     'div',
                     { className: 'xai-pop-title' },
-                    violations.length ? 'Why This Meal Has Warnings' : 'Why Recommended?',
+                    'Meal Suitability Review',
                   ),
                   React.createElement('div', { className: 'xai-pop-meal' }, meal.name),
                 ),

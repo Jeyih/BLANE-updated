@@ -97,6 +97,11 @@
   border: 1px solid rgba(251, 146, 60, 0.22);
 }
 
+.cb-violation-badge.review {
+  background: rgba(148, 163, 184, 0.1);
+  color: #b7c4cf;
+  border-color: rgba(148, 163, 184, 0.25);
+}
 .cb-violation-badge.safe {
   background: rgba(45, 220, 122, 0.08);
   color: #2ddc7a;

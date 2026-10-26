@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
 import MealPlanTour from '../components/MealPlanTour';
 import WhyButton from '../components/WhyButton';
+import { mealReviewKey } from '../lib/meal-review';
 import PortionOptimizerPanel, { OptimizeButton } from '../components/PortionOptimizerPanel';
 import { scoreRecipe } from '../lib/seasonal';
 import { SeasonBadge, IngSeasonTag, SeasonalAltBanner } from '../components/SeasonalBadges';
@@ -1930,11 +1931,14 @@ function SlotCard({
   const meal = getMeal(slot.mealId);
   const displayedMeal = appliedMeal(meal, appliedOptimization);
   const [ingredientsOpen, setIngredientsOpen] = useState(false);
+  const [aiReview, setAiReview] = useState(null);
   const alreadyAdded = meal && groceryList.some((g) => g.mealId === meal.id);
   const seasonScore = meal ? scoreRecipe(meal.ingredients) : null;
   const violations = meal
     ? checkRecipeViolations(meal, activeConstraints, true, constraintDefinitions)
     : [];
+  const reviewKey = mealReviewKey(displayedMeal || {}, profile || {}, violations);
+  const currentAiVerdict = aiReview?.key === reviewKey ? aiReview.verdict : null;
   return React.createElement(
     'div',
     null,
@@ -2035,7 +2039,7 @@ function SlotCard({
                     ' Fats',
                   ),
                   seasonScore && React.createElement(SeasonBadge, { scoreResult: seasonScore }),
-                  React.createElement(ViolationBadge, { violations }),
+                  React.createElement(ViolationBadge, { violations, aiVerdict: currentAiVerdict }),
                 ),
               ),
               React.createElement(
@@ -2219,7 +2223,13 @@ function SlotCard({
                 disabled: violations.length > 0 || !(Number(meal.kcal) > 0),
                 onToggle: () => onSetOpenOptimizer(openOptimizerId === meal.id ? null : meal.id),
               }),
-              React.createElement(WhyButton, { meal, profile, violations }),
+              React.createElement(WhyButton, {
+                key: reviewKey,
+                meal: displayedMeal,
+                profile,
+                violations,
+                onReview: verdict => setAiReview({ key: reviewKey, verdict }),
+              }),
               React.createElement(
                 'button',
                 {
