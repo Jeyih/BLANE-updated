@@ -28,6 +28,8 @@ import DashboardTour from '../components/DashboardTour';
 import FeedbackWidget from '../components/FeedbackWidget';
 import DriftWidget from '../components/DriftWidget';
 import RecommendWidget from '../components/RecommendWidget';
+import ProfileRequired from '../components/ProfileRequired';
+import { isProfileComplete } from '../lib/profile-readiness';
 import '../styles/dashboard.css';
 function getCalorieGoal(profile) {
   return computeDailyTargets(profile).calories;
@@ -35,6 +37,8 @@ function getCalorieGoal(profile) {
 function Dashboard() {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState(false);
   const [firstName, setFirstName] = useState('...');
   const [logs, setLogs] = useState([]);
   const [tourOpen, setTourOpen] = useState(false);
@@ -51,11 +55,15 @@ function Dashboard() {
   }, [user?.id]);
   async function loadProfile() {
     if (!user) return;
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-    if (data) {
-      setProfile(data);
-      setFirstName((data.full_name || user.email.split('@')[0]).split(' ')[0]);
-    }
+    setProfileLoading(true);
+    setProfileError(false);
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      if (error) throw error;
+      setProfile(data || {});
+      setFirstName((data?.full_name || user.email.split('@')[0]).split(' ')[0]);
+    } catch { setProfileError(true); }
+    finally { setProfileLoading(false); }
   }
   const [quickCheckinMood, setQuickCheckinMood] = useState(null);
   const [checkinToast, setCheckinToast] = useState('');
@@ -76,6 +84,11 @@ function Dashboard() {
     month: 'long',
     day: 'numeric',
   });
+  if (profileLoading || profileError || !isProfileComplete(profile)) {
+    return React.createElement(React.Fragment, null,
+      React.createElement(Navbar, null),
+      React.createElement(ProfileRequired, { loading: profileLoading, error: profileError, onRetry: loadProfile }));
+  }
   return React.createElement(
     React.Fragment,
     null,

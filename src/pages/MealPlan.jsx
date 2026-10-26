@@ -7,6 +7,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
+import ProfileRequired from '../components/ProfileRequired';
+import { isProfileComplete } from '../lib/profile-readiness';
 import MealPlanTour from '../components/MealPlanTour';
 import WhyButton from '../components/WhyButton';
 import { mealReviewKey } from '../lib/meal-review';
@@ -63,6 +65,8 @@ function getMealCompletionKey(date, slot, index) {
 function MealPlan() {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
   const [savedRecipes, setRecipes] = useState([]);
   const { records: priceRecords, referenceData } = useIngredientPrices();
@@ -124,8 +128,14 @@ function MealPlan() {
   }, [completedMeals]);
   async function loadProfile() {
     if (!user) return;
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-    if (data) setProfile(data);
+    setProfileLoading(true);
+    setProfileError(false);
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      if (error) throw error;
+      setProfile(data || {});
+    } catch { setProfileError(true); }
+    finally { setProfileLoading(false); }
   }
   async function loadRecipes() {
     setLoadingRecipes(true);
@@ -250,7 +260,7 @@ function MealPlan() {
   }
   const eligibleRecipes = recipes.filter(r => canSelectRecipe(r, profile, constraintDefinitions, constraintsReady));
   useEffect(() => {
-    if (!profile || !constraintsReady || loadingRecipes || localStorage.getItem('blane_meal_plan')) return;
+    if (!isProfileComplete(profile) || !constraintsReady || loadingRecipes || localStorage.getItem('blane_meal_plan')) return;
     setDaySlots(generateMealPlan(recipes, profile, constraintDefinitions, { ready: constraintsReady }));
   }, [profile, constraintsReady, loadingRecipes, recipes, constraintDefinitions]);
   function regeneratePlan() {
@@ -460,6 +470,11 @@ function MealPlan() {
       ...(recipe.ingredients || []).map((ingredient) => ingredient.name),
     ].some((value) => value?.toLowerCase().includes(query));
   });
+  if (profileLoading || profileError || !isProfileComplete(profile)) {
+    return React.createElement(React.Fragment, null,
+      React.createElement(Navbar, null),
+      React.createElement(ProfileRequired, { loading: profileLoading, error: profileError, onRetry: loadProfile }));
+  }
   return React.createElement(
     React.Fragment,
     null,

@@ -22,6 +22,7 @@ import useMealClock from '../hooks/useMealClock';
 import PriceEstimateNotice from './PriceEstimateNotice';
 import '../styles/meal-experience.css';
 import '../styles/recommend.css';
+import { isProfileComplete } from '../lib/profile-readiness';
 async function loadRecommendationData() {
   const definitions = await loadConstraintDefinitions();
   const { data: goalData, error: goalErr } = await supabase.from('goal_ideals').select('*');
@@ -153,8 +154,9 @@ function RecommendWidget({ profile }) {
   }, []);
   useEffect(() => {
     let cancelled = false;
-    if (!metadataReady || !profile || recipes.length === 0) {
+    if (!metadataReady || !isProfileComplete(profile) || recipes.length === 0) {
       setTop3([]);
+      setLoading(false);
       return;
     }
     setLoading(true);
@@ -215,7 +217,9 @@ function RecommendWidget({ profile }) {
     React.createElement(PriceEstimateNotice, null),
     actionMessage &&
       React.createElement('p', { className: 'meal-action-status', role: 'status' }, actionMessage),
-    metadataError
+    !isProfileComplete(profile)
+      ? React.createElement('p', { className: 'rec-no-profile' }, 'Complete your ', React.createElement(Link, { to: '/onboarding' }, 'health profile'), ' before receiving personalized recommendations.')
+      : metadataError
       ? React.createElement('p', { className: 'meal-action-status' }, metadataError)
       : loading || !metadataReady
         ? React.createElement(SkeletonLoader, null)

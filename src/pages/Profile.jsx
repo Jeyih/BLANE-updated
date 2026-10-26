@@ -1,5 +1,6 @@
 import { computeDailyTargets, validateMeasurements } from '../../supabase/functions/_shared/nutrition.js';
 import React from 'react';
+import { isProfileComplete } from '../lib/profile-readiness';
 import PasswordInput from '../components/PasswordInput';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -207,10 +208,10 @@ function Profile() {
         bmiCategory = 'Obese';
         bmiColor = '#f87171';
       }
-      const targets = computeDailyTargets(profile);
-      calorieTdee = Math.round(targets.tdee);
-      calorieTarget = targets.calories;
-      const label = "TDEE: " + calorieTdee.toLocaleString() + " kcal/day";
+      const targets = isProfileComplete(profile) ? computeDailyTargets(profile) : null;
+      calorieTdee = targets ? Math.round(targets.tdee) : null;
+      calorieTarget = targets?.calories ?? null;
+      const label = targets ? "TDEE: " + calorieTdee.toLocaleString() + " kcal/day" : 'Complete your profile';
       const bmiMarkerPct = Math.min(Math.max((bmi - 10) / 30, 0), 1) * 100;
       return {
         bmiValue: bmiFixed,

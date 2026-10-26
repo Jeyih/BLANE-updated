@@ -1,10 +1,13 @@
 import { computeDailyTargets } from '../../supabase/functions/_shared/nutrition.js';
 import { parseHealthLog } from '../lib/health-log-inputs.js';
 import React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { createHealthLogSaver } from '../lib/health-log-save';
+import { philippineClock } from '../lib/meal-experience';
 import '../styles/feedback.css';
 const DRIFT = { weightGain: 0.5, weightLoss: 1.5, sleepMin: 6, waterMin: 1800, calLowPct: 0.75 };
+const saveHealthLog = createHealthLogSaver(supabase);
 function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
   const [logs, setLogs] = useState([]);
   const [todayLogged, setTodayLogged] = useState(false);
@@ -16,6 +19,8 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
   const [alerts, setAlerts] = useState([]);
   const [recalcBanner, setRecalcBanner] = useState(null);
   const [toast, setToast] = useState(null);
+  const [logsError, setLogsError] = useState('');
+  const savingRef = useRef(false);
   useEffect(() => {
     loadRecentLogs();
   }, [profile]);
@@ -23,80 +28,62 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
     if (!profile?.id) return;
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('health_logs')
       .select('*')
       .eq('user_id', profile.id)
-      .gte('logged_at', sevenDaysAgo.toISOString().split('T')[0])
-      .order('logged_at', { ascending: false });
+      .gte('logged_at', philippineClock(sevenDaysAgo).dateKey)
+      .order('logged_at', { ascending: false })
+      .abortSignal(AbortSignal.timeout(15000));
+    if (error) { setLogsError('Health history could not be refreshed. Check your connection and retry.'); return false; }
+    setLogsError('');
     if (data) {
       setLogs(data);
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = philippineClock().dateKey;
       const isLogged = data.some((l) => l.logged_at === todayStr);
       setTodayLogged(isLogged);
       const todayLog2 = data.find((l) => l.logged_at === todayStr);
       if (todayLog2) {
-        if (todayLog2.weight_kg) setWeight(todayLog2.weight_kg);
-        if (todayLog2.sleep_hours) setSleep(todayLog2.sleep_hours);
-        if (todayLog2.water_ml) setWaterCups(Math.round(todayLog2.water_ml / 300));
-        if (todayLog2.calories_burned) setCalories(todayLog2.calories_burned);
+        setWeight(todayLog2.weight_kg ?? '');
+        setSleep(todayLog2.sleep_hours ?? '');
+        setWaterCups(todayLog2.water_ml == null ? '' : todayLog2.water_ml / 300);
+        setCalories(todayLog2.calories_burned ?? '');
       }
       if (data.length >= 2) setAlerts(detectDrift(data, profile));
       onLogsChange?.(data);
     }
+    return true;
   }
   const yesterday = logs.find((l) => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return l.logged_at === d.toISOString().split('T')[0];
+    return l.logged_at === philippineClock(d).dateKey;
   });
   async function handleLogSubmit() {
+    if (savingRef.current) return;
     let values;
     try { values = parseHealthLog({ weight, sleep, waterCups, calories }); }
     catch (error) { showToast(error.message, true); return; }
-    const w = values.weight_kg;
+    savingRef.current = true;
     setSaving(true);
-    const todayStr = new Date().toISOString().split('T')[0];
-    const { error } = await supabase
-      .from('health_logs')
-      .upsert(
-        {
-          user_id: profile.id,
-          logged_at: todayStr,
-          ...values,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,logged_at' },
-      );
-    if (error) {
-      showToast('Could not save: ' + error.message, true);
+    try {
+      const updatedProfile = await saveHealthLog(profile, values);
+      if (updatedProfile !== profile) onProfileUpdate?.(updatedProfile);
+      const historyLoaded = await loadRecentLogs();
+      const targets = recalculateTargets(updatedProfile);
+      setRecalcBanner(targets);
+      setTimeout(() => setRecalcBanner(null), 6000);
+      showToast(historyLoaded ? '\u2713 Health data logged and targets updated' : 'Health data saved. Health history could not be refreshed.', !historyLoaded);
+    } catch (error) {
+      showToast(error.message || 'Could not confirm the save. Check your connection and retry.', true);
+    } finally {
+      savingRef.current = false;
       setSaving(false);
-      return;
     }
-    let updatedProfile = profile;
-    if (w && w !== profile.weight_kg) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({ id: profile.id, weight_kg: w, updated_at: new Date().toISOString() });
-      if (profileError) {
-        await loadRecentLogs();
-        setSaving(false);
-        showToast('Health log saved, but profile weight could not be updated. Please retry.', true);
-        return;
-      }
-      updatedProfile = { ...profile, weight_kg: w };
-      onProfileUpdate?.(updatedProfile);
-    }
-    await loadRecentLogs();
-    const targets = recalculateTargets(updatedProfile);
-    setRecalcBanner(targets);
-    setTimeout(() => setRecalcBanner(null), 6e3);
-    setSaving(false);
-    showToast('\u2713 Health data logged and targets updated');
   }
   function showToast(msg, isError) {
     setToast({ msg, isError });
-    setTimeout(() => setToast(null), 3500);
+    if (!isError) setTimeout(() => setToast(null), 3500);
   }
   const metrics = [
     { key: 'weight_kg', label: 'Weight', icon: '\u2696\uFE0F' },
@@ -104,10 +91,11 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
     { key: 'water_ml', label: 'Water', icon: '\u{1F4A7}' },
     { key: 'calories_burned', label: 'Activity', icon: '\u{1F525}' },
   ];
-  const todayLog = logs.find((l) => l.logged_at === new Date().toISOString().split('T')[0]);
+  const todayLog = logs.find((l) => l.logged_at === philippineClock().dateKey);
   return React.createElement(
     'div',
     { className: 'fb-widget col-12', 'data-dashboard-tour': 'feedback' },
+    logsError && React.createElement('p', { role: 'alert' }, logsError),
     React.createElement(
       'div',
       { className: 'fb-widget-header' },
@@ -158,7 +146,7 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
       React.createElement(
         'div',
         { className: 'fb-metric-card' },
-        React.createElement('div', { className: 'fb-metric-label' }, '\u2696\uFE0F Weight'),
+        React.createElement('label', { className: 'fb-metric-label', htmlFor: 'health-weight' }, '\u2696\uFE0F Weight (kg)'),
         React.createElement(
           'div',
           { className: 'fb-metric-input-row' },
@@ -170,6 +158,7 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
             max: '300',
             step: '0.1',
             value: weight,
+            id: 'health-weight',
             onChange: (e) => setWeight(e.target.value),
           }),
           React.createElement('span', { className: 'fb-metric-unit' }, 'kg'),
@@ -183,7 +172,7 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
       React.createElement(
         'div',
         { className: 'fb-metric-card' },
-        React.createElement('div', { className: 'fb-metric-label' }, '\u{1F634} Sleep'),
+        React.createElement('label', { className: 'fb-metric-label', htmlFor: 'health-sleep' }, '\u{1F634} Sleep (hours)'),
         React.createElement(
           'div',
           { className: 'fb-metric-input-row' },
@@ -195,6 +184,7 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
             max: '24',
             step: '0.5',
             value: sleep,
+            id: 'health-sleep',
             onChange: (e) => setSleep(e.target.value),
           }),
           React.createElement('span', { className: 'fb-metric-unit' }, 'hrs'),
@@ -203,7 +193,7 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
       React.createElement(
         'div',
         { className: 'fb-metric-card' },
-        React.createElement('div', { className: 'fb-metric-label' }, '\u{1F4A7} Water'),
+        React.createElement('label', { className: 'fb-metric-label', htmlFor: 'health-water' }, '\u{1F4A7} Water (cups)'),
         React.createElement(
           'div',
           { className: 'fb-metric-input-row' },
@@ -215,6 +205,7 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
             max: '20',
             step: '1',
             value: waterCups,
+            id: 'health-water',
             onChange: (e) => setWaterCups(e.target.value),
           }),
           React.createElement('span', { className: 'fb-metric-unit' }, 'cups'),
@@ -231,7 +222,7 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
       React.createElement(
         'div',
         { className: 'fb-metric-card' },
-        React.createElement('div', { className: 'fb-metric-label' }, '\u{1F525} Calories Burned'),
+        React.createElement('label', { className: 'fb-metric-label', htmlFor: 'health-calories' }, '\u{1F525} Calories Burned (kcal)'),
         React.createElement(
           'div',
           { className: 'fb-metric-input-row' },
@@ -243,6 +234,7 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
             max: '5000',
             step: '10',
             value: calories,
+            id: 'health-calories',
             onChange: (e) => setCalories(e.target.value),
           }),
           React.createElement('span', { className: 'fb-metric-unit' }, 'kcal'),
@@ -256,7 +248,7 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
     ),
     React.createElement(
       'button',
-      { className: 'fb-log-btn', onClick: handleLogSubmit, disabled: saving },
+      { className: 'fb-log-btn', onClick: handleLogSubmit, disabled: saving, 'aria-busy': saving },
       React.createElement(
         'svg',
         {
@@ -330,6 +322,7 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
       React.createElement(
         'div',
         {
+          role: toast.isError ? 'alert' : 'status',
           style: {
             position: 'fixed',
             bottom: 28,
@@ -343,7 +336,8 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
             fontSize: 14,
             color: toast.isError ? '#f87171' : '#2ddc7a',
             zIndex: 999,
-            whiteSpace: 'nowrap',
+            maxWidth: 'calc(100vw - 32px)',
+            whiteSpace: 'normal',
           },
         },
         toast.msg,
