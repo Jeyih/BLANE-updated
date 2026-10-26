@@ -46,6 +46,9 @@ function AuthProvider({ children }) {
   async function updatePassword(newPassword) {
     const { data, error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) throw error;
+    if (!data?.user?.id || data.user.id !== session?.user?.id) {
+      throw new Error('The password update could not be confirmed for this account. Request a new reset link.');
+    }
     return data;
   }
   async function logout() {

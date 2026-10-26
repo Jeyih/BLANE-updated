@@ -8,6 +8,7 @@ import { useIngredientPrices } from '../context/PriceContext';
 import { marketIngredientPriceText } from '../lib/pricing';
 import {
   fetchMarketSnapshot,
+  isTarlacCityMarket,
   getMealPlanRecipeIds,
   mealPlanMarketIngredients,
   MARKET_REFRESH_MS,
@@ -180,6 +181,7 @@ function Markets() {
         }
         const origin = coordsRef.current;
         const loaded = snapshot.markets
+          .filter(isTarlacCityMarket)
           .map((market) => {
             const ingredients = ingredientsByMarket.get(String(market.id)) || [];
             const lat = Number(market.lat);
@@ -487,7 +489,7 @@ function Markets() {
             React.createElement(
               'p',
               { className: 'mk-page-sub' },
-              'Browse all markets and see which selected-day meal ingredients each store carries.',
+              'Browse Tarlac City markets and find ingredients from your selected day’s meal plan.',
             ),
           ),
           React.createElement(
@@ -636,7 +638,7 @@ function Markets() {
             { className: 'mk-market-count' },
             React.createElement('span', null, filteredMarkets.length),
             ' ',
-            marketSearch ? 'matching markets' : 'markets',
+            marketSearch ? 'matching Tarlac City markets' : 'Tarlac City markets',
           ),
         ),
         React.createElement(

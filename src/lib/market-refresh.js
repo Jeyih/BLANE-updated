@@ -1,4 +1,10 @@
 const MARKET_REFRESH_MS = 15e3;
+function isTarlacCityMarket(market) {
+  const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const locality = normalize(market.city || market.municipality);
+  if (locality) return locality === 'tarlac city' || locality === 'city of tarlac';
+  return /\btarlac city\b|\bcity of tarlac\b/.test(normalize(market.address));
+}
 async function readRows(client, table, signal, recipeIds) {
   const rows = [];
   for (let start = 0; ; start += 1e3) {
@@ -65,6 +71,7 @@ function marketDistanceKm(origin, destination) {
 }
 export {
   MARKET_REFRESH_MS,
+  isTarlacCityMarket,
   fetchMarketSnapshot,
   getMealPlanRecipeIds,
   mealPlanMarketIngredients,

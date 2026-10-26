@@ -2,10 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   fetchMarketSnapshot,
+  isTarlacCityMarket,
   getMealPlanRecipeIds,
   mealPlanMarketIngredients,
   marketDistanceKm,
 } from './market-refresh.js';
+test('city scope survives catalogue updates and excludes province-only or conflicting locality records', () => {
+  const rows = [
+    { id: 'city', address: 'San Roque, Tarlac City, Tarlac' },
+    { id: 'city-variant', address: 'City of Tarlac, Philippines' },
+    { id: 'structured', city: 'TARLAC CITY', address: 'San Vicente' },
+    { id: 'outside', address: 'Capas, Tarlac' },
+    { id: 'province-only', address: 'Tarlac' },
+    { id: 'brand-only', name: 'Tarlac City Grocery', address: 'Paniqui, Tarlac' },
+    { id: 'conflict', municipality: 'Concepcion', address: 'Road to Tarlac City' },
+    { id: 'missing' },
+  ];
+  assert.deepEqual(rows.filter(isTarlacCityMarket).map(row => row.id), ['city', 'city-variant', 'structured']);
+  rows.push({ id: 'new-outside', address: 'Concepcion, Tarlac' });
+  assert.equal(rows.filter(isTarlacCityMarket).some(row => row.id === 'new-outside'), false);
+});
 function clientFor(tables, failures = {}, seen = []) {
   return {
     from(table) {

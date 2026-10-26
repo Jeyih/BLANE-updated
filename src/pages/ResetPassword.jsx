@@ -1,6 +1,6 @@
 import React from 'react';
 import PasswordInput from '../components/PasswordInput';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -14,20 +14,44 @@ function ResetPassword() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [linkError, setLinkError] = useState('');
+  const errorRef = useRef(null);
   useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
+  useEffect(() => {
+    let active = true;
+    const query = new URLSearchParams(window.location.search);
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    const invalidCallback = query.has('error') || query.has('error_code') || fragment.has('error') || fragment.has('error_code');
+    if (invalidCallback) {
+      setLinkError('This reset link is invalid or expired. Request a new reset email.');
+      setChecking(false);
+      return;
+    }
     async function checkSession() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setReady(Boolean(session));
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (!active) return;
+        setReady(Boolean(session) && !sessionError);
+        if (!session || sessionError) setLinkError('This reset link is invalid or expired. Request a new reset email.');
+      } catch {
+        if (active) setLinkError('Could not check your reset link. Check your connection and try again.');
+      } finally {
+        if (active) setChecking(false);
+      }
     }
     void checkSession();
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         setReady(Boolean(session));
+        if (session) setLinkError('');
+        setChecking(false);
       }
     });
     return () => {
+      active = false;
       authListener.subscription.unsubscribe();
     };
   }, []);
@@ -48,15 +72,19 @@ function ResetPassword() {
       return;
     }
     setLoading(true);
+    const confirmationTimer = setTimeout(() => {
+      setError('Still waiting for server confirmation. Check your connection and avoid submitting again until this finishes.');
+    }, 15000);
     try {
       await updatePassword(newPassword);
-      setSuccess(
-        'Your password has been updated successfully. Redirecting you back to sign in\u2026',
-      );
-      setTimeout(() => navigate('/'), 1800);
+      setError('');
+      setSuccess('Your password has been updated successfully.');
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (err) {
       setError(err.message || 'Unable to update your password. Please request a new reset link.');
     } finally {
+      clearTimeout(confirmationTimer);
       setLoading(false);
     }
   }
@@ -92,18 +120,31 @@ function ResetPassword() {
         ),
       ),
       React.createElement('h3', null, 'Reset your password'),
-      !ready
-        ? React.createElement('p', null, 'Checking your secure reset link\u2026')
-        : React.createElement(
+      success
+        ? React.createElement(
+            React.Fragment,
+            null,
+            React.createElement('p', { className: 'form-success', role: 'status', style: { display: 'block' } }, success),
+            React.createElement('button', { type: 'button', className: 'btn btn-primary btn-lg form-submit', onClick: () => navigate('/dashboard') }, 'Continue to BLANE'),
+          )
+        : checking
+          ? React.createElement('p', { role: 'status' }, 'Checking your secure reset link\u2026')
+          : !ready
+            ? React.createElement(
+                React.Fragment,
+                null,
+                React.createElement('p', { className: 'form-error', role: 'alert', style: { display: 'block' } }, linkError || 'This reset link is invalid or expired. Request a new reset email.'),
+                React.createElement('button', { type: 'button', className: 'btn btn-primary btn-lg form-submit', onClick: () => navigate('/') }, 'Back to BLANE'),
+              )
+            : React.createElement(
             'form',
             { onSubmit: handlePasswordReset, noValidate: true },
             error &&
               React.createElement(
                 'p',
-                { className: 'form-error', style: { display: 'block' } },
+                { className: 'form-error', id: 'reset-password-error', ref: errorRef, role: 'alert', tabIndex: -1, style: { display: 'block' } },
                 error,
               ),
-            success && React.createElement('p', { className: 'form-success' }, success),
             React.createElement(
               'div',
               { className: 'form-group' },
@@ -116,6 +157,7 @@ function ResetPassword() {
                 className: 'form-input',
                 id: 'reset-new-password',
                 autoComplete: 'new-password',
+                'aria-describedby': error ? 'reset-password-error' : undefined,
                 placeholder: 'Enter a new password',
                 value: newPassword,
                 onChange: (e) => setNewPassword(e.target.value),
@@ -133,6 +175,7 @@ function ResetPassword() {
                 className: 'form-input',
                 id: 'reset-confirm-password',
                 autoComplete: 'new-password',
+                'aria-describedby': error ? 'reset-password-error' : undefined,
                 placeholder: 'Repeat your new password',
                 value: confirmPassword,
                 onChange: (e) => setConfirmPassword(e.target.value),

@@ -5,7 +5,7 @@ const TOUR_STEPS = [
     target: '[data-markets-tour="header"]',
     title: 'Welcome to GeoMarket Scanner',
     description:
-      'Explore all project-managed markets and find ingredients from your selected day’s meal plan.',
+      'Explore listed Tarlac City markets and find ingredients from your selected day’s meal plan.',
   },
   {
     target: '[data-markets-tour="location"]',
@@ -17,13 +17,13 @@ const TOUR_STEPS = [
     target: '[data-markets-tour="pin"]',
     title: 'Pin your location',
     description:
-      'If GPS is unavailable, select Pin location and click the map. Distances update from your selected location.',
+      'If GPS is unavailable, select Pin location and click the map. Distances update while market coverage stays within Tarlac City.',
   },
   {
     target: '[data-markets-tour="filters"]',
     title: 'Filter nearby market types',
     description:
-      'Show all listed markets or filter by palengke, supermarket, talipapa, or grocery. The count shows how many match.',
+      'Show all listed Tarlac City markets or filter by palengke, supermarket, talipapa, or grocery. The count shows how many match.',
   },
   {
     target: '[data-markets-tour="map"]',
