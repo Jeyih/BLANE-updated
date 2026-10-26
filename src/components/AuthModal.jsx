@@ -14,6 +14,7 @@ function AuthModal({ open, tab, onClose, onSwitchTab }) {
   const [forgotError, setForgotError] = useState('');
   const [forgotSuccess, setForgotSuccess] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
@@ -58,7 +59,7 @@ function AuthModal({ open, tab, onClose, onSwitchTab }) {
       document.removeEventListener('keydown', handleKey);
       previousFocus?.focus();
     };
-  }, [open]);
+  }, [open, tab]);
   if (!open) return null;
   async function handleLoginSubmit(e) {
     e.preventDefault();
@@ -118,9 +119,13 @@ function AuthModal({ open, tab, onClose, onSwitchTab }) {
     setForgotError('');
     setForgotSuccess('');
     if (forgotLoading) return;
-    const email = loginEmail.trim();
+    const email = forgotEmail.trim();
     if (!email) {
       setForgotError('Please enter your email address.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setForgotError('Please enter a valid email address.');
       return;
     }
     setForgotLoading(true);
@@ -128,7 +133,7 @@ function AuthModal({ open, tab, onClose, onSwitchTab }) {
       await resetPassword(email);
       setLoginEmail(email);
       setForgotSuccess(
-        `A password reset link has been sent to ${email}. Check your inbox and follow the instructions.`,
+        'If an account uses this email, a reset link will arrive shortly. Check your inbox and spam folder.',
       );
     } catch (err) {
       setForgotError(err.message || 'Unable to send a password reset email.');
@@ -151,7 +156,7 @@ function AuthModal({ open, tab, onClose, onSwitchTab }) {
         ref: dialogRef,
         role: 'dialog',
         'aria-modal': 'true',
-        'aria-label': tab === 'register' ? 'Create a BLANE account' : 'Sign in to BLANE',
+        'aria-label': tab === 'forgot' ? 'Reset your BLANE password' : tab === 'register' ? 'Create a BLANE account' : 'Sign in to BLANE',
         tabIndex: -1,
       },
       React.createElement(
@@ -184,7 +189,7 @@ function AuthModal({ open, tab, onClose, onSwitchTab }) {
           ),
         ),
       ),
-      React.createElement(
+      tab !== 'forgot' && React.createElement(
         'div',
         { className: 'modal-tabs' },
         React.createElement(
@@ -213,13 +218,6 @@ function AuthModal({ open, tab, onClose, onSwitchTab }) {
               'p',
               { className: 'form-error', style: { display: 'block' } },
               loginError,
-            ),
-          forgotSuccess && React.createElement('p', { className: 'form-success' }, forgotSuccess),
-          forgotError &&
-            React.createElement(
-              'p',
-              { className: 'form-error', style: { display: 'block' } },
-              forgotError,
             ),
           React.createElement(
             'div',
@@ -265,8 +263,13 @@ function AuthModal({ open, tab, onClose, onSwitchTab }) {
             { className: 'form-forgot' },
             React.createElement(
               'button',
-              { type: 'button', disabled: forgotLoading, onClick: handleForgotPasswordSubmit },
-              forgotLoading ? 'Sending\u2026' : 'Forgot password?',
+              { type: 'button', onClick: () => {
+                setForgotEmail(loginEmail);
+                setForgotError('');
+                setForgotSuccess('');
+                onSwitchTab('forgot');
+              } },
+              'Forgot password?',
             ),
           ),
           React.createElement(
@@ -296,6 +299,29 @@ function AuthModal({ open, tab, onClose, onSwitchTab }) {
             ),
           ),
         ),
+      tab === 'forgot' && React.createElement(
+        'form',
+        { onSubmit: handleForgotPasswordSubmit, noValidate: true },
+        React.createElement('h3', null, 'Forgot password?'),
+        React.createElement('p', { className: 'form-terms' }, 'Type your email to receive a reset link.'),
+        forgotError && React.createElement('p', { className: 'form-error', role: 'alert', style: { display: 'block' } }, forgotError),
+        forgotSuccess && React.createElement('p', { className: 'form-success', role: 'status', style: { display: 'block' } }, forgotSuccess),
+        React.createElement('div', { className: 'form-group' },
+          React.createElement('label', { className: 'form-label', htmlFor: 'forgot-email' }, 'Type your email'),
+          React.createElement('input', {
+            id: 'forgot-email', className: 'form-input', type: 'email', autoComplete: 'email',
+            placeholder: 'you@example.com', value: forgotEmail, required: true,
+            disabled: forgotLoading,
+            onChange: e => { setForgotEmail(e.target.value); setForgotError(''); setForgotSuccess(''); },
+          }),
+        ),
+        React.createElement('button', {
+          type: 'submit', className: 'btn btn-primary btn-lg form-submit', disabled: forgotLoading,
+        }, forgotLoading ? 'Sending\u2026' : 'Send reset link'),
+        React.createElement('p', { className: 'form-terms' },
+          React.createElement('button', { type: 'button', className: 'btn btn-outline', onClick: () => onSwitchTab('login') }, 'Back to Sign in'),
+        ),
+      ),
       tab === 'register' &&
         !regSuccess &&
         React.createElement(
