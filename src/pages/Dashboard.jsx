@@ -1,8 +1,7 @@
-import { generateMealPlan } from '../lib/plan-generation.js';
+import { generateMealPlan, emptyMealPlan } from '../lib/plan-generation.js';
 import { appliedMeal } from '../lib/portions.js';
 import { loadConstraintDefinitions } from '../lib/constraints';
 import { localMealStorage as localStorage, sessionMealStorage as sessionStorage } from '../lib/account-storage.js';
-import { computeDailyTargets } from '../../supabase/functions/_shared/nutrition.js';
 import React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -29,10 +28,11 @@ import FeedbackWidget from '../components/FeedbackWidget';
 import DriftWidget from '../components/DriftWidget';
 import RecommendWidget from '../components/RecommendWidget';
 import ProfileRequired from '../components/ProfileRequired';
-import { isProfileComplete } from '../lib/profile-readiness';
+import ProfileReminder from '../components/ProfileReminder';
+import { isProfileComplete, personalizedCalorieTarget } from '../lib/profile-readiness';
 import '../styles/dashboard.css';
 function getCalorieGoal(profile) {
-  return computeDailyTargets(profile).calories;
+  return personalizedCalorieTarget(profile);
 }
 function Dashboard() {
   const { user } = useAuth();
@@ -84,7 +84,7 @@ function Dashboard() {
     month: 'long',
     day: 'numeric',
   });
-  if (profileLoading || profileError || !isProfileComplete(profile)) {
+  if (profileLoading || profileError) {
     return React.createElement(React.Fragment, null,
       React.createElement(Navbar, null),
       React.createElement(ProfileRequired, { loading: profileLoading, error: profileError, onRetry: loadProfile }));
@@ -117,7 +117,7 @@ function Dashboard() {
               'p',
               { className: 'dash-page-date', style: { color: '#d1fae5', fontSize: 15 } },
               today,
-              ' \xB7 Personalized for your metabolic profile',
+              isProfileComplete(profile) ? ' \xB7 Personalized for your metabolic profile' : ' · Explore recipes and plan meals at your own pace',
             ),
           ),
           React.createElement(
@@ -131,6 +131,7 @@ function Dashboard() {
             ),
           ),
         ),
+        !isProfileComplete(profile) && React.createElement(ProfileReminder),
         React.createElement(
           'div',
           {
@@ -235,13 +236,13 @@ function Dashboard() {
           React.createElement(MealPlanWidget, { profile }),
           React.createElement(BmiWidget, { profile }),
           React.createElement(RecommendWidget, { profile }),
-          profile &&
+          profile?.id &&
             React.createElement(FeedbackWidget, {
               profile,
               onProfileUpdate: setProfile,
               onLogsChange: setLogs,
             }),
-          profile && React.createElement(DriftWidget, { logs, profile }),
+          profile?.id && React.createElement(DriftWidget, { logs, profile }),
         ),
       ),
     ),
@@ -311,7 +312,9 @@ function MealPlanWidget({ profile }) {
       if (formattedRecipes.length > 0) {
         const definitions = await loadConstraintDefinitions();
         if (cancelled) return;
-        const defaultPlan = generateMealPlan(formattedRecipes, profile, definitions || {}, { ready: Boolean(definitions) });
+        const defaultPlan = isProfileComplete(profile)
+          ? generateMealPlan(formattedRecipes, profile, definitions || {}, { ready: Boolean(definitions) })
+          : emptyMealPlan();
         setDaySlots(defaultPlan);
         localStorage.setItem('blane_meal_plan', JSON.stringify(defaultPlan));
       }
@@ -367,7 +370,7 @@ function MealPlanWidget({ profile }) {
   const totalCost = allPlannedMeals.reduce((acc, item) => acc + (item.meal.cost || 0), 0);
   const missingCosts = allPlannedMeals.some((item) => item.meal.priceIncomplete);
   const calGoal = getCalorieGoal(profile);
-  const calPct = Math.min(Math.round((totalKcal / calGoal) * 100), 100);
+  const calPct = calGoal ? Math.min(Math.round((totalKcal / calGoal) * 100), 100) : 0;
   const activeMealType = visibleMealTypes[Math.min(activeTabIdx, visibleMealTypes.length - 1)];
   const currentItem = plannedMeals.find((item) => item.slot.type === activeMealType);
   const mealTimeGuide = {
@@ -610,9 +613,7 @@ function MealPlanWidget({ profile }) {
                 'span',
                 { className: 'daily-cal-numbers' },
                 React.createElement('span', null, totalKcal),
-                ' / ',
-                calGoal,
-                ' kcal',
+                calGoal ? ` / ${calGoal} kcal` : ' kcal · Profile needed for target',
               ),
             ),
             React.createElement(
@@ -641,7 +642,7 @@ function BmiWidget({ profile }) {
   const bmiFixed = bmi ? bmi.toFixed(1) : '--';
   let category = '--',
     color = '#2ddc7a',
-    desc = 'Loading your profile data...';
+    desc = 'Add your height and weight in Profile to see your body stats.';
   if (bmi) {
     if (bmi < 18.5) {
       category = 'Underweight';

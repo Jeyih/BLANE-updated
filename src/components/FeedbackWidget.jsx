@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { createHealthLogSaver } from '../lib/health-log-save';
 import { philippineClock } from '../lib/meal-experience';
+import { isProfileComplete } from '../lib/profile-readiness';
 import '../styles/feedback.css';
 const DRIFT = { weightGain: 0.5, weightLoss: 1.5, sleepMin: 6, waterMin: 1800, calLowPct: 0.75 };
 const saveHealthLog = createHealthLogSaver(supabase);
@@ -70,10 +71,10 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
       const updatedProfile = await saveHealthLog(profile, values);
       if (updatedProfile !== profile) onProfileUpdate?.(updatedProfile);
       const historyLoaded = await loadRecentLogs();
-      const targets = recalculateTargets(updatedProfile);
+      const targets = isProfileComplete(updatedProfile) ? recalculateTargets(updatedProfile) : null;
       setRecalcBanner(targets);
       setTimeout(() => setRecalcBanner(null), 6000);
-      showToast(historyLoaded ? '\u2713 Health data logged and targets updated' : 'Health data saved. Health history could not be refreshed.', !historyLoaded);
+      showToast(historyLoaded ? (targets ? '\u2713 Health data logged and targets updated' : '\u2713 Health data saved') : 'Health data saved. Health history could not be refreshed.', !historyLoaded);
     } catch (error) {
       showToast(error.message || 'Could not confirm the save. Check your connection and retry.', true);
     } finally {
@@ -487,7 +488,7 @@ function detectDrift(logs, profile) {
         ' L \u2014 below the 1.8 L minimum. Dehydration can suppress appetite signals and reduce energy.',
     });
   }
-  if (today.calories_burned != null && profile) {
+  if (today.calories_burned != null && isProfileComplete(profile)) {
     const tdee = computeTDEE(profile);
     const pct = today.calories_burned / tdee;
     if (pct < DRIFT.calLowPct) {

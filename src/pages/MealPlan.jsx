@@ -1,14 +1,16 @@
-import { generateMealPlan } from '../lib/plan-generation.js';
+import { generateMealPlan, emptyMealPlan } from '../lib/plan-generation.js';
 import { appliedMeal } from '../lib/portions.js';
 import { localMealStorage as localStorage, sessionMealStorage as sessionStorage, readStoredJson } from '../lib/account-storage.js';
-import { computeDailyTargets, nutritionProfile } from '../../supabase/functions/_shared/nutrition.js';
+import { nutritionProfile } from '../../supabase/functions/_shared/nutrition.js';
 import React from 'react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
 import ProfileRequired from '../components/ProfileRequired';
-import { isProfileComplete } from '../lib/profile-readiness';
+import ProfileReminder from '../components/ProfileReminder';
+import { isProfileComplete, personalizedCalorieTarget } from '../lib/profile-readiness';
 import MealPlanTour from '../components/MealPlanTour';
 import WhyButton from '../components/WhyButton';
 import { mealReviewKey } from '../lib/meal-review';
@@ -45,7 +47,7 @@ const SLOT_PRESETS = [
   { type: 'Custom', icon: '\u270F\uFE0F', time: 'Your own' },
 ];
 function getCalorieGoal(profile) {
-  return computeDailyTargets(profile).calories;
+  return personalizedCalorieTarget(profile);
 }
 function getIngredientQuantityLabel(ingredient, optimizedQuantity) {
   const hasQuantity = ingredient.quantity != null && ingredient.quantity !== '';
@@ -260,10 +262,11 @@ function MealPlan() {
   }
   const eligibleRecipes = recipes.filter(r => canSelectRecipe(r, profile, constraintDefinitions, constraintsReady));
   useEffect(() => {
-    if (!isProfileComplete(profile) || !constraintsReady || loadingRecipes || localStorage.getItem('blane_meal_plan')) return;
-    setDaySlots(generateMealPlan(recipes, profile, constraintDefinitions, { ready: constraintsReady }));
+    if (!profile || !constraintsReady || loadingRecipes || localStorage.getItem('blane_meal_plan')) return;
+    setDaySlots(isProfileComplete(profile) ? generateMealPlan(recipes, profile, constraintDefinitions, { ready: constraintsReady }) : emptyMealPlan());
   }, [profile, constraintsReady, loadingRecipes, recipes, constraintDefinitions]);
   function regeneratePlan() {
+    if (!isProfileComplete(profile)) return;
     if (eligibleRecipes.length === 0) { alert('No recipes can be selected with the available dietary rules and ingredient data.'); return; }
     const newSlots = generateMealPlan(recipes, profile, constraintDefinitions, { ready: constraintsReady, random: true });
     setDaySlots(newSlots);
@@ -338,7 +341,7 @@ function MealPlan() {
     slots.reduce((s, slot) => s + (getDisplayedMeal(slot.mealId)?.protein || 0), 0),
   );
   const calGoal = getCalorieGoal(profile);
-  const dayPct = Math.min(Math.round((totalKcal / calGoal) * 100), 100);
+  const dayPct = calGoal ? Math.min(Math.round((totalKcal / calGoal) * 100), 100) : 0;
   function removeSlot(idx) {
     setDaySlots((prev) => {
       const next = { ...prev };
@@ -470,7 +473,7 @@ function MealPlan() {
       ...(recipe.ingredients || []).map((ingredient) => ingredient.name),
     ].some((value) => value?.toLowerCase().includes(query));
   });
-  if (profileLoading || profileError || !isProfileComplete(profile)) {
+  if (profileLoading || profileError) {
     return React.createElement(React.Fragment, null,
       React.createElement(Navbar, null),
       React.createElement(ProfileRequired, { loading: profileLoading, error: profileError, onRetry: loadProfile }));
@@ -508,13 +511,12 @@ function MealPlan() {
               { className: 'mp-btn mp-btn-outline', type: 'button', onClick: exportWeekPlan, disabled: loadingRecipes || !profile },
               'Export Week',
             ),
-            React.createElement(
-              'button',
-              { className: 'mp-btn mp-btn-primary', onClick: regeneratePlan },
-              'Regenerate Plan',
-            ),
+            isProfileComplete(profile)
+              ? React.createElement('button', { className: 'mp-btn mp-btn-primary', onClick: regeneratePlan }, 'Regenerate Plan')
+              : React.createElement(Link, { to: '/onboarding', className: 'mp-btn mp-btn-primary' }, 'Set up personalized planning'),
           ),
         ),
+        !isProfileComplete(profile) && React.createElement(ProfileReminder),
         React.createElement(
           'div',
           { className: 'week-nav', 'data-mealplan-tour': 'week' },
@@ -583,9 +585,7 @@ function MealPlan() {
                   React.createElement(
                     'small',
                     { style: { fontSize: 13, color: '#4d6e5a', fontWeight: 400 } },
-                    '/ ',
-                    calGoal,
-                    ' kcal',
+                    calGoal ? `/ ${calGoal} kcal` : 'kcal · Profile needed for target',
                   ),
                 ),
               ),
@@ -625,7 +625,7 @@ function MealPlan() {
                   'div',
                   { className: 'day-cal-bar-label' },
                   React.createElement('span', null, 'Progress'),
-                  React.createElement('span', null, dayPct, '%'),
+                  React.createElement('span', null, calGoal ? `${dayPct}%` : 'Profile needed'),
                 ),
                 React.createElement(
                   'div',
@@ -1201,6 +1201,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
   const unverifiedCount = sortedMeals.filter((meal) => !isBudgetPriced(meal)).length;
   const cheapestDay = computeCheapestDay(meals, perMeal);
   async function suggestMeal() {
+    if (!isProfileComplete(profile)) { setSuggestionError('Complete your profile to receive personalized meal suggestions.'); return; }
     const requestId = ++suggestionRequest.current;
     setSuggestion(null);
     setSuggestionLoading(true);
@@ -1461,16 +1462,9 @@ function PriceOptimizerPanel({ meals = [], profile }) {
         React.createElement('option', null, 'Dinner'),
         React.createElement('option', null, 'Snack'),
       ),
-      React.createElement(
-        'button',
-        {
-          className: 'po-apply-btn',
-          type: 'button',
-          onClick: suggestMeal,
-          disabled: suggestionLoading,
-        },
-        suggestionLoading ? 'Finding a meal...' : 'Suggest a meal',
-      ),
+      isProfileComplete(profile)
+        ? React.createElement('button', { className: 'po-apply-btn', type: 'button', onClick: suggestMeal, disabled: suggestionLoading }, suggestionLoading ? 'Finding a meal...' : 'Suggest a meal')
+        : React.createElement(Link, { className: 'po-apply-btn', to: '/onboarding' }, 'Complete profile for suggestions'),
     ),
     suggestionError &&
       React.createElement('div', { className: 'po-ai-suggest-error' }, suggestionError),
@@ -2234,11 +2228,11 @@ function SlotCard({
                 ),
                 alreadyAdded ? 'Added \u2713' : 'Add to grocery',
               ),
-              React.createElement(OptimizeButton, {
+              isProfileComplete(profile) ? React.createElement(OptimizeButton, {
                 disabled: violations.length > 0 || !(Number(meal.kcal) > 0),
                 onToggle: () => onSetOpenOptimizer(openOptimizerId === meal.id ? null : meal.id),
-              }),
-              React.createElement(WhyButton, {
+              }) : React.createElement(Link, { to: '/onboarding', className: 'meal-action-btn' }, 'Set up portions'),
+              isProfileComplete(profile) && React.createElement(WhyButton, {
                 key: reviewKey,
                 meal: displayedMeal,
                 profile,
@@ -2272,7 +2266,7 @@ function SlotCard({
             meal,
             profile,
             totalMealsToday,
-            open: openOptimizerId === meal.id && violations.length === 0 && Number(meal.kcal) > 0,
+            open: isProfileComplete(profile) && openOptimizerId === meal.id && violations.length === 0 && Number(meal.kcal) > 0,
             onClose: () => onSetOpenOptimizer(null),
             onApplied: onPortionApplied,
             onOriginalMeal,
