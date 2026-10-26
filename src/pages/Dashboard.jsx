@@ -28,7 +28,6 @@ import FeedbackWidget from '../components/FeedbackWidget';
 import DriftWidget from '../components/DriftWidget';
 import RecommendWidget from '../components/RecommendWidget';
 import ProfileRequired from '../components/ProfileRequired';
-import ProfileReminder from '../components/ProfileReminder';
 import { isProfileComplete, personalizedCalorieTarget } from '../lib/profile-readiness';
 import '../styles/dashboard.css';
 function getCalorieGoal(profile) {
@@ -131,7 +130,6 @@ function Dashboard() {
             ),
           ),
         ),
-        !isProfileComplete(profile) && React.createElement(ProfileReminder),
         React.createElement(
           'div',
           {

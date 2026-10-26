@@ -267,7 +267,7 @@ function Navbar() {
             React.createElement(
               Link,
               {
-                to: '/onboarding',
+                to: '/profile',
                 className: 'dash-dropdown-item',
                 onClick: () => setDropdownOpen(false),
               },

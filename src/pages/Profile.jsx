@@ -348,6 +348,7 @@ function Profile() {
       activity_level: basicForm.activity_level,
     };
     setProfile(updated);
+    window.dispatchEvent(new Event('blane-profile-saved'));
     setEditingBasic(false);
     showToast('\u2713 Basic info saved successfully');
   }
@@ -380,6 +381,7 @@ function Profile() {
       allergies: healthForm.allergies,
     }));
     setEditingHealth(false);
+    window.dispatchEvent(new Event('blane-profile-saved'));
     showToast('\u2713 Health info saved successfully');
   }
   async function handlePasswordChange() {

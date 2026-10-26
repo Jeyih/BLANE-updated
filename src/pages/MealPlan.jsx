@@ -9,7 +9,6 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
 import ProfileRequired from '../components/ProfileRequired';
-import ProfileReminder from '../components/ProfileReminder';
 import { isProfileComplete, personalizedCalorieTarget } from '../lib/profile-readiness';
 import MealPlanTour from '../components/MealPlanTour';
 import WhyButton from '../components/WhyButton';
@@ -513,10 +512,9 @@ function MealPlan() {
             ),
             isProfileComplete(profile)
               ? React.createElement('button', { className: 'mp-btn mp-btn-primary', onClick: regeneratePlan }, 'Regenerate Plan')
-              : React.createElement(Link, { to: '/onboarding', className: 'mp-btn mp-btn-primary' }, 'Set up personalized planning'),
+              : React.createElement(Link, { to: '/profile', className: 'mp-btn mp-btn-primary' }, 'Update profile for planning'),
           ),
         ),
-        !isProfileComplete(profile) && React.createElement(ProfileReminder),
         React.createElement(
           'div',
           { className: 'week-nav', 'data-mealplan-tour': 'week' },
@@ -1464,7 +1462,7 @@ function PriceOptimizerPanel({ meals = [], profile }) {
       ),
       isProfileComplete(profile)
         ? React.createElement('button', { className: 'po-apply-btn', type: 'button', onClick: suggestMeal, disabled: suggestionLoading }, suggestionLoading ? 'Finding a meal...' : 'Suggest a meal')
-        : React.createElement(Link, { className: 'po-apply-btn', to: '/onboarding' }, 'Complete profile for suggestions'),
+        : React.createElement(Link, { className: 'po-apply-btn', to: '/profile' }, 'Update profile for suggestions'),
     ),
     suggestionError &&
       React.createElement('div', { className: 'po-ai-suggest-error' }, suggestionError),
@@ -2231,7 +2229,7 @@ function SlotCard({
               isProfileComplete(profile) ? React.createElement(OptimizeButton, {
                 disabled: violations.length > 0 || !(Number(meal.kcal) > 0),
                 onToggle: () => onSetOpenOptimizer(openOptimizerId === meal.id ? null : meal.id),
-              }) : React.createElement(Link, { to: '/onboarding', className: 'meal-action-btn' }, 'Set up portions'),
+              }) : React.createElement(Link, { to: '/profile', className: 'meal-action-btn' }, 'Update profile for portions'),
               isProfileComplete(profile) && React.createElement(WhyButton, {
                 key: reviewKey,
                 meal: displayedMeal,

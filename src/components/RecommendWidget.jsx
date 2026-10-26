@@ -218,7 +218,7 @@ function RecommendWidget({ profile }) {
     actionMessage &&
       React.createElement('p', { className: 'meal-action-status', role: 'status' }, actionMessage),
     !isProfileComplete(profile)
-      ? React.createElement('p', { className: 'rec-no-profile' }, 'Complete your ', React.createElement(Link, { to: '/onboarding' }, 'health profile'), ' before receiving personalized recommendations.')
+      ? React.createElement('p', { className: 'rec-no-profile' }, 'Update your ', React.createElement(Link, { to: '/profile' }, 'health profile'), ' before receiving personalized recommendations.')
       : metadataError
       ? React.createElement('p', { className: 'meal-action-status' }, metadataError)
       : loading || !metadataReady

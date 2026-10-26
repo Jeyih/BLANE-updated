@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase, REDIRECT_AFTER_ONBOARD } from '../lib/supabase';
+import { hasInitialProfile, onboardingFormFromProfile } from '../lib/onboarding-profile';
 import '../styles/onboarding.css';
 const TOTAL_STEPS = 5;
 const STEP_LABELS = [
@@ -35,6 +36,9 @@ function Onboarding() {
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileLoadError, setProfileLoadError] = useState(false);
+  const [retryProfile, setRetryProfile] = useState(0);
   const [goalsList, setGoalsList] = useState([]);
   const [dietaryList, setDietaryList] = useState([]);
   const [medicalList, setMedicalList] = useState([]);
@@ -92,9 +96,29 @@ function Onboarding() {
     };
   }, []);
   useEffect(() => {
-    const metaName = session?.user?.user_metadata?.full_name;
-    if (metaName) setForm((f) => ({ ...f, fullName: f.fullName || metaName }));
-  }, [session]);
+    if (!session?.user?.id) return;
+    let active = true;
+    async function loadSavedProfile() {
+      setProfileLoading(true);
+      setProfileLoadError(false);
+      try {
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
+          .abortSignal(AbortSignal.timeout(15000));
+        if (!active) return;
+        if (error) throw error;
+        if (hasInitialProfile(data)) {
+          window.dispatchEvent(new Event('blane-profile-saved'));
+          navigate(REDIRECT_AFTER_ONBOARD, { replace: true });
+          return;
+        }
+        setForm(onboardingFormFromProfile(data, session.user.user_metadata?.full_name || ''));
+      } catch {
+        if (active) { setProfileLoadError(true); setError('Could not load your saved profile. Please retry before making changes.'); }
+      } finally { if (active) setProfileLoading(false); }
+    }
+    loadSavedProfile();
+    return () => { active = false; };
+  }, [session?.user?.id, navigate, retryProfile]);
   function updateField(key, value) {
     setForm((f) => ({ ...f, [key]: value }));
   }
@@ -118,6 +142,7 @@ function Onboarding() {
       if (!form.sex) return fail('Please select your biological sex.');
       if (!form.height) return fail('Please enter your height.');
       if (!form.weight) return fail('Please enter your weight.');
+      if (!form.activity) return fail('Please select your activity level.');
     }
     if (step === 2) {
       if (!form.goal) return fail('Please select a health goal.');
@@ -144,6 +169,8 @@ function Onboarding() {
     }
   }
   async function submitProfile() {
+    if (profileLoading || profileLoadError || saving) return;
+    if (!validateStep(1) || !validateStep(2)) { setCurrentStep(1); return; }
     setSaving(true);
     const dietary = [...form.dietary];
     if (form.dietaryOther.trim()) dietary.push(form.dietaryOther.trim());
@@ -172,9 +199,16 @@ function Onboarding() {
       setError('Could not save: ' + dbError.message);
       return;
     }
-    navigate(REDIRECT_AFTER_ONBOARD);
+    window.dispatchEvent(new Event('blane-profile-saved'));
+    navigate(REDIRECT_AFTER_ONBOARD, { replace: true });
   }
   const progressPct = Math.round(((currentStep - 1) / TOTAL_STEPS) * 100);
+  if (profileLoading || profileLoadError) {
+    return React.createElement('main', { className: 'onboard-card', style: { margin: '90px auto', maxWidth: 600, padding: 32 } },
+      React.createElement('h1', null, profileLoading ? 'Loading your saved profile…' : 'Could not load your profile'),
+      React.createElement('p', { role: profileLoadError ? 'alert' : 'status' }, profileLoadError ? error : 'Checking your existing details before setup.'),
+      profileLoadError && React.createElement('button', { className: 'btn btn-primary', type: 'button', onClick: () => setRetryProfile(value => value + 1) }, 'Try again'));
+  }
   return React.createElement(
     React.Fragment,
     null,
