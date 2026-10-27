@@ -986,7 +986,7 @@ function Markets() {
   );
 }
 function GeoMarketScanner({ markets, userCoords, onLocate }) {
-  const { records: priceRecords } = useIngredientPrices();
+  const { records: priceRecords, referenceData } = useIngredientPrices();
   const [activeTab, setActiveTab] = useState('search');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);

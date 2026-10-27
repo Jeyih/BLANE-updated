@@ -2,22 +2,26 @@ import { fetchDaPrices } from '../../server/da-prices.js';
 import { createPriceFeed } from '../../server/price-feed.js';
 import { fetchRetailPrices } from '../../server/retail-prices.js';
 import {
-  createReferenceDataClient,
+  createPriceFeedAccess,
   replacePriceReferenceData,
 } from '../../server/reference-data.js';
 import { loadPriceReferenceData } from '../../src/lib/price-reference.js';
 
-function createHandler({ loadReferenceData, saveDa, saveRetail } = {}) {
+function createHandler({ loadReferenceData, saveDa, saveRetail,
+  access = createPriceFeedAccess, loadDa = fetchDaPrices, loadRetail = fetchRetailPrices,
+} = {}) {
   let feed;
+  let persistence = 'database';
   async function getFeed() {
     if (!feed) {
       let referenceData;
       if (loadReferenceData) {
         referenceData = await loadReferenceData();
       } else {
-        const client = createReferenceDataClient();
+        const { client, canPersist } = access();
         referenceData = await loadPriceReferenceData(client);
-        saveDa = async (data) => {
+        persistence = canPersist ? 'database' : 'memory';
+        saveDa = canPersist ? async (data) => {
           const entries = [
             ...data.records.map((record, index) => ({
               catalogue: 'da_price',
@@ -27,21 +31,21 @@ function createHandler({ loadReferenceData, saveDa, saveRetail } = {}) {
             { catalogue: 'da_report', entry_key: 'latest', data: data.report },
           ];
           await replacePriceReferenceData(client, ['da_price', 'da_report'], entries);
-        };
-        saveRetail = async (data) => {
+        } : undefined;
+        saveRetail = canPersist ? async (data) => {
           const entries = data.records.map((record, index) => ({
             catalogue: 'retail_price',
             entry_key: `${String(index + 1).padStart(3, '0')}:${record.name}`,
             data: record,
           }));
           await replacePriceReferenceData(client, ['retail_price'], entries);
-        };
+        } : undefined;
       }
       feed = createPriceFeed({
         daSnapshot: referenceData.daSnapshot,
         retailSnapshot: referenceData.retailSnapshot,
-        loadDa: () => fetchDaPrices(referenceData),
-        loadRetail: (previousRecords) => fetchRetailPrices(previousRecords, referenceData),
+        loadDa: () => loadDa(referenceData),
+        loadRetail: (previousRecords) => loadRetail(previousRecords, referenceData),
         saveDa,
         saveRetail,
       });
@@ -60,7 +64,11 @@ function createHandler({ loadReferenceData, saveDa, saveRetail } = {}) {
           'Cache-Control': 'no-store',
           'Netlify-CDN-Cache-Control': 'no-store',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, persistence,
+          warning: [data.warning, persistence === 'memory'
+            ? 'Source checks are available, but new quotes are not saved to the database. Database persistence needs server configuration.'
+            : ''].filter(Boolean).join(' '),
+        }),
       };
     } catch (error) {
       console.error('Unable to load price references:', error);

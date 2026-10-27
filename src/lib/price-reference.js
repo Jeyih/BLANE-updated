@@ -44,13 +44,22 @@ function groupPriceReferenceRows(rows) {
 }
 
 async function loadPriceReferenceData(client) {
-  const { data, error } = await client
-    .from('price_reference_data')
-    .select('catalogue,entry_key,data')
-    .order('catalogue')
-    .order('entry_key');
-  if (error) throw new Error(`Could not load price reference data: ${error.message}`);
-  return groupPriceReferenceRows(data);
+  const rows = [];
+  const signal = AbortSignal.timeout(15000);
+  for (let start = 0; ; start += 1000) {
+    const { data, error } = await client
+      .from('price_reference_data')
+      .select('catalogue,entry_key,data')
+      .order('catalogue')
+      .order('entry_key')
+      .range(start, start + 999)
+      .abortSignal(signal);
+    if (error) throw new Error(`Could not load price reference data: ${error.message}`);
+    rows.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  if (!rows.length) throw new Error('Price reference catalogue is empty or inaccessible.');
+  return groupPriceReferenceRows(rows);
 }
 
 export { groupPriceReferenceRows, loadPriceReferenceData };

@@ -31,6 +31,8 @@ function PriceProvider({ children }) {
       const job = (async () => {
         const cachedCatalogue = catalogueRef.current;
         const cachedReferences = referenceDataRef.current;
+        const reuseReferences = cachedReferences && !reloadCatalogue
+          && Date.now() - cachedReferences.checkedAt < 30000;
         const [reference, catalogue, priceReferences] = await Promise.allSettled([
           fetch(`/.netlify/functions/ingredient-prices${force ? '?refresh=1' : ''}`, {
             cache: 'no-store',
@@ -46,8 +48,8 @@ function PriceProvider({ children }) {
               ? Promise.resolve(cachedCatalogue.data)
               : loadPriceCatalogue(supabase)
             : Promise.resolve({ foods: [], recipeIngredients: [] }),
-          cachedReferences && !reloadCatalogue
-            ? Promise.resolve(cachedReferences)
+          reuseReferences
+            ? Promise.resolve(cachedReferences.data)
             : loadPriceReferenceData(supabase),
         ]);
         if (request !== requestRef.current) return;
@@ -55,7 +57,8 @@ function PriceProvider({ children }) {
           catalogueRef.current = { userId, data: catalogue.value };
         const feed = reference.status === 'fulfilled' ? reference.value : null;
         const dbReferences = priceReferences.status === 'fulfilled' ? priceReferences.value : null;
-        if (dbReferences) referenceDataRef.current = dbReferences;
+        if (dbReferences && !reuseReferences)
+          referenceDataRef.current = { data: dbReferences, checkedAt: Date.now() };
         const dbRecords = dbReferences
           ? [...dbReferences.daSnapshot.records, ...dbReferences.retailSnapshot.records]
           : null;

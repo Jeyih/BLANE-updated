@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { groupPriceReferenceRows } from './price-reference.js';
+import { groupPriceReferenceRows, loadPriceReferenceData } from './price-reference.js';
 
 test('groups database price rows and restores structured mapping and portion data', () => {
   const data = groupPriceReferenceRows([
@@ -44,4 +44,19 @@ test('groups database price rows and restores structured mapping and portion dat
   assert.equal(data.partialRawFoods.has('Rice, well-milled, fried'), true);
   assert.deepEqual(data.fnriPortions['Carrot, boiled'], { apGrams: 51, epGrams: 45 });
   assert.equal(data.fnriPortionMeta.sourceUrl, 'https://fnri.example/portion');
+});
+
+test('reference loading retrieves pages beyond the database row cap and rejects empty catalogues', async () => {
+  const rows = Array.from({ length: 1002 }, (_, i) => ({ catalogue: 'price_alias', entry_key: String(i), data: { target: `food-${i}` } }));
+  let start = 0;
+  const client = { from() { return {
+    select() { return this; }, order() { return this; },
+    range(first) { start = first; return this; },
+    async abortSignal(signal) { assert.equal(signal.aborted, false); return { data: rows.slice(start, start + 1000) }; },
+  }; } };
+  const data = await loadPriceReferenceData(client);
+  assert.equal(Object.keys(data.aliases).length, 1002);
+  assert.equal(data.aliases['1001'], 'food-1001');
+  rows.length = 0;
+  await assert.rejects(loadPriceReferenceData(client), /empty or inaccessible/);
 });
