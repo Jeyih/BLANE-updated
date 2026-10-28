@@ -119,7 +119,6 @@ function WhyButton({ meal, profile, violations = [], onReview }) {
     setOpen(false);
   }
   useEffect(() => {
-    if (!open) return;
     let active = true;
     setVerdict(null);
     setText('');
@@ -143,7 +142,7 @@ function WhyButton({ meal, profile, violations = [], onReview }) {
     return () => {
       active = false;
     };
-  }, [open, requestKey, retryCount]);
+  }, [requestKey, retryCount]);
   function positionPopover() {
     if (!btnRef.current) return;
     const btnRect = btnRef.current.getBoundingClientRect();
@@ -188,7 +187,7 @@ function WhyButton({ meal, profile, violations = [], onReview }) {
       {
         ref: btnRef,
         className: `xai-why-btn${aiStatus ? ` status-${aiStatus}` : ' status-pending'}`,
-        title: aiStatus ? `AI verdict: ${aiStatus}` : 'Click to get the AI verdict',
+        title: aiStatus ? `AI verdict: ${aiStatus}` : 'BLANE AI is reviewing this meal automatically',
         onClick: (e) => {
           e.stopPropagation();
           toggle();
