@@ -66,13 +66,6 @@ function Dashboard() {
     } catch { setProfileError(true); }
     finally { setProfileLoading(false); }
   }
-  const [quickCheckinMood, setQuickCheckinMood] = useState(null);
-  const [checkinToast, setCheckinToast] = useState('');
-  function handleCheckin(mood, note) {
-    setQuickCheckinMood(mood);
-    setCheckinToast(note);
-    setTimeout(() => setCheckinToast(''), 4e3);
-  }
   function closeTour() {
     if (user?.id) {
       globalThis.localStorage.setItem(`blane_dashboard_tour_completed_${user.id}`, 'true');
@@ -129,104 +122,6 @@ function Dashboard() {
               { className: 'dash-tour-trigger', type: 'button', onClick: () => setTourOpen(true) },
               React.createElement('span', { 'aria-hidden': 'true' }, '\u24D8'),
               ' Take a tour',
-            ),
-          ),
-        ),
-        React.createElement(
-          'div',
-          {
-            style: {
-              background: 'linear-gradient(135deg, #173023 0%, #12261b 100%)',
-              border: '1px solid rgba(45, 220, 122, 0.25)',
-              borderRadius: '18px',
-              padding: '16px 20px',
-              marginBottom: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '14px',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-            },
-            'data-dashboard-tour': 'check-in',
-          },
-          React.createElement(
-            'div',
-            { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
-            React.createElement('span', { style: { fontSize: '24px' } }, '\u{1F331}'),
-            React.createElement(
-              'div',
-              null,
-              React.createElement(
-                'div',
-                { style: { color: '#ffffff', fontWeight: 700, fontSize: '15px' } },
-                'Daily Check-in: How are you feeling right now?',
-              ),
-              React.createElement(
-                'div',
-                { style: { color: '#d1fae5', fontSize: '13px' } },
-                checkinToast ||
-                  'Select your mood for a brief check-in.',
-              ),
-            ),
-          ),
-          React.createElement(
-            'div',
-            { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
-            [
-              {
-                mood: 'energetic',
-                icon: '\u26A1',
-                label: 'Energetic',
-                note: 'Energetic selected for this session.',
-              },
-              {
-                mood: 'great',
-                icon: '\u{1F60A}',
-                label: 'Feeling Great',
-                note: 'Feeling great selected for this session.',
-              },
-              {
-                mood: 'active',
-                icon: '\u{1F4AA}',
-                label: 'Workout Today',
-                note: 'Workout selected. Record your activity in the health log below.',
-              },
-              {
-                mood: 'tired',
-                icon: '\u{1F634}',
-                label: 'Tired / Low Energy',
-                note: 'Low energy selected. Review your recent health entries below.',
-              },
-            ].map((item) =>
-              React.createElement(
-                'button',
-                {
-                  key: item.mood,
-                  type: 'button',
-                  onClick: () => handleCheckin(item.mood, item.note),
-                  style: {
-                    background:
-                      quickCheckinMood === item.mood ? '#2ddc7a' : 'rgba(255, 255, 255, 0.06)',
-                    color: quickCheckinMood === item.mood ? '#0a1610' : '#ffffff',
-                    border:
-                      quickCheckinMood === item.mood
-                        ? '2px solid #ffffff'
-                        : '1px solid rgba(45, 220, 122, 0.25)',
-                    borderRadius: '12px',
-                    padding: '8px 14px',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s ease',
-                  },
-                },
-                React.createElement('span', null, item.icon),
-                React.createElement('span', null, item.label),
-              ),
             ),
           ),
         ),

@@ -8,13 +8,6 @@ const TOUR_STEPS = [
       'Your dashboard brings your nutrition plan and health insights together in one place.',
   },
   {
-    target: '[data-dashboard-tour="check-in"]',
-    title: 'Check in with yourself',
-    interactionTargets: ['[data-dashboard-tour="check-in"] button'],
-    description:
-      'Choose a mood to get a quick note about how BLANE considers your energy, recovery, and food balance today.',
-  },
-  {
     target: '[data-dashboard-tour="meal-plan"]',
     title: 'Your meals for today',
     interactionTargets: ['[data-dashboard-tour="meal-plan"] .meal-tab-btn'],
