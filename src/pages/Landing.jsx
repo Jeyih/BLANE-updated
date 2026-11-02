@@ -760,7 +760,7 @@ function Landing() {
             React.createElement(
               'p',
               null,
-              'Meal plans and completion marks are stored in this browser. Grocery entries are kept for the browser session, so these records may not appear on another device.',
+              'Meal plans and groceries are saved on this device and sync to your account when connected. Previously opened profile, health-log and recipe data can be viewed offline on the same browser. Sign out to clear cached profile and health-log copies.',
             ),
           ),
           React.createElement(

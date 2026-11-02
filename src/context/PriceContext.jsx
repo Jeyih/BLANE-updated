@@ -6,6 +6,8 @@ import { supabase } from '../lib/supabase';
 import { loadPriceCatalogue, isSourcedPrice } from '../lib/pricing';
 import { loadPriceReferenceData } from '../lib/price-reference.js';
 import { PRICE_POLL_MS } from '../lib/price-refresh-policy';
+import { createOfflineFetch } from '../lib/offline-data.js';
+const priceFetch = createOfflineFetch({ baseUrl: window.location.origin });
 const PriceContext = createContext(null);
 function PriceProvider({ children }) {
   const { user } = useAuth();
@@ -35,7 +37,7 @@ function PriceProvider({ children }) {
         const reuseReferences = cachedReferences && !reloadCatalogue
           && Date.now() - cachedReferences.checkedAt < 30000;
         const [reference, catalogue, priceReferences] = await Promise.allSettled([
-          fetch(`/.netlify/functions/ingredient-prices${force ? '?refresh=1' : ''}`, {
+          priceFetch(`/.netlify/functions/ingredient-prices${force ? '?refresh=1' : ''}`, {
             cache: 'no-store',
             signal: AbortSignal.timeout(26e3),
           }).then(async (r) => {

@@ -2,18 +2,29 @@ import { setActiveAccount } from '../lib/account-storage.js';
 import React from 'react';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { clearOfflineAccount } from '../lib/offline-data.js';
+import { readSavedSession } from '../lib/offline-session.js';
+const savedOfflineSession = () => readSavedSession(import.meta.env.VITE_SUPABASE_URL);
 const AuthContext = createContext(null);
 function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
+    if (navigator.onLine === false) {
+      const saved = savedOfflineSession();
+      setActiveAccount(saved?.user?.id);
+      setSession(saved);
+      setLoading(false);
+    }
     supabase.auth.getSession().then(({ data: { session: session2 } }) => {
-      setActiveAccount(session2?.user?.id);
-      setSession(session2);
+      const available = session2 || (navigator.onLine === false ? savedOfflineSession() : null);
+      setActiveAccount(available?.user?.id);
+      setSession(available);
       setLoading(false);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (event === 'TOKEN_REFRESHED') return;
+      if (event === 'INITIAL_SESSION' && !newSession && navigator.onLine === false) return;
       setActiveAccount(newSession?.user?.id);
       setSession(newSession);
     });
@@ -52,8 +63,9 @@ function AuthProvider({ children }) {
     return data;
   }
   async function logout() {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
     if (error) throw error;
+    clearOfflineAccount(session?.user?.id);
     setActiveAccount(null);
   }
   const value = {

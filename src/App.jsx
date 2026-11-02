@@ -1,4 +1,5 @@
 import React from 'react';
+import OfflineNotice from './components/OfflineNotice';
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
@@ -35,6 +36,7 @@ function App() {
     React.createElement(
       PriceProvider,
       null,
+      React.createElement(OfflineNotice, null),
       React.createElement(
         BrowserRouter,
         null,

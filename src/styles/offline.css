@@ -1,0 +1,4 @@
+.offline-notice { position: relative; z-index: 100; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 12px 24px; background: #243c2c; border-bottom: 1px solid #63866b; color: #edf8ef; font-size: 13px; line-height: 1.6; }
+.offline-notice strong { color: #ffdc89; }
+.offline-notice span { flex: 1; min-width: min(100%, 240px); }
+.offline-notice button { background: #1b5734; border: 1px solid #7cba91; color: #f0fff4; border-radius: 8px; padding: 8px 12px; cursor: pointer; }

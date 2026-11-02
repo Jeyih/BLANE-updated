@@ -30,6 +30,7 @@ export function createMealStateSync({ account, client, local, session, subscribe
     void sync();
   }
   async function run() {
+    if (globalThis.navigator?.onLine === false) { report('offline'); return; }
     report('saving');
     try {
       const result = await client.from('private_meal_state').select('state_key,value,revision').eq('user_id', account).abortSignal(AbortSignal.timeout(8000));
