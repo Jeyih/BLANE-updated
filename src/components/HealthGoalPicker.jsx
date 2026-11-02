@@ -1,5 +1,5 @@
 import React, { useId } from 'react';
-import { MAX_HEALTH_GOALS, selectedHealthGoals, toggleHealthGoal, primaryHealthGoal } from '../lib/health-goals.js';
+import { MAX_HEALTH_GOALS, healthGoalDescription, selectedHealthGoals, toggleHealthGoal, primaryHealthGoal } from '../lib/health-goals.js';
 import '../styles/health-goals.css';
 
 export default function HealthGoalPicker({ options, value, onChange, readOnly = false, disabled = false }) {
@@ -27,7 +27,7 @@ export default function HealthGoalPicker({ options, value, onChange, readOnly = 
         },
         React.createElement('span', { className: 'health-goal-icon', 'aria-hidden': true }, option.icon || '🎯'),
         React.createElement('span', { className: 'health-goal-label' }, option.label),
-        option.desc && React.createElement('span', { className: 'health-goal-desc' }, option.desc),
+        healthGoalDescription(option) && React.createElement('span', { className: 'health-goal-desc' }, healthGoalDescription(option)),
         value.goal === option.key && React.createElement('span', { className: 'health-goal-primary' }, 'Primary'));
       })),
     !readOnly && selected.length > 0 && React.createElement('div', { className: 'health-goal-primary-field' },

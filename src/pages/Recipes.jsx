@@ -1,3 +1,4 @@
+import { singleDishRecipeRows, singleDishIngredientRows, singleDishStepRows } from '../lib/single-dish-catalogue.js';
 import { localMealStorage as localStorage, sessionMealStorage as sessionStorage } from '../lib/account-storage.js';
 import React from 'react';
 import { useEffect, useMemo, useState } from 'react';
@@ -16,6 +17,9 @@ import '../styles/meal-experience.css';
 import Navbar from '../components/Navbar';
 import RecipesTour from '../components/RecipesTour';
 import RecipeIngredient from '../components/RecipeIngredient';
+import PublishedRecipeReferences from '../components/PublishedRecipeReferences';
+import RecipeEvidence from '../components/RecipeEvidence';
+import RecipeCookingGuide from '../components/RecipeCookingGuide';
 import { scoreRecipe } from '../lib/seasonal';
 import {
   SeasonBadge,
@@ -33,7 +37,7 @@ import {
   ViolationDetail,
 } from '../components/ConstraintWarnings';
 import '../styles/recipes.css';
-const TYPE_FILTERS = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert'];
+const TYPE_FILTERS = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 const DIET_FILTERS = ['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free'];
 const DIFF_COLORS = { easy: '#2ddc7a', medium: '#fbbf24', hard: '#f87171' };
 const DAILY_RECIPE_LIMIT = 13;
@@ -138,10 +142,11 @@ function Recipes() {
       );
     }
     const ingByRecipe = {};
-    (ingRes.data || []).forEach((ing) => {
+    singleDishIngredientRows(ingRes.data).forEach((ing) => {
       if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
       ingByRecipe[ing.recipe_id].push({
         id: ing.id,
+        fct_id: ing.fct_id,
         name: ing.name || ing.ingredient_name || ing.food_name,
         ingredient_name: ing.ingredient_name,
         food_name: ing.food_name,
@@ -151,7 +156,7 @@ function Recipes() {
       });
     });
     const stepsByRecipe = {};
-    (stepRes.data || []).forEach((s) => {
+    singleDishStepRows(stepRes.data).forEach((s) => {
       if (!stepsByRecipe[s.recipe_id]) stepsByRecipe[s.recipe_id] = [];
       stepsByRecipe[s.recipe_id].push({
         title: s.title,
@@ -160,7 +165,7 @@ function Recipes() {
       });
     });
     setRecipes(
-      (recipesData || []).map((r) => ({
+      singleDishRecipeRows(recipesData).map((r) => ({
         id: r.id,
         emoji: r.emoji,
         name: r.name,
@@ -187,7 +192,7 @@ function Recipes() {
     () =>
       recipes.filter((r) => {
         const matchType =
-          !typeFilter || (typeFilter === 'Dessert' ? isDessert(r) : r.type === typeFilter);
+          !typeFilter || r.type === typeFilter;
         const dietKey = dietFilter
           ? dietFilter.toLowerCase().replace('-', '_').replace(' ', '_')
           : '';
@@ -270,6 +275,7 @@ function Recipes() {
           React.createElement(ConstraintActiveBar, { activeConstraints }),
         ),
         React.createElement(PriceEstimateNotice, null),
+        React.createElement(PublishedRecipeReferences, null),
         actionMessage &&
           React.createElement(
             'p',
@@ -670,30 +676,8 @@ function RecipeModal({
           })),
         ),
         React.createElement('div', { className: 'modal-section-title' }, 'How to Cook'),
-        React.createElement(
-          'div',
-          { className: 'modal-steps' },
-          recipe.steps.map((step, i) =>
-            React.createElement(
-              'div',
-              { key: i, className: 'modal-step' },
-              React.createElement('div', { className: 'modal-step-num' }, i + 1),
-              React.createElement(
-                'div',
-                { className: 'modal-step-content' },
-                React.createElement('div', { className: 'modal-step-title' }, step.title),
-                React.createElement('div', { className: 'modal-step-desc' }, step.desc),
-                step.timer &&
-                  React.createElement(
-                    'div',
-                    { className: 'modal-step-timer' },
-                    '\u23F1 ',
-                    formatTimer(step.timer),
-                  ),
-              ),
-            ),
-          ),
-        ),
+        React.createElement(RecipeCookingGuide, { steps: recipe.steps, formatTimer }),
+        React.createElement(RecipeEvidence, { recipe }),
         React.createElement(
           'div',
           { className: 'modal-actions' },

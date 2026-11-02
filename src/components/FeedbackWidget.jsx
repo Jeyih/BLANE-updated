@@ -306,16 +306,19 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
       { className: 'fb-history-row' },
       React.createElement(Sparkline, {
         label: 'Weight (7d)',
+        unit: 'kg',
         values: logs.map((l) => l.weight_kg).reverse(),
         color: '#2ddc7a',
       }),
       React.createElement(Sparkline, {
         label: 'Sleep (7d)',
+        unit: 'hrs',
         values: logs.map((l) => l.sleep_hours).reverse(),
         color: '#60a5fa',
       }),
       React.createElement(Sparkline, {
         label: 'Activity (7d)',
+        unit: 'kcal',
         values: logs.map((l) => l.calories_burned).reverse(),
         color: '#fbbf24',
       }),
@@ -346,25 +349,18 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
       ),
   );
 }
-function Sparkline({ label, values, color }) {
+function Sparkline({ label, values, color, unit }) {
   const valid = values.filter((v) => v != null);
   const W = 120,
     H = 32;
   let content;
-  let isEmpty = valid.length < 2;
-  if (isEmpty) {
-    content = React.createElement(
-      'text',
-      {
-        x: '60',
-        y: '20',
-        fill: '#4d6e5a',
-        fontSize: '9',
-        fontFamily: 'DM Sans,sans-serif',
-        textAnchor: 'middle',
-      },
-      'Not enough data yet',
-    );
+  if (valid.length < 2) {
+    return React.createElement('div', { className: 'fb-sparkline-wrap' },
+      React.createElement('div', { className: 'fb-sparkline-label' }, label),
+      valid.length === 1 && React.createElement('div', { className: 'fb-sparkline-value', style: { color } },
+        String(valid[0]), React.createElement('span', { className: 'fb-sparkline-unit' }, unit)),
+      React.createElement('p', { className: 'fb-sparkline-message' },
+        valid.length === 1 ? 'First entry saved. Add another entry to see a trend.' : 'No entries yet.'));
   } else {
     const min = Math.min(...valid);
     const max = Math.max(...valid);
@@ -395,12 +391,16 @@ function Sparkline({ label, values, color }) {
     'div',
     { className: 'fb-sparkline-wrap' },
     React.createElement('div', { className: 'fb-sparkline-label' }, label),
+    React.createElement('div', { className: 'fb-sparkline-value', style: { color } },
+      String(valid[valid.length - 1]), React.createElement('span', { className: 'fb-sparkline-unit' }, unit)),
     React.createElement(
       'svg',
       {
         className: 'fb-sparkline-svg',
         viewBox: '0 0 120 32',
-        preserveAspectRatio: isEmpty ? 'xMidYMid meet' : 'none',
+        preserveAspectRatio: 'none',
+        role: 'img',
+        'aria-label': `${label}: ${valid.length} recorded entries`,
       },
       content,
     ),

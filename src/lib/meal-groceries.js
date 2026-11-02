@@ -1,11 +1,12 @@
 import { priceIngredient } from './pricing.js';
+import { recipeDisplayName } from './recipe-names.js';
 
 export function replaceGrocerySources(previous, sources) {
   const keys = new Set(sources.map(source => source.key));
   const recipes = new Set(sources.map(source => source.meal.id));
   const retained = previous.filter(item => !keys.has(item.sourceKey) && (item.sourceKey || !recipes.has(item.mealId)));
   return [...retained, ...sources.flatMap(source => (source.meal.ingredients || []).map((ingredient, index) => ({
-    sourceKey: source.key, sourceLabel: source.label, mealId: source.meal.id,
+    sourceKey: source.key, sourceLabel: source.label, mealId: source.meal.id, recipeName: source.meal.name,
     lineKey: `${source.key}:${index}`, name: ingredient.name,
     qty: shoppingQuantity(ingredient.qty ?? ingredient.quantity ?? '—', source.meal.servings), checked: false,
     pricingIngredient: pricingBasis(source.baseMeal?.ingredients?.[index] || ingredient),
@@ -60,13 +61,32 @@ export function groceryRows(items) {
     const key = parsed ? `${String(item.name).trim().toLowerCase()}:${parsed.unit}` : `uncombined:${index}`;
     let row = rows.get(key);
     if (!row) {
-      row = { key, name: item.name, qty: item.qty, amount: 0, unit: parsed?.unit, checked: true, indices: [], sourceLabels: [] };
+      row = { key, name: item.name, qty: item.qty, amount: 0, unit: parsed?.unit, checked: true, indices: [], sourceLabels: [], recipeNames: [] };
       rows.set(key, row);
     }
     row.indices.push(index);
     row.checked = row.checked && Boolean(item.checked);
     if (item.sourceLabel && !row.sourceLabels.includes(item.sourceLabel)) row.sourceLabels.push(item.sourceLabel);
+    const recipeName = recipeDisplayName(item.recipeName);
+    if (recipeName && !row.recipeNames.includes(recipeName)) row.recipeNames.push(recipeName);
     if (parsed) { row.amount += parsed.number; row.qty = `${Number(row.amount.toFixed(3))} ${parsed.unit}`; }
   });
   return [...rows.values()];
+}
+
+// Keep original indices so checking/removing a recipe line never affects another meal.
+export function groceryRecipeGroups(items, recipes = []) {
+  const groups = new Map();
+  items.forEach((item, index) => {
+    const key = item.sourceKey || `${item.mealId || 'saved'}:${item.sourceLabel || ''}`;
+    if (!groups.has(key)) groups.set(key, { key, name: recipeDisplayName(item.recipeName || recipes.find(recipe => recipe.id === item.mealId)?.name || 'Saved recipe'), label: item.sourceLabel || 'Saved grocery items', items: [] });
+    groups.get(key).items.push({ ...item, indices: [index], key: `${key}:${index}` });
+  });
+  return [...groups.values()];
+}
+
+export function groceryText(items, recipes = []) {
+  return groceryRecipeGroups(items, recipes).map(group =>
+    `For: ${group.name}\n${group.items.map(item => `[${item.checked ? 'x' : ' '}] ${item.name} (${item.qty})`).join('\n')}`
+  ).join('\n\n');
 }

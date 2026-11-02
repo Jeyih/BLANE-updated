@@ -110,7 +110,7 @@ function IngredientPriceCatalogue() {
   }
   return React.createElement(
     'details',
-    { className: 'price-catalog' },
+    { className: 'price-catalog price-coverage-catalog' },
     React.createElement('summary', null, 'All ingredient prices and coverage'),
     !foods.length
       ? React.createElement(
@@ -244,7 +244,7 @@ function IngredientPriceCatalogue() {
                     React.createElement(
                       'td',
                       null,
-                      food.food_name,
+                      React.createElement('span', { className: 'price-two-line', title: food.food_name }, food.food_name),
                       React.createElement(
                         'div',
                         { className: 'price-estimate-note' },
@@ -326,6 +326,7 @@ function IngredientPriceCatalogue() {
                               'a',
                               {
                                 href: food.quote.records[0].sourceUrl,
+                                title: food.quote.records[0].source,
                                 target: '_blank',
                                 rel: 'noreferrer',
                               },

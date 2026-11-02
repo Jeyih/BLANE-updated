@@ -1,3 +1,4 @@
+import { singleDishRecipeRows, singleDishIngredientRows, singleDishStepRows } from '../lib/single-dish-catalogue.js';
 import React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
@@ -8,9 +9,10 @@ import { marketIngredientPriceText, loadAllPriceRows, formatEstimatedPrice, pric
 import { adminRecipePrices } from '../lib/admin-recipe-prices.js';
 import { sortFoodData } from '../lib/admin-food-data.js';
 import { isAdmin } from '../lib/admin-auth';
+import { healthGoalDescription } from '../lib/health-goals.js';
+import { seasonalCleanupPlan, deleteSeasonalRows } from '../lib/seasonal-cleanup.js';
 import { loadConstraintDefinitions } from '../lib/constraints';
 import PriceSourceStatus from '../components/PriceSourceStatus';
-import RecipeCostEvidence from '../components/RecipeCostEvidence';
 import '../styles/admin.css';
 import '../styles/nav.css';
 const MARKET_TYPES = [
@@ -161,6 +163,9 @@ function Admin() {
   });
   const [seasonRecords, setSeasonRecords] = useState([]);
   const [seasonSearch, setSeasonSearch] = useState('');
+  const [seasonCleanup, setSeasonCleanup] = useState(null);
+  const [seasonCleanupBusy, setSeasonCleanupBusy] = useState(false);
+  const [seasonCleanupBackedUp, setSeasonCleanupBackedUp] = useState(false);
   const [seasonModalOpen, setSeasonModalOpen] = useState(false);
   const [seasonModalMode, setSeasonModalMode] = useState('add');
   const [seasonForm, setSeasonForm] = useState({
@@ -381,7 +386,7 @@ function Admin() {
       showToast('Error loading recipes: ' + error.message, true);
       return;
     }
-    setRecipes(data || []);
+    setRecipes(singleDishRecipeRows(data));
   }
   async function loadFnri() {
     try {
@@ -427,7 +432,8 @@ function Admin() {
     } catch (syncErr) {
       console.warn('Goal option sync warning:', syncErr);
     }
-    const merged = [...optionRows.filter((row) => row.group !== 'goals'), ...goalRows];
+    const merged = [...optionRows.filter((row) => row.group !== 'goals'),
+      ...goalRows.map(row => ({ ...row, description: healthGoalDescription(row) }))];
     setOptionLists(merged);
   }
   async function loadConstraintDefs() {
@@ -730,6 +736,43 @@ function Admin() {
     showToast('\u2713 Seasonal ingredient deleted');
     await loadSeasonRecords();
   }
+  async function reviewSeasonCleanup() {
+    setSeasonCleanupBusy(true);
+    setSeasonCleanupBackedUp(false);
+    try {
+      const rows = await loadAllPriceRows(supabase, 'ingredient_seasons', '*', 'id');
+      const ingredients = await loadAllPriceRows(supabase, 'recipe_ingredients', '*', 'id');
+      const recipeIds = new Set(recipes.map(recipe => recipe.id));
+      const plan = seasonalCleanupPlan(rows,
+        singleDishIngredientRows(ingredients).filter(item => recipeIds.has(item.recipe_id)), priceRecords, referenceData || {});
+      if (!plan.keep.length) throw new Error('No priced recipe ingredients matched. Check the loaded data before deleting anything.');
+      setSeasonCleanup({ ...plan, snapshot: rows });
+    } catch (error) { showToast(error.message, true); }
+    finally { setSeasonCleanupBusy(false); }
+  }
+  function backUpSeasonCleanup() {
+    if (!seasonCleanup) return;
+    const backup = { exportedAt: new Date().toISOString(), table: 'ingredient_seasons', records: seasonCleanup.snapshot,
+      keepIds: seasonCleanup.keep.map(row => row.id), deleteIds: seasonCleanup.remove.map(row => row.id) };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'BLANE-seasonal-ingredients-before-cleanup.json';
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setSeasonCleanupBackedUp(true);
+  }
+  async function confirmSeasonCleanup() {
+    if (!seasonCleanup || !seasonCleanupBackedUp || seasonCleanupBusy) return;
+    if (!window.confirm(`Permanently delete ${seasonCleanup.remove.length} seasonal ingredient records and keep ${seasonCleanup.keep.length}? Recipes will not be changed.`)) return;
+    setSeasonCleanupBusy(true);
+    try {
+      const count = await deleteSeasonalRows(supabase, seasonCleanup.remove.map(row => row.id));
+      showToast(`Removed ${count} seasonal records. Recipes were not changed.`);
+      setSeasonCleanup(null);
+    } catch (error) { showToast(error.message, true); setSeasonCleanup(null); }
+    finally { await loadSeasonRecords(); setSeasonCleanupBusy(false); }
+  }
   function openMarketModal(id) {
     const market = markets.find((item) => item.id === id);
     if (!market) {
@@ -890,7 +933,7 @@ function Admin() {
       return;
     }
     setRecipeIngredients(
-      (ingRes.data || []).map((item) => ({
+      singleDishIngredientRows(ingRes.data).map((item) => ({
         id: item.id,
         fct_id: item.fct_id || '',
         name: item.name,
@@ -900,7 +943,7 @@ function Admin() {
       })),
     );
     setRecipeSteps(
-      (stepRes.data || []).map((item) => ({
+      singleDishStepRows(stepRes.data).map((item) => ({
         id: item.id,
         title: item.title,
         description: item.description,
@@ -908,7 +951,7 @@ function Admin() {
       })),
     );
     const linkedFctIds = [
-      ...new Set((ingRes.data || []).map((item) => item.fct_id).filter(Boolean)),
+      ...new Set(singleDishIngredientRows(ingRes.data).map((item) => item.fct_id).filter(Boolean)),
     ];
     if (linkedFctIds.length > 0) {
       const { data: nutrientRows, error: nutrientError } = await supabase
@@ -1323,7 +1366,6 @@ function Admin() {
           'div',
           { className: activeTab === 'markets' ? 'ad-tab-panel active' : 'ad-tab-panel' },
           React.createElement(PriceSourceStatus, { showCatalog: true }),
-          React.createElement(RecipeCostEvidence, null),
           React.createElement(
             'div',
             { className: 'ad-toolbar' },
@@ -2155,6 +2197,16 @@ function Admin() {
         React.createElement(
           'div',
           { className: activeTab === 'seasons' ? 'ad-tab-panel active' : 'ad-tab-panel' },
+          React.createElement('button', { className: 'ad-btn ad-btn-outline', type: 'button', disabled: pricesLoading || seasonCleanupBusy || !recipes.length, onClick: reviewSeasonCleanup }, seasonCleanupBusy ? 'Checking seasonal records...' : 'Review unused seasonal records'),
+          seasonCleanup && React.createElement('section', { className: 'ad-season-cleanup', 'aria-label': 'Seasonal ingredient cleanup review' },
+            React.createElement('h3', null, 'Seasonal ingredient cleanup'),
+            React.createElement('p', { role: 'status' }, `Keep ${seasonCleanup.keep.length} priced ingredients used in recipes. Delete ${seasonCleanup.remove.length} other seasonal records. Recipes remain unchanged.`),
+            React.createElement('details', null, React.createElement('summary', null, 'Ingredients to keep'), React.createElement('p', null, seasonCleanup.keep.map(row => row.ingredient_name).join('; '))),
+            React.createElement('details', null, React.createElement('summary', null, 'Records to delete'), React.createElement('ul', null, seasonCleanup.remove.map(row => React.createElement('li', { key: row.id }, `${row.ingredient_name} — ${row.cleanupReason}`)))),
+            React.createElement('div', { className: 'ad-toolbar' },
+              React.createElement('button', { className: 'ad-btn ad-btn-outline', type: 'button', onClick: backUpSeasonCleanup, disabled: seasonCleanupBusy }, 'Download seasonal backup'),
+              React.createElement('button', { className: 'ad-btn ad-btn-danger', type: 'button', onClick: confirmSeasonCleanup, disabled: !seasonCleanupBackedUp || seasonCleanupBusy || !seasonCleanup.remove.length }, `Delete ${seasonCleanup.remove.length} seasonal records`),
+              React.createElement('button', { className: 'ad-btn ad-btn-outline', type: 'button', onClick: () => setSeasonCleanup(null), disabled: seasonCleanupBusy }, 'Cancel cleanup'))),
           React.createElement(
             'div',
             { className: 'ad-toolbar' },

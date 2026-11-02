@@ -1,5 +1,5 @@
 .drift-section {
-  background: #0d1a12;
+  background: #142c1f;
   border: 1px solid rgba(45, 220, 122, 0.12);
   border-radius: 20px;
   padding: 24px;
@@ -64,18 +64,18 @@
 }
 
 .drift-sub {
-  font-size: 12px;
-  color: #4d6e5a;
+  font-size: 13px;
+  color: #c0d8c9;
   margin-top: 1px;
 }
 
 .drift-range-badge {
-  font-size: 11px;
+  font-size: 12px;
   background: #111f16;
   border: 1px solid rgba(45, 220, 122, 0.15);
   border-radius: 100px;
   padding: 3px 12px;
-  color: #4d6e5a;
+  color: #c0d8c9;
 }
 
 .drift-score-row {
@@ -125,7 +125,7 @@
 
 .drift-score-label-sm {
   font-size: 9px;
-  color: #4d6e5a;
+  color: #c0d8c9;
   margin-top: 2px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -151,7 +151,7 @@
 
 .drift-score-desc {
   font-size: 13px;
-  color: #8aab96;
+  color: #c9e0d2;
   line-height: 1.5;
 }
 
@@ -164,13 +164,13 @@
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  color: #4d6e5a;
+  color: #c0d8c9;
   margin-bottom: 5px;
 }
 
 .drift-score-bar-bg {
   height: 8px;
-  background: #0d1a12;
+  background: #142c1f;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -183,12 +183,12 @@
 
 .drift-cards-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
 .drift-card {
-  background: #060d0a;
+  background: #1c3929;
   border: 1px solid rgba(45, 220, 122, 0.1);
   border-radius: 14px;
   padding: 16px;
@@ -197,6 +197,9 @@
     transform 0.2s;
   position: relative;
   overflow: hidden;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .drift-card:hover {
@@ -233,6 +236,8 @@
   align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .drift-card-icon-label {
@@ -246,18 +251,18 @@
 }
 
 .drift-card-name {
-  font-size: 12px;
-  color: #8aab96;
+  font-size: 13px;
+  color: #c9e0d2;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.2px;
 }
 
 .drift-trend-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 100px;
@@ -316,23 +321,30 @@
 
 .drift-card-value-unit {
   font-size: 13px;
-  color: #4d6e5a;
+  color: #c0d8c9;
   font-family: 'DM Sans', sans-serif;
   font-weight: 400;
 }
 
 .drift-card-context {
-  font-size: 12px;
-  color: #4d6e5a;
+  font-size: 13px;
+  color: #c0d8c9;
   margin-bottom: 12px;
-  line-height: 1.4;
+  line-height: 1.6;
+  text-align: left;
+  overflow-wrap: anywhere;
 }
 
 .drift-chart-wrap {
-  height: 40px;
+  height: 64px;
   position: relative;
   margin-bottom: 10px;
+  margin-top: auto;
 }
+
+.drift-chart-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.drift-chart-dot { display: block; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.drift-chart-message { color: #c0d8c9; font-size: 12px; line-height: 1.5; text-align: center; max-width: 100%; overflow-wrap: anywhere; }
 
 .drift-mini-svg {
   width: 100%;
@@ -342,11 +354,12 @@
 }
 
 .drift-risk-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   padding: 4px 10px;
   border-radius: 100px;
   display: inline-block;
+  align-self: flex-start;
 }
 
 .drift-risk-label.good {
@@ -369,14 +382,14 @@
 
 .drift-risk-label.neutral {
   background: rgba(77, 110, 90, 0.15);
-  color: #4d6e5a;
+  color: #c0d8c9;
   border: 1px solid rgba(77, 110, 90, 0.25);
 }
 
 .drift-no-data {
   text-align: center;
   padding: 32px 20px;
-  color: #4d6e5a;
+  color: #c0d8c9;
 }
 
 .drift-no-data-icon {
@@ -448,4 +461,8 @@
     flex-wrap: wrap;
     gap: 12px;
   }
+}
+
+@media (max-width: 440px) {
+  .drift-cards-grid { grid-template-columns: 1fr; gap: 12px; }
 }

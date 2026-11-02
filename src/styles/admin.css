@@ -1083,3 +1083,6 @@
 .ad-food-pagination[hidden] { display: none; }
 .ad-food-pagination button { background: #123321; border: 1px solid #356348; color: #e2f5e9; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
 .ad-food-pagination button:disabled { opacity: .45; cursor: default; }
+.ad-season-cleanup { padding: 16px; margin: 16px 0; border: 1px solid rgba(45,220,122,.25); border-radius: 12px; background: #142c1f; color: #d4e7dc; }
+.ad-season-cleanup details { margin: 12px 0; line-height: 1.6; }
+.ad-season-cleanup details ul { max-height: 220px; overflow-y: auto; }

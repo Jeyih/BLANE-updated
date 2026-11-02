@@ -1,13 +1,16 @@
+import GroceryItems from '../components/GroceryItems';
+import { singleDishRecipeRows, singleDishIngredientRows } from '../lib/single-dish-catalogue.js';
 import { COMPLETED_MEALS_KEY, getMealCompletionKey, readCompletionRecords, migrateWeekCompletions } from '../lib/meal-completion.js';
 import { philippineClock, weekStartKey, slotOptimizationKey } from '../lib/meal-calendar.js';
 import { WEEK_PLANS_KEY, SLOT_OPTIMIZATIONS_KEY, normalizeWeek, newSlotId, readWeekPlan, writeWeekPlan, readSlotOptimizations } from '../lib/week-plans.js';
-import { replaceGrocerySources, groceryRows, groceryCost } from '../lib/meal-groceries.js';
+import { replaceGrocerySources, groceryRows, groceryCost, groceryText } from '../lib/meal-groceries.js';
 import useMealClock from '../hooks/useMealClock';
 import { assessPlanDay } from '../lib/plan-assessment.js';
+import { assignBudgetRecipe } from '../lib/budget-meal-selection.js';
+import { createRecipeOrder, groupMealChoices, mealChoicePriceText } from '../lib/meal-choice-groups.js';
 import { generateMealPlan, emptyMealPlan } from '../lib/plan-generation.js';
 import { appliedMeal } from '../lib/portions.js';
 import { localMealStorage as localStorage, sessionMealStorage as sessionStorage, readStoredJson } from '../lib/account-storage.js';
-import { nutritionProfile } from '../../supabase/functions/_shared/nutrition.js';
 import React from 'react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -35,9 +38,10 @@ import {
   formatEstimatedPrice,
   pricingLabel,
 } from '../lib/pricing';
-import { isBudgetPriced, isAffordableMeal, mealBudget, cheapestPlannedDay, recipePriceGaps } from '../lib/meal-budget';
-import { mealSuggestionService, selectRecipeFallback } from '../lib/meal-suggestions';
+import { isBudgetPriced, isAffordableMeal, isReviewEstimate, mealBudget, cheapestPlannedDay, recipePriceGaps } from '../lib/meal-budget';
+import { selectCatalogueRecipe } from '../lib/meal-suggestions';
 import PriceEstimateNotice from '../components/PriceEstimateNotice';
+import ClinicalReviewNotice from '../components/ClinicalReviewNotice';
 import { useIngredientPrices } from '../context/PriceContext';
 import { ViolationBadge, ViolationDetail } from '../components/ConstraintWarnings';
 import '../styles/mealplan.css';
@@ -106,7 +110,9 @@ function MealPlan() {
     setCompletedMeals(previous => migrateWeekCompletions(previous, selectedWeek, daySlots));
   }, [selectedWeek, daySlots]);
   const [groceryList, setGroceryList] = useState(() => readStoredJson(sessionStorage, sessionStorage.getItem('blane_grocery_v2') !== null ? 'blane_grocery_v2' : 'blane_grocery', []));
-  const groupedGroceryList = useMemo(() => groceryRows(groceryList), [groceryList]);
+  const groupedGroceryList = useMemo(() => groceryRows(groceryList.map(item => ({ ...item,
+    recipeName: item.recipeName || recipes.find(recipe => recipe.id === item.mealId)?.name,
+  }))), [groceryList, recipes]);
   const groceryPricing = useMemo(() => groceryCost(groceryList, priceRecords, referenceData || {}), [groceryList, priceRecords, referenceData]);
   const [openOptimizerId, setOpenOptimizerId] = useState(null);
   const [appliedOptimizations, setAppliedOptimizations] = useState(() => readSlotOptimizations(sessionStorage, weekStartKey(), readWeekPlan(localStorage) || {}));
@@ -128,6 +134,8 @@ function MealPlan() {
   const [swapTarget, setSwapTarget] = useState(null);
   const [swapChoice, setSwapChoice] = useState(null);
   const [swapSearch, setSwapSearch] = useState('');
+  const swapSearchInput = useRef(null);
+  const [swapOrder, setSwapOrder] = useState({});
   const [completionTarget, setCompletionTarget] = useState(null);
   useEffect(() => {
     if (!user?.id) return;
@@ -191,7 +199,7 @@ function MealPlan() {
       }
     }
     const ingByRecipe = {};
-    (ingData || []).forEach((ing) => {
+    singleDishIngredientRows(ingData).forEach((ing) => {
       if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
       const quantity = ing.quantity ?? '';
       ingByRecipe[ing.recipe_id].push({
@@ -212,7 +220,7 @@ function MealPlan() {
         status: ing.status || 'avail',
       });
     });
-    const formatted = (recipesData || []).map((r) => {
+    const formatted = singleDishRecipeRows(recipesData).map((r) => {
       const servings = Number(r.servings) || 1;
       const recipeIngredients = (ingByRecipe[r.id] || []).map((ing) => {
         const nutrient = nutrientByFctId[ing.fct_id];
@@ -390,7 +398,8 @@ function MealPlan() {
     setSelectedRecipeForAdd('');
   }
   function openSwap(mealOrSlot, slotIdx) {
-    setSwapTarget({ meal: mealOrSlot, slotIdx });
+    setSwapTarget({ meal: mealOrSlot, slotIdx, type: slots[slotIdx]?.type || mealOrSlot.type || 'Meal' });
+    setSwapOrder(createRecipeOrder(eligibleRecipes));
     setSwapChoice(null);
     setSwapSearch('');
   }
@@ -418,6 +427,15 @@ function MealPlan() {
       return next;
     });
     setCompletionTarget(null);
+  }
+  function useBudgetRecipe(recipeId) {
+    const recipe = getMeal(recipeId);
+    if (!recipe || !canSelectRecipe(recipe, profile, constraintDefinitions, constraintsReady)) {
+      throw new Error('This recipe conflicts with your profile or cannot be fully checked.');
+    }
+    const result = assignBudgetRecipe(slots, recipe, newSlotId);
+    if (result.changed) setDaySlots(previous => ({ ...previous, [selectedDayIndex]: result.slots }));
+    return `${recipe.name} ${result.changed ? 'added to' : 'is already in'} ${selectedDate.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })} ${recipe.type.toLowerCase()}.`;
   }
   function grocerySource(slot) {
     const meal = getDisplayedMeal(slot.mealId, slot);
@@ -460,6 +478,10 @@ function MealPlan() {
       recipe.type,
       ...(recipe.ingredients || []).map((ingredient) => ingredient.name),
     ].some((value) => value?.toLowerCase().includes(query));
+  });
+  const swapMealBudget = mealBudget(planBudget, slots);
+  const swapGroups = groupMealChoices(filteredSwapRecipes, {
+    mealType: swapTarget?.type || 'Meal', budget: swapMealBudget, order: swapOrder,
   });
   if (profileLoading || profileError) {
     return React.createElement(React.Fragment, null,
@@ -721,7 +743,8 @@ function MealPlan() {
               ),
               'Add meal slot',
             ),
-            React.createElement(PriceOptimizerPanel, { meals: eligibleRecipes, profile, slots, onBudgetChange: setPlanBudget }),
+            React.createElement(PriceOptimizerPanel, { meals: eligibleRecipes, profile, slots, onBudgetChange: setPlanBudget,
+              onUseExistingRecipe: useBudgetRecipe, selectionKey: `${selectedWeek}:${selectedDayIndex}` }),
           ),
           React.createElement(
             'div',
@@ -764,35 +787,7 @@ function MealPlan() {
                 "+ Add all today's meals to list",
               ),
             ),
-            React.createElement(
-              'div',
-              { className: 'grocery-list' },
-              groceryList.length === 0
-                ? React.createElement(
-                    'div',
-                    { className: 'grocery-empty' },
-                    React.createElement('span', { className: 'grocery-empty-icon' }, '\u{1F6D2}'),
-                    'No items yet. Add meals to build your list.',
-                  )
-                : groupedGroceryList.map((item, i) =>
-                    React.createElement(
-                      'div',
-                      { key: item.key, className: 'grocery-item' + (item.checked ? ' checked' : '') },
-                      React.createElement(
-                        'div',
-                        { className: 'grocery-checkbox', onClick: () => toggleGroceryChecked(item) },
-                        item.checked ? '\u2713' : '',
-                      ),
-                      React.createElement('span', { className: 'grocery-item-name', title: item.sourceLabels.join(' · ') }, item.name, item.sourceLabels.length > 1 && React.createElement('small', { style: { display: 'block', fontSize: 10, opacity: 0.7 } }, item.sourceLabels.length + ' meals')),
-                      React.createElement('span', { className: 'grocery-item-qty' }, item.qty),
-                      React.createElement(
-                        'button',
-                        { className: 'grocery-remove-btn', onClick: () => removeGroceryItem(item.indices) },
-                        '\u2715',
-                      ),
-                    ),
-                  ),
-            ),
+            React.createElement(GroceryItems, { items: groceryList, rows: groupedGroceryList, recipes, onToggle: toggleGroceryChecked, onRemove: removeGroceryItem }),
             React.createElement(
               'div',
               { className: 'grocery-cost-total' },
@@ -817,9 +812,7 @@ function MealPlan() {
                     alert('Grocery list is empty.');
                     return;
                   }
-                  const text = groupedGroceryList
-                    .map((g) => `[${g.checked ? 'x' : ' '}] ${g.name} (${g.qty})`)
-                    .join('\n');
+                  const text = groceryText(groceryList, recipes);
                   const blob = new Blob(
                     [
                       `BLANE GROCERY LIST
@@ -958,7 +951,7 @@ ${text}`,
           { className: 'swap-modal', style: { maxWidth: 520 } },
           React.createElement(
             'button',
-            { className: 'swap-close', onClick: () => setSwapTarget(null) },
+            { className: 'swap-close', type: 'button', 'aria-label': 'Close recipe picker', onClick: () => setSwapTarget(null) },
             '\u2715',
           ),
           React.createElement('div', { className: 'swap-modal-label' }, 'Choose Recipe'),
@@ -969,6 +962,7 @@ ${text}`,
               ? `Swapping: ${swapTarget.meal.name}`
               : `Select recipe for ${swapTarget.meal?.type || 'slot'}`,
           ),
+          React.createElement('p', { className: 'swap-picker-context' }, `${swapTarget.type} · ${selectedDate.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}. Matching meals appear first; other meal types are alternatives. Dietary checks apply to every option.`),
           React.createElement(
             'div',
             { className: 'swap-search-wrap' },
@@ -978,6 +972,7 @@ ${text}`,
               '\u{1F50D}',
             ),
             React.createElement('input', {
+              ref: swapSearchInput,
               className: 'swap-search-input',
               type: 'search',
               'aria-label': 'Search recipes',
@@ -985,12 +980,19 @@ ${text}`,
               value: swapSearch,
               onChange: (event) => setSwapSearch(event.target.value),
             }),
+            swapSearch && React.createElement('button', {
+              className: 'swap-search-clear', type: 'button', 'aria-label': 'Clear recipe search',
+              onClick: () => { setSwapSearch(''); swapSearchInput.current?.focus(); },
+            }, React.createElement('svg', { viewBox: '0 0 24 24', width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 2, 'aria-hidden': 'true' },
+              React.createElement('path', { d: 'M6 6l12 12M18 6L6 18' }))),
           ),
           React.createElement(
             'div',
             { className: 'swap-options', style: { maxHeight: 360, overflowY: 'auto' } },
             filteredSwapRecipes.length > 0
-              ? filteredSwapRecipes.map((alt) =>
+              ? swapGroups.map(group => React.createElement('section', { key: group.key, className: 'swap-recipe-group', 'aria-label': group.title },
+                  React.createElement('h3', { className: 'swap-group-heading' }, group.title, ` (${group.recipes.length})`),
+                  group.recipes.length ? group.recipes.map((alt) =>
                   React.createElement(
                     'div',
                     {
@@ -1041,6 +1043,7 @@ ${text}`,
                           alt.protein,
                           'g protein \xA0\xB7\xA0 ',
                           alt.prep,
+                          React.createElement('div', { className: 'swap-price-fit' }, mealChoicePriceText(alt, swapMealBudget).detail),
                         ),
                       ),
                       React.createElement(
@@ -1049,11 +1052,11 @@ ${text}`,
                           className: 'swap-option-cost',
                           style: { color: '#fbbf24', fontWeight: 600 },
                         },
-                        formatEstimatedPrice(alt.cost),
+                        mealChoicePriceText(alt, swapMealBudget).amount,
                       ),
                     ),
                   ),
-                )
+                ) : React.createElement('p', { className: 'swap-empty-state' }, `No matching ${swapTarget.type.toLowerCase()} recipes. Review the alternatives below or change your search.`)))
               : React.createElement(
                   'p',
                   { className: 'swap-empty-state', role: 'status' },
@@ -1145,10 +1148,15 @@ ${text}`,
       ),
   );
 }
-function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }) {
+function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange, onUseExistingRecipe, selectionKey }) {
   const { records: priceRecords, referenceData } = useIngredientPrices();
-  const [dailyBudget, setDailyBudget] = useState(200);
+  const [includeEstimates, setIncludeEstimates] = useState(false);
+  const priceFitsMode = meal => includeEstimates ? isReviewEstimate(meal) : isBudgetPriced(meal);
+  const affordableForMode = (meal, budget) => Number.isFinite(budget) && budget >= 0 && priceFitsMode(meal) && meal.cost <= budget;
+  const [dailyBudget, setDailyBudget] = useState('200');
+  const [budgetError, setBudgetError] = useState('');
   const [appliedBudget, setAppliedBudget] = useState(200);
+  const budgetPending = !dailyBudget.trim() || !Number.isFinite(Number(dailyBudget)) || Number(dailyBudget) !== appliedBudget;
   const [sortMode, setSortMode] = useState('cost');
   const [filterOver, setFilterOver] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
@@ -1158,6 +1166,9 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
   const [suggestionError, setSuggestionError] = useState('');
   const [suggestionNotice, setSuggestionNotice] = useState('');
   const suggestionRequest = useRef(0);
+  const previousSuggestions = useRef(new Map());
+  const useExistingRecipeRef = useRef(onUseExistingRecipe);
+  useExistingRecipeRef.current = onUseExistingRecipe;
   useEffect(() => {
     suggestionRequest.current += 1;
     setSuggestion(null);
@@ -1167,7 +1178,7 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
     return () => {
       suggestionRequest.current += 1;
     };
-  }, [profile, appliedBudget, suggestionType, slots.length]);
+  }, [profile, appliedBudget, suggestionType, slots.length, includeEstimates, selectionKey]);
   const liveSuggestion = useMemo(
     () =>
       suggestion
@@ -1176,31 +1187,40 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
     [suggestion, priceRecords, referenceData],
   );
   const perMeal = mealBudget(appliedBudget, slots);
-  const cheapestResult = cheapestPlannedDay(meals, slots);
+  const cheapestResult = cheapestPlannedDay(meals, slots, { includeEstimates });
   useEffect(() => { onBudgetChange?.(appliedBudget); }, [appliedBudget, onBudgetChange]);
   const sortedMeals = useMemo(() => {
     const list = [...meals];
     if (sortMode === 'cost') {
       return list.sort(
-        (a, b) => (isBudgetPriced(a) ? a.cost : Infinity) - (isBudgetPriced(b) ? b.cost : Infinity),
+        (a, b) => (priceFitsMode(a) ? a.cost : Infinity) - (priceFitsMode(b) ? b.cost : Infinity),
       );
     }
     return list.sort(
       (a, b) =>
-        (isBudgetPriced(b) && b.cost > 0 ? b.kcal / b.cost : 0) -
-        (isBudgetPriced(a) && a.cost > 0 ? a.kcal / a.cost : 0),
+        (priceFitsMode(b) && b.cost > 0 ? b.kcal / b.cost : 0) -
+        (priceFitsMode(a) && a.cost > 0 ? a.kcal / a.cost : 0),
     );
-  }, [sortMode, meals]);
+  }, [sortMode, meals, includeEstimates]);
   const visibleMeals = filterOver
-    ? sortedMeals.filter((meal) => isAffordableMeal(meal, perMeal))
+    ? sortedMeals.filter((meal) => affordableForMode(meal, perMeal))
     : sortedMeals;
-  const affordableCount = sortedMeals.filter((meal) => isAffordableMeal(meal, perMeal)).length;
-  const unverifiedCount = sortedMeals.filter((meal) => !isBudgetPriced(meal)).length;
+  const mealGroups = [...new Set(['Breakfast', 'Lunch', 'Dinner', 'Snack', ...sortedMeals.map(meal => meal.type || 'Other')])]
+    .map(type => ({ type, meals: visibleMeals.filter(meal => (meal.type || 'Other') === type) }));
+  const affordableCount = sortedMeals.filter((meal) => affordableForMode(meal, perMeal)).length;
+  const alternativeTypes = [...new Set(sortedMeals.filter(meal => affordableForMode(meal, perMeal)).map(meal => meal.type))]
+    .filter(type => ['Breakfast', 'Lunch', 'Dinner', 'Snack'].includes(type));
+  const hasExistingType = sortedMeals.some(meal => meal.type === suggestionType && affordableForMode(meal, perMeal));
+  const unverifiedCount = sortedMeals.filter((meal) => !priceFitsMode(meal)).length;
   const cheapestDay = cheapestResult.cost;
-  async function suggestMeal() {
+  const dayCostDisplay = cheapestDay ?? cheapestResult.subtotal;
+  const incompleteDay = cheapestDay === null;
+  async function suggestMeal({ applyToPlan = false } = {}) {
+    if (budgetPending) { setSuggestionError('Click Apply Budget before suggesting a meal.'); return; }
     if (perMeal === null) { setSuggestionError('Add a meal slot before requesting a budgeted suggestion.'); return; }
     if (!isProfileComplete(profile)) { setSuggestionError('Complete your profile to receive personalized meal suggestions.'); return; }
     const requestId = ++suggestionRequest.current;
+    const recipeToApply = applyToPlan ? suggestion : null;
     setSuggestion(null);
     setSuggestionLoading(true);
     setSuggestionError('');
@@ -1216,91 +1236,48 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
           'Your dietary preferences could not be fully checked. Please check your health profile before requesting a suggestion.',
         );
       }
-      const active = getActiveConstraints(profile, definitions);
       const isAllowed = (meal) =>
         canSelectRecipe(meal, profile, definitions);
       const priceMeal = (meal) =>
         applyDynamicRecipePrices([meal], priceRecords, referenceData || {})[0];
       const validate = (meal) =>
         meal.type === suggestionType &&
-        isAffordableMeal(priceMeal(meal), perMeal) &&
+        affordableForMode(priceMeal(meal), perMeal) &&
         isAllowed(meal);
-      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL.replace('.supabase.co', '.functions.supabase.co')}/optimize-meal`;
-      const result = await mealSuggestionService.get({
-        key: JSON.stringify({
-          user: session.user.id,
-          profile,
-          budget: perMeal,
-          mealType: suggestionType,
-          definitions,
-        }),
-        validate,
-        request: async () => {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 12e3);
-          try {
-            const response = await fetch(functionUrl, {
-              method: 'POST',
-              signal: controller.signal,
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${session.access_token}`,
-              },
-              body: JSON.stringify({
-                mode: 'suggest',
-                profile: nutritionProfile(profile),
-                budget: perMeal,
-                mealType: suggestionType,
-              }),
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-              const error = new Error(payload.error || 'AI temporarily unavailable.');
-              error.status = response.status;
-              throw error;
-            }
-            return {
-              ...payload,
-              type: suggestionType,
-              servings: 1,
-              ingredients: (payload.ingredients || []).map((ing) => ({
-                ...ing,
-                quantity: ing.quantity,
-              })),
-            };
-          } finally {
-            clearTimeout(timeout);
-          }
-        },
-        fallback: () => {
-          const meal = selectRecipeFallback(
-            applyDynamicRecipePrices(meals, priceRecords, referenceData || {}),
-            {
-            mealType: suggestionType,
-            budget: perMeal,
-            isAllowed,
-            },
-          );
-          return (
-            meal && {
-              ...meal,
-              mealType: suggestionType,
-              source: 'Existing recipe \xB7 fallback',
-              reason:
-                'Selected from your existing recipes using current sourced prices and your dietary preferences. No AI generation was used.',
-            }
-          );
-        },
-      });
+      const historyKey = `${session.user.id}:${suggestionType}`;
+      const currentRecipe = meals.find(meal => slots.some(slot => slot.type === suggestionType && slot.mealId === meal.id));
+      const previousName = previousSuggestions.current.get(historyKey) || currentRecipe?.name;
+      const isRepeat = meal => Boolean(previousName) && meal.name?.trim().toLowerCase() === previousName.trim().toLowerCase();
+      const selected = recipeToApply ? priceMeal(recipeToApply) : selectCatalogueRecipe(
+        applyDynamicRecipePrices(meals, priceRecords, referenceData || {}),
+        { mealType: suggestionType, includeEstimates, budget: perMeal, isAllowed, previousName },
+      );
+      if (!selected || !validate(selected)) {
+        throw new Error('No catalogue recipe matches this meal type, budget and dietary checks. Try another meal type or review the price details.');
+      }
+      const result = { meal: {
+        ...selected,
+        mealType: suggestionType,
+        source: 'Recipe catalogue',
+        reason: 'Selected from the recipe catalogue using your dietary preferences and budget. Review ingredient quantities and price details before shopping.',
+      } };
       if (requestId !== suggestionRequest.current) return;
       const priced = priceMeal(result.meal);
+      if (applyToPlan) {
+        if (!validate(priced)) throw new Error('The recipe no longer meets the current budget or dietary checks.');
+        if (!useExistingRecipeRef.current) throw new Error('Meal selection is unavailable. Please reload the meal plan.');
+        const confirmation = useExistingRecipeRef.current(priced.id);
+        previousSuggestions.current.set(historyKey, priced.name);
+        setSuggestion({ ...result.meal, ...priced });
+        setSuggestionNotice(confirmation + ' Review your updated meal plan above.');
+        return;
+      }
+      previousSuggestions.current.set(historyKey, priced.name);
       setSuggestion({ ...result.meal, ...priced });
       setSuggestionNotice(
-        result.delivery === 'cached'
-          ? 'Reused a recent suggestion; ingredient prices have been checked again.'
-          : result.delivery === 'fallback'
-            ? 'AI is temporarily unavailable or could not provide a suitable meal. Showing an existing recipe instead.'
-            : 'AI suggestion checked against current ingredient prices and dietary rules.',
+        isRepeat(priced)
+          ? 'Only one matching recipe is currently available for this meal type and budget.'
+          : 'Recipe selected from the catalogue to match your dietary preferences and budget.',
       );
     } catch (error) {
       if (requestId === suggestionRequest.current) setSuggestionError(error.message);
@@ -1309,8 +1286,14 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
     }
   }
   function applyBudget() {
-    const nextBudget = Math.max(50, Math.min(2e3, Number(dailyBudget) || 200));
-    setDailyBudget(nextBudget);
+    const enteredBudget = Number(dailyBudget);
+    if (!dailyBudget.trim() || !Number.isFinite(enteredBudget) || enteredBudget < 150 || enteredBudget > 2000) {
+      setBudgetError('Enter a daily budget from ₱150 to ₱2,000.');
+      return;
+    }
+    const nextBudget = Math.round(enteredBudget * 100) / 100;
+    setDailyBudget(String(nextBudget));
+    setBudgetError('');
     setAppliedBudget(nextBudget);
     setFilterOver(true);
     setSuggestion(null);
@@ -1398,11 +1381,17 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
           'p',
           { className: 'price-estimate-note' },
           unverifiedCount,
-          ' meals have incomplete or unverified prices and are excluded from affordable results. View all meals to inspect their ingredient sources.',
+          ' meals are excluded by the current price checks. View all meals to inspect missing sources or quantities. Estimates needing review can be included separately below.',
         ),
     ),
+    React.createElement('label', { className: 'po-estimate-toggle' },
+      React.createElement('input', { type: 'checkbox', checked: includeEstimates, onChange: event => setIncludeEstimates(event.target.checked) }),
+      ' Include estimates needing review'),
+    includeEstimates && React.createElement('p', { className: 'price-estimate-note', role: 'status', style: { padding: '0 24px' } },
+      'Provisional planning only: raw/cooked, quantity and product-match assumptions may affect totals. Missing prices and partial-food subtotals remain excluded. These totals do not confirm that a meal is affordable.'),
+    React.createElement(ClinicalReviewNotice, { active: getActiveConstraints(profile) }),
     cheapestResult.missing.length > 0 && React.createElement('details', { className: 'plan-check' },
-      React.createElement('summary', null, 'Why is the full-day estimate unavailable?'),
+      React.createElement('summary', null, 'What is missing from the day estimate?'),
       React.createElement('ul', null, cheapestResult.missing.map(entry => React.createElement('li', { key: entry.index },
         `${entry.type}: `, entry.recipes.length ? 'Recipes need complete price and quantity evidence.' : 'No eligible recipe matches this slot.')))),
     React.createElement(
@@ -1415,11 +1404,23 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
         React.createElement('input', {
           className: 'po-budget-input',
           type: 'number',
+          'aria-label': 'Daily meal budget in pesos',
+          'aria-invalid': Boolean(budgetError),
+          'aria-describedby': budgetError ? 'po-budget-error' : budgetPending ? 'po-budget-pending' : undefined,
           value: dailyBudget,
-          min: 50,
+          min: 150,
           max: 2e3,
-          step: 10,
-          onChange: (event) => setDailyBudget(parseInt(event.target.value, 10) || 200),
+          step: 0.01,
+          onChange: (event) => {
+            suggestionRequest.current += 1;
+            setDailyBudget(event.target.value);
+            setBudgetError('');
+            setSuggestion(null);
+            setSuggestionNotice('');
+            setSuggestionError('');
+            setSuggestionLoading(false);
+          },
+          onKeyDown: (event) => { if (event.key === 'Enter') { event.preventDefault(); applyBudget(); } },
         }),
       ),
       React.createElement('span', { className: 'po-budget-label' }, 'Budget'),
@@ -1435,6 +1436,8 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
         'Apply Budget',
       ),
     ),
+    budgetError && React.createElement('p', { id: 'po-budget-error', role: 'alert', className: 'po-budget-error' }, budgetError),
+    budgetPending && React.createElement('p', { id: 'po-budget-pending', role: 'status', className: 'po-budget-pending' }, 'Click Apply Budget before suggesting a meal.'),
     React.createElement(
       'div',
       { className: 'po-ai-suggest-row' },
@@ -1444,12 +1447,12 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
         React.createElement(
           'div',
           { className: 'po-ai-suggest-title' },
-          'Suggest an affordable meal',
+          includeEstimates ? 'Suggest a meal using provisional estimates' : 'Suggest an affordable meal',
         ),
         React.createElement(
           'div',
           { className: 'po-ai-suggest-sub' },
-          'Recent suggestions are reused for 15 minutes. Existing recipes are used when AI is unavailable.',
+      'Suggestions vary within your dietary and budget checks. Use existing recipe adds a meal to the selected day. Suggest a meal shows an option to review.',
         ),
       ),
       React.createElement(
@@ -1465,9 +1468,17 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
         React.createElement('option', null, 'Snack'),
       ),
       isProfileComplete(profile)
-        ? React.createElement('button', { className: 'po-apply-btn', type: 'button', onClick: suggestMeal, disabled: suggestionLoading }, suggestionLoading ? 'Finding a meal...' : 'Suggest a meal')
+        ? React.createElement('button', { className: 'po-apply-btn', type: 'button', onClick: suggestMeal, disabled: suggestionLoading || budgetPending, 'aria-describedby': budgetPending ? 'po-budget-pending' : undefined }, suggestionLoading ? 'Finding a meal...' : 'Suggest a meal')
         : React.createElement(Link, { className: 'po-apply-btn', to: '/profile' }, 'Update profile for suggestions'),
+      isProfileComplete(profile) && React.createElement('button', { className: 'mp-btn mp-btn-outline', type: 'button', disabled: suggestionLoading || budgetPending, 'aria-describedby': budgetPending ? 'po-budget-pending' : undefined, onClick: () => suggestMeal({ applyToPlan: true }) }, 'Use existing recipe'),
     ),
+    !hasExistingType && React.createElement('div', { className: 'po-ai-suggest-error', role: 'status' },
+      `No existing ${suggestionType.toLowerCase()} recipe passes your dietary and current price checks. `,
+      alternativeTypes.length ? 'Available meal types: ' : 'Review the price gaps below; no eligible alternative is available yet.',
+      alternativeTypes.map(type => React.createElement('button', {
+        key: type, type: 'button', className: 'mp-btn mp-btn-outline',
+        onClick: () => setSuggestionType(type),
+      }, `Try ${type}`))),
     suggestionError &&
       React.createElement('div', { className: 'po-ai-suggest-error' }, suggestionError),
     suggestionNotice &&
@@ -1477,14 +1488,14 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
         suggestionNotice,
       ),
     liveSuggestion &&
-      !isAffordableMeal(liveSuggestion, perMeal) &&
+      !affordableForMode(liveSuggestion, perMeal) &&
       React.createElement(
         'div',
         { className: 'po-ai-suggest-error', role: 'status' },
         'The suggestion no longer has a complete sourced estimate within your current budget. Choose an affordable meal below or request another suggestion.',
       ),
     liveSuggestion &&
-      isAffordableMeal(liveSuggestion, perMeal) &&
+      affordableForMode(liveSuggestion, perMeal) &&
       React.createElement(
         'div',
         { className: 'po-ai-suggestion' },
@@ -1565,7 +1576,7 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
       React.createElement(
         'div',
         { className: 'po-summary-item' },
-        React.createElement('div', { className: 'po-summary-label' }, 'Affordable Meals'),
+        React.createElement('div', { className: 'po-summary-label' }, includeEstimates ? 'Meals within estimated budget' : 'Affordable Meals'),
         React.createElement(
           'div',
           { className: 'po-summary-value green' },
@@ -1578,14 +1589,16 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
       React.createElement(
         'div',
         { className: 'po-summary-item' },
-        React.createElement('div', { className: 'po-summary-label' }, 'Cheapest Planned Day'),
+        React.createElement('div', { className: 'po-summary-label' }, incompleteDay ? 'Priced slots subtotal' : includeEstimates ? 'Lowest provisional day estimate' : 'Cheapest Planned Day'),
         React.createElement(
           'div',
           {
-            className: `po-summary-value ${cheapestDay !== null && cheapestDay <= appliedBudget ? 'green' : 'red'}`,
+            className: `po-summary-value ${incompleteDay ? 'yellow' : cheapestDay <= appliedBudget ? 'green' : 'red'}`,
           },
-          formatEstimatedPrice(cheapestDay),
+          dayCostDisplay === null ? 'No priced slots' : formatEstimatedPrice(dayCostDisplay),
         ),
+        incompleteDay && React.createElement('div', { className: 'price-estimate-note' },
+          `${cheapestResult.pricedSlots} of ${cheapestResult.totalSlots} slots priced. Not a full-day total.`),
       ),
       React.createElement('div', { className: 'po-summary-divider' }),
       React.createElement(
@@ -1594,12 +1607,12 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
         React.createElement(
           'div',
           { className: 'po-budget-bar-labels' },
-          React.createElement('span', null, 'Cheapest day cost'),
+          React.createElement('span', null, incompleteDay ? 'Pricing coverage' : 'Cheapest day cost'),
           React.createElement(
             'span',
             null,
-            cheapestDay === null
-              ? 'Incomplete prices'
+            incompleteDay
+              ? `${cheapestResult.pricedSlots}/${cheapestResult.totalSlots} slots`
               : `${Math.round((cheapestDay / appliedBudget) * 100)}%`,
           ),
         ),
@@ -1609,8 +1622,8 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
           React.createElement('div', {
             className: 'po-budget-bar-fill',
             style: {
-              width: `${Math.min(Math.round((cheapestDay / appliedBudget) * 100), 100)}%`,
-              background: cheapestDay <= appliedBudget ? '#2ddc7a' : '#f87171',
+              width: `${incompleteDay ? (cheapestResult.totalSlots ? Math.round(cheapestResult.pricedSlots / cheapestResult.totalSlots * 100) : 0) : Math.min(Math.round((cheapestDay / appliedBudget) * 100), 100)}%`,
+              background: incompleteDay ? '#fbbf24' : cheapestDay <= appliedBudget ? '#2ddc7a' : '#f87171',
             },
           }),
         ),
@@ -1619,6 +1632,8 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
     React.createElement(
       'div',
       { className: 'po-controls' },
+      incompleteDay && React.createElement('p', { className: 'price-estimate-note', role: 'status', style: { flexBasis: '100%' } },
+        cheapestResult.totalSlots ? `Still needed: ${[...new Set(cheapestResult.missing.map(entry => entry.type))].join(', ')}. These slots are excluded from the subtotal until an eligible priced recipe is available.` : 'Add meal slots to calculate a day estimate.'),
       React.createElement('span', { className: 'po-sort-label' }, 'Sort by:'),
       React.createElement(
         'button',
@@ -1661,13 +1676,21 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
         React.createElement(
           'div',
           { className: 'po-ai-suggest-error', role: 'status' },
-          'No meals with complete, verified source estimates fit your \u20B1',
+          'No meals pass the current price checks within your \u20B1',
           (perMeal === null ? '—' : perMeal.toFixed(2)),
-          ' per-meal budget yet. Try a higher budget or view all meals to check which ingredients need pricing.',
+          ' per-meal budget. View all meals to inspect price gaps, or include estimates needing review. Missing price evidence cannot be resolved by raising the budget alone.',
         ),
-      visibleMeals.map((meal) => {
-        const isOver = perMeal !== null && isBudgetPriced(meal) && meal.cost > perMeal;
-        const affordClass = perMeal === null || !isBudgetPriced(meal)
+      mealGroups.map(group => React.createElement(
+        'section',
+        { key: group.type, className: 'po-meal-group', 'aria-label': `${group.type} recipes` },
+        React.createElement('h3', { className: 'po-meal-group-title' },
+          group.type,
+          React.createElement('span', null, `${group.meals.length} ${group.meals.length === 1 ? 'meal' : 'meals'}`)),
+        !group.meals.length && React.createElement('p', { className: 'po-meal-group-empty' },
+          filterOver ? 'No meals match the current budget and price checks. Select “View all meals” to see other options.' : 'No recipes match your saved dietary rules in this category.'),
+        group.meals.map((meal) => {
+        const isOver = perMeal !== null && priceFitsMode(meal) && meal.cost > perMeal;
+        const affordClass = perMeal === null || !priceFitsMode(meal)
           ? 'unknown'
           : meal.cost <= perMeal * 0.6
             ? 'cheap'
@@ -1677,7 +1700,7 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
                 ? 'pricey'
                 : 'over';
         const valueScore =
-          isBudgetPriced(meal) && meal.cost > 0
+          priceFitsMode(meal) && meal.cost > 0
             ? Math.round((meal.kcal / meal.cost) * 10) / 10
             : '\u2014';
         const maxIngredientCost = Math.max(
@@ -1719,7 +1742,7 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
               React.createElement(
                 'span',
                 { className: `po-afford-badge ${affordClass}` },
-                affordClass === 'unknown'
+                !isBudgetPriced(meal) && priceFitsMode(meal) ? 'Estimate — review needed' : affordClass === 'unknown'
                   ? 'Needs verification'
                   : affordClass === 'cheap'
                     ? 'Budget-Friendly'
@@ -1902,7 +1925,7 @@ function PriceOptimizerPanel({ meals = [], profile, slots = [], onBudgetChange }
             ),
           ),
         );
-      }),
+      }))),
     ),
   );
 }
@@ -2004,7 +2027,7 @@ function SlotCard({
                     React.createElement(
                       'span',
                       { className: 'meal-optimized-badge' },
-                      'Optimized meal',
+                      'Your chosen portion',
                     ),
                   completed &&
                     React.createElement('span', { className: 'meal-completed-badge' }, 'Finished'),

@@ -744,6 +744,13 @@
   margin-bottom: 24px;
 }
 
+.cooking-step-list { list-style: none; padding: 0; }
+.cooking-instruction { margin: 3px 0 0; }
+.cooking-explanation-list { list-style: decimal; padding-left: 22px; margin: 10px 0 0; color: #acc7b6; font-size: 13px; line-height: 1.7; }
+.cooking-explanation-list li { display: list-item; list-style: decimal; padding-left: 3px; margin-top: 8px; }
+.recipe-cooking-guide .modal-step-title { margin-top: 0; }
+.cooking-word-help { margin: 14px 0; padding: 12px 14px; border: 1px solid #28533c; border-radius: 10px; }
+
 .modal-step {
   display: flex;
   gap: 14px;

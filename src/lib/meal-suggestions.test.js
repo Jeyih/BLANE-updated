@@ -17,6 +17,43 @@ test('fallback uses only the requested type, sourced affordable prices and allow
   assert.equal(selectRecipeFallback(candidates, { ...options, budget: 0 }), null);
   assert.equal(candidates[0].id, 'allergen', 'Stored catalogue order is unchanged');
 });
+test('random selection varies across eligible recipes and excludes the previous name', () => {
+  const second = { ...meal, id: 'second', name: 'Vegetable rice', cost: 40 };
+  const blocked = { ...meal, id: 'blocked', name: 'Blocked meal', cost: 1 };
+  const candidates = [meal, second, blocked, { ...meal, id: 'expensive', cost: 100 }];
+  const options = { mealType: 'Lunch', budget: 50, isAllowed: m => m.id !== 'blocked' };
+  assert.equal(selectRecipeFallback(candidates, { ...options, random: () => 0 }).id, meal.id);
+  assert.equal(selectRecipeFallback(candidates, { ...options, random: () => 0.99 }).id, second.id);
+  assert.equal(selectRecipeFallback(candidates, { ...options, previousName: ' RICE MEAL ', random: () => 0 }).id, second.id);
+  assert.equal(selectRecipeFallback([meal], { ...options, previousName: meal.name }).id, meal.id);
+});
+test('fresh suggestions bypass cache and replace repeated AI output with a checked alternative', async () => {
+  const service = createSuggestionService();
+  let calls = 0;
+  const alternative = { ...meal, id: 'alternative', name: 'Vegetable rice' };
+  const options = {
+    key: 'fresh', fresh: true,
+    request: async () => { calls++; return meal; },
+    validate: m => m.cost <= 50,
+    fallback: () => alternative,
+  };
+  await service.get(options);
+  const result = await service.get({ ...options, isRepeat: m => m.name === meal.name });
+  assert.equal(calls, 2);
+  assert.equal(result.delivery, 'alternative');
+  assert.equal(result.meal.id, alternative.id);
+});
+test('repeat avoidance cannot bypass dietary validation', async () => {
+  const service = createSuggestionService();
+  const result = await service.get({
+    key: 'single', fresh: true,
+    request: async () => meal,
+    validate: m => m.id === meal.id,
+    isRepeat: m => m.id === meal.id,
+    fallback: () => ({ ...meal, id: 'unsafe' }),
+  });
+  assert.equal(result.meal.id, meal.id);
+});
 test('cache expires, coalesces concurrent calls and keeps users and budgets separate', async () => {
   let time = 100;
   let calls = 0;

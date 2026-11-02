@@ -464,6 +464,26 @@
   border-radius: 2px;
 }
 
+.po-meal-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.po-meal-group + .po-meal-group { margin-top: 18px; }
+.po-meal-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(45, 220, 122, 0.18);
+  color: #dcfce7;
+  font-size: 15px;
+}
+.po-meal-group-title span { color: #8ab79c; font-size: 12px; font-weight: 400; }
+.po-meal-group-empty { margin: 0; color: #9bb6a5; font-size: 12px; line-height: 1.6; }
 .po-meal-row {
   background: #111f16;
   border: 1px solid rgba(45, 220, 122, 0.1);
@@ -752,3 +772,5 @@
   color: #fbbf24;
   margin-left: auto;
 }
+.po-budget-error { margin: -4px 24px 16px; color: #fca5a5; font-size: 13px; line-height: 1.5; }
+.po-budget-pending { margin: -4px 24px 16px; color: #fbbf24; font-size: 13px; line-height: 1.5; }

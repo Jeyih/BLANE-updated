@@ -1,12 +1,9 @@
 import { SLOT_OPTIMIZATIONS_KEY } from '../lib/week-plans.js';
 import { sessionMealStorage as sessionStorage, readStoredJson } from '../lib/account-storage.js';
-import { computeDailyTargets as sharedDailyTargets, nutritionProfile, mealForAi, normalizePortionResult } from '../../supabase/functions/_shared/nutrition.js';
+import { buildPortionPreview } from '../lib/manual-portions.js';
 import React from 'react';
 import { useEffect, useState } from 'react';
-import { supabase, SUPABASE_URL } from '../lib/supabase';
 import '../styles/optimizer.css';
-const OPT_MIN_SCALE = 0.5;
-const OPT_MAX_SCALE = 2;
 function OptimizeButton({ open, onToggle, disabled = false, disabledReason }) {
   return React.createElement(
     'button',
@@ -37,12 +34,8 @@ function OptimizeButton({ open, onToggle, disabled = false, disabledReason }) {
       React.createElement('line', { x1: '9', y1: '8', x2: '15', y2: '8' }),
       React.createElement('line', { x1: '17', y1: '16', x2: '23', y2: '16' }),
     ),
-    ' Optimize',
+    ' Adjust portion',
   );
-}
-function getOptimizeMealUrl() {
-  if (!SUPABASE_URL) return null;
-  return SUPABASE_URL.replace('.supabase.co', '.functions.supabase.co') + '/optimize-meal';
 }
 function PortionOptimizerPanel({
   optimizationKey,
@@ -59,89 +52,15 @@ function PortionOptimizerPanel({
   const storedMealKey = optimizationKey || meal?.id;
   const [applied, setApplied] = useState(false);
   const [originalRestored, setOriginalRestored] = useState(false);
-  const [aiResult, setAiResult] = useState(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState('');
-  const [aiMode, setAiMode] = useState('local');
+  const [selectedScale, setSelectedScale] = useState(1);
   useEffect(() => {
-    if (!open || !meal || !profile || !meal.ingredients) return;
-    let cancelled = false;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
-    const fallbackResult = optimizeMeal(meal, totalMealsToday || 4, profile);
-    async function loadAiOptimization() {
-      setAiLoading(true);
-      setAiError('');
-      setAiMode('local');
-      setAiResult(fallbackResult);
-      try {
-        const optimizeUrl = getOptimizeMealUrl();
-        if (!optimizeUrl) {
-          throw new Error('Supabase function URL is not configured.');
-        }
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (!session) {
-          if (!cancelled) {
-            setAiMode('local');
-            setAiError(
-              'Sign in to enable Gemini optimization. Using a smart local estimate instead.',
-            );
-          }
-          return;
-        }
-        const res = await fetch(optimizeUrl, {
-          method: 'POST',
-          signal: controller.signal,
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + session.access_token,
-          },
-          body: JSON.stringify({ meal: mealForAi(meal), profile: nutritionProfile(profile), totalMealsToday: totalMealsToday || 4 }),
-        });
-        const payload = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(payload.error || 'BLANE AI could not optimize this meal.');
-        }
-        if (!cancelled) {
-          const normalized = normalizePortionResult(payload, meal, profile, totalMealsToday || 4);
-          normalized.ingredients = meal.ingredients.map(ing => scaleIngredient(ing, normalized.scaleFactor));
-          setAiResult(normalized);
-          setAiMode('ai');
-          setAiError('');
-        }
-      } catch (err) {
-        console.error('Portion optimizer AI failed:', err);
-        if (!cancelled) {
-          setAiResult(fallbackResult);
-          setAiMode('local');
-          setAiError(
-            'BLANE AI is temporarily unavailable. Showing the smart local estimate instead.',
-          );
-        }
-      } finally {
-        clearTimeout(timeout);
-        if (!cancelled) setAiLoading(false);
-      }
-    }
-    loadAiOptimization();
-    return () => {
-      cancelled = true;
-      clearTimeout(timeout);
-      controller.abort();
-    };
-  }, [
-    open,
-    meal?.id,
-    profile?.age,
-    profile?.sex,
-    profile?.height_cm,
-    profile?.weight_kg,
-    profile?.goal,
-    profile?.activity_level,
-    totalMealsToday,
-  ]);
+    if (!open) return;
+    const saved = readStoredJson(sessionStorage, optimizationStorageKey, {})[storedMealKey];
+    const value = Number(saved?.scaleFactor);
+    setSelectedScale(Number.isFinite(value) && value >= 0.5 && value <= 2 ? value : 1);
+    setApplied(false);
+    setOriginalRestored(false);
+  }, [open, storedMealKey, optimizationStorageKey]);
   if (!open) return null;
   if (!profile?.height_cm) {
     return React.createElement(
@@ -158,23 +77,23 @@ function PortionOptimizerPanel({
       ),
     );
   }
-  const result = aiResult || optimizeMeal(meal, totalMealsToday || 4, profile);
+  const result = buildPortionPreview(meal, totalMealsToday || 4, profile, selectedScale);
   const scaleClass = result.scaleFactor > 1.05 ? 'over' : result.scaleFactor < 0.95 ? 'under' : '';
   const scaleLabel =
     result.scaleFactor > 1.05
       ? '\u2191 ' + result.scaleFactor.toFixed(2) + '\xD7 Increase'
       : result.scaleFactor < 0.95
         ? '\u2193 ' + result.scaleFactor.toFixed(2) + '\xD7 Decrease'
-        : '\u2192 ' + result.scaleFactor.toFixed(2) + '\xD7 (Optimal)';
-  const pBar = (val, target) => Math.min(Math.round((val / target) * 100), 120);
+        : '\u2192 ' + result.scaleFactor.toFixed(2) + '\xD7 Original';
   function handleApply() {
-    if (blocked || aiLoading) return;
+    if (blocked) return;
     const saved = readStoredJson(sessionStorage, optimizationStorageKey, {});
     saved[storedMealKey] = {
       scaleFactor: result.scaleFactor,
       ingredients: result.ingredients,
       optimizedKcal: result.optimizedKcal,
       appliedAt: new Date().toISOString(),
+      source: 'user',
     };
     sessionStorage.setItem(optimizationStorageKey, JSON.stringify(saved));
     window.dispatchEvent(new Event('blane-portions-updated'));
@@ -194,11 +113,12 @@ function PortionOptimizerPanel({
     window.dispatchEvent(new Event('blane-portions-updated'));
     setApplied(false);
     setOriginalRestored(true);
+    setSelectedScale(1);
     onOriginalMeal?.(meal.id);
   }
   return React.createElement(
     'div',
-    { className: 'opt-panel open' + (aiMode === 'ai' ? ' opt-panel-ai' : '') },
+    { className: 'opt-panel open opt-manual-panel' },
     React.createElement(
       'div',
       { className: 'opt-inner' },
@@ -210,16 +130,8 @@ function PortionOptimizerPanel({
           { className: 'opt-header-left' },
           React.createElement(
             'div',
-            { className: 'opt-icon' + (aiMode === 'ai' ? ' ai' : '') },
-            aiMode === 'ai'
-              ? React.createElement(
-                  'svg',
-                  { viewBox: '0 0 24 24', fill: 'currentColor', width: '17', height: '17' },
-                  React.createElement('path', {
-                    d: 'M12 2.5l1.8 5.2 5.2 1.8-5.2 1.8L12 17.5l-1.8-5.2-5.2-1.8 5.2-1.8L12 2.5z',
-                  }),
-                )
-              : '\u2696\uFE0F',
+            { className: 'opt-icon' },
+            '\u2696\uFE0F',
           ),
           React.createElement(
             'div',
@@ -227,13 +139,13 @@ function PortionOptimizerPanel({
             React.createElement(
               'div',
               { className: 'opt-title' },
-              'AI Portion Optimizer \u2014 ',
+              'Portion size \u2014 ',
               meal.name,
             ),
             React.createElement(
               'div',
               { className: 'opt-sub' },
-              'Powered by Gemini \xB7 adjusted for your calorie & macro targets',
+              'Choose your portion. Apply it when you are ready.',
             ),
           ),
         ),
@@ -243,70 +155,14 @@ function PortionOptimizerPanel({
           '\u2715 Close',
         ),
       ),
-      React.createElement(
-        'div',
-        { className: 'opt-header-strip' + (aiLoading ? ' opt-header-strip-loading' : '') },
-        React.createElement(
-          'span',
-          { className: 'opt-mode-badge ' + aiMode },
-          aiMode === 'ai'
-            ? React.createElement(
-                React.Fragment,
-                null,
-                React.createElement(
-                  'svg',
-                  {
-                    viewBox: '0 0 24 24',
-                    fill: 'currentColor',
-                    width: '11',
-                    height: '11',
-                    className: 'opt-mode-badge-spark',
-                  },
-                  React.createElement('path', {
-                    d: 'M12 2.5l1.8 5.2 5.2 1.8-5.2 1.8L12 17.5l-1.8-5.2-5.2-1.8 5.2-1.8L12 2.5z',
-                  }),
-                ),
-                'Gemini AI',
-              )
-            : '\u2699 Local estimate',
-        ),
-        aiLoading &&
-          React.createElement(
-            'span',
-            { className: 'opt-loading-text opt-loading-pulse' },
-            React.createElement('span', { className: 'opt-loading-dot' }),
-            React.createElement('span', { className: 'opt-loading-dot' }),
-            React.createElement('span', { className: 'opt-loading-dot' }),
-            'Gemini is analyzing this meal\u2026',
-          ),
-        !aiLoading &&
-          aiError &&
-          React.createElement('span', { className: 'opt-warning-text' }, aiError),
-      ),
-      aiMode === 'ai' &&
-        (result.insight || result.explanation || result.reasoning) &&
-        React.createElement(
-          'div',
-          { className: 'opt-ai-insight' },
-          React.createElement(
-            'svg',
-            {
-              viewBox: '0 0 24 24',
-              fill: 'currentColor',
-              width: '14',
-              height: '14',
-              className: 'opt-ai-insight-spark',
-            },
-            React.createElement('path', {
-              d: 'M12 2.5l1.8 5.2 5.2 1.8-5.2 1.8L12 17.5l-1.8-5.2-5.2-1.8 5.2-1.8L12 2.5z',
-            }),
-          ),
-          React.createElement(
-            'span',
-            null,
-            result.insight || result.explanation || result.reasoning,
-          ),
-        ),
+      React.createElement('div', { className: 'opt-manual-controls' },
+        React.createElement('label', { htmlFor: `portion-${storedMealKey}` }, 'Portion multiplier: ', React.createElement('strong', null, selectedScale.toFixed(2), ' times the original')),
+        React.createElement('input', { id: `portion-${storedMealKey}`, type: 'range', min: 0.5, max: 2, step: 0.05, value: selectedScale, disabled: blocked, 'aria-label': 'Portion multiplier', onChange: e => { setSelectedScale(Number(e.target.value)); setApplied(false); setOriginalRestored(false); } }),
+        React.createElement('div', { className: 'opt-portion-presets' },
+          [[0.5, 'Half'], [0.75, 'Three-quarter'], [1, 'Original'], [1.5, 'One and a half'], [2, 'Double']].map(([value, label]) => React.createElement('button', { key: value, type: 'button', className: 'opt-btn opt-btn-outline', 'aria-pressed': selectedScale === value, disabled: blocked, onClick: () => { setSelectedScale(value); setApplied(false); setOriginalRestored(false); } }, label))),
+        React.createElement('p', null, 'Choose your portion size. Ingredient amounts adjust together, while dietary checks remain in place.'),
+        React.createElement('p', null, `Your portion: ${result.optimized.protein} g protein · ${result.optimized.carbs} g carbs · ${result.optimized.fats} g fat. Prices retain the original recipe’s estimate limitations.`),
+        React.createElement('p', { role: 'status' }, applied ? 'Your chosen portion is applied.' : originalRestored ? 'Original meal restored.' : 'Preview only — click Apply to save.')),
       React.createElement(
         'div',
         { className: 'opt-target-row' },
@@ -349,7 +205,7 @@ function PortionOptimizerPanel({
         React.createElement(
           'div',
           { className: 'opt-target-chip' },
-          React.createElement('div', { className: 'opt-target-chip-label' }, 'Optimized Meal'),
+          React.createElement('div', { className: 'opt-target-chip-label' }, 'Your Portion'),
           React.createElement(
             'div',
             { className: 'opt-target-chip-value green' },
@@ -357,12 +213,13 @@ function PortionOptimizerPanel({
             ' kcal',
           ),
         ),
+        React.createElement('div', { className: 'opt-target-chip' }, React.createElement('div', { className: 'opt-target-chip-label' }, 'Estimated portion cost'), React.createElement('div', { className: 'opt-target-chip-value' }, result.cost == null ? 'Unavailable' : `₱${result.cost.toFixed(2)}`)),
         React.createElement('span', { className: 'opt-scale-badge ' + scaleClass }, scaleLabel),
       ),
       React.createElement(
         'div',
         { className: 'opt-section-title' },
-        'Ingredient Portions \u2014 Original vs Optimized',
+        'Ingredient Portions \u2014 Original vs Your Portion',
       ),
       React.createElement(
         'div',
@@ -372,9 +229,9 @@ function PortionOptimizerPanel({
           { className: 'opt-table-header' },
           React.createElement('span', null, 'Ingredient'),
           React.createElement('span', null, 'Orig Quantity'),
-          React.createElement('span', null, 'Opti Quantity'),
+          React.createElement('span', null, 'Your Quantity'),
           React.createElement('span', null, 'Original (g)'),
-          React.createElement('span', null, 'Optimized (g)'),
+          React.createElement('span', null, 'Your Weight (g)'),
           React.createElement('span', null, 'Macros'),
         ),
         result.ingredients.map((ing) => {
@@ -389,10 +246,7 @@ function PortionOptimizerPanel({
             if (ingredientMacro != null && Number.isFinite(Number(ingredientMacro))) {
               return Math.round(Number(ingredientMacro) * result.scaleFactor);
             }
-            return Math.round(
-              ((Number(meal[key]) || 0) / Math.max(meal.ingredients.length, 1)) *
-                result.scaleFactor,
-            );
+            return null;
           };
           const changeClass = ing.increased ? 'more' : ing.decreased ? 'less' : 'same';
           const changeTxt = ing.increased
@@ -447,19 +301,19 @@ function PortionOptimizerPanel({
                 'div',
                 { className: 'opt-ing-macro-line' },
                 'P ',
-                React.createElement('b', null, '~', macroValue('protein'), 'g'),
+                React.createElement('b', null, macroValue('protein') == null ? 'Not recorded' : `~${macroValue('protein')}g`),
               ),
               React.createElement(
                 'div',
                 { className: 'opt-ing-macro-line' },
                 'C ',
-                React.createElement('b', null, '~', macroValue('carbs'), 'g'),
+                React.createElement('b', null, macroValue('carbs') == null ? 'Not recorded' : `~${macroValue('carbs')}g`),
               ),
               React.createElement(
                 'div',
                 { className: 'opt-ing-macro-line' },
                 'F ',
-                React.createElement('b', null, '~', macroValue('fats'), 'g'),
+                React.createElement('b', null, macroValue('fats') == null ? 'Not recorded' : `~${macroValue('fats')}g`),
               ),
             ),
           );
@@ -470,7 +324,7 @@ function PortionOptimizerPanel({
         { className: 'opt-apply-row' },
         React.createElement(
           'button',
-          { className: 'opt-btn opt-btn-primary', onClick: handleApply, disabled: aiLoading || blocked },
+          { className: 'opt-btn opt-btn-primary', onClick: handleApply, disabled: blocked },
           React.createElement(
             'svg',
             {
@@ -502,112 +356,9 @@ function PortionOptimizerPanel({
             { className: 'opt-applied-badge show' },
             '\u2713 Original meal restored',
           ),
-        !applied &&
-          aiMode === 'ai' &&
-          !aiLoading &&
-          React.createElement(
-            'span',
-            { className: 'opt-ai-footer-note' },
-            React.createElement(
-              'svg',
-              { viewBox: '0 0 24 24', fill: 'currentColor', width: '11', height: '11' },
-              React.createElement('path', {
-                d: 'M12 2.5l1.8 5.2 5.2 1.8-5.2 1.8L12 17.5l-1.8-5.2-5.2-1.8 5.2-1.8L12 2.5z',
-              }),
-            ),
-            'Optimized with Gemini AI',
-          ),
+
       ),
     ),
   );
-}
-function computeDailyTargets(profile) {
-  return sharedDailyTargets(profile);
-}
-function optimizeMeal(meal, totalMealsToday, profile) {
-  const daily = computeDailyTargets(profile);
-  const perMealKcal = Math.round(daily.calories / totalMealsToday);
-  const originalKcal = meal.kcal;
-  let scaleFactor = perMealKcal / originalKcal;
-  scaleFactor = Math.max(OPT_MIN_SCALE, Math.min(OPT_MAX_SCALE, scaleFactor));
-  const optimizedKcal = Math.round(originalKcal * scaleFactor);
-  const optimizedProtein = Math.round(meal.protein * scaleFactor);
-  const optimizedCarbs = Math.round(meal.carbs * scaleFactor);
-  const optimizedFats = Math.round(meal.fats * scaleFactor);
-  const mealProteinTarget = Math.round(daily.protein / totalMealsToday);
-  const mealCarbsTarget = Math.round(daily.carbs / totalMealsToday);
-  const mealFatsTarget = Math.round(daily.fats / totalMealsToday);
-  const scaledIngredients = meal.ingredients.map((ing) => scaleIngredient(ing, scaleFactor));
-  return {
-    scaleFactor,
-    perMealKcal,
-    originalKcal,
-    optimizedKcal,
-    original: { protein: meal.protein, carbs: meal.carbs, fats: meal.fats },
-    optimized: { protein: optimizedProtein, carbs: optimizedCarbs, fats: optimizedFats },
-    targets: {
-      protein: mealProteinTarget,
-      carbs: mealCarbsTarget,
-      fats: mealFatsTarget,
-      calories: perMealKcal,
-    },
-    ingredients: scaledIngredients,
-    daily,
-  };
-}
-function scaleIngredient(ing, factor) {
-  const original = ing.qty;
-  const optimized = scaleQtyString(original, factor);
-  return {
-    name: ing.name,
-    status: ing.status,
-    original,
-    optimized,
-    factor,
-    changed: Math.abs(factor - 1) > 0.05,
-    increased: factor > 1.05,
-    decreased: factor < 0.95,
-  };
-}
-function scaleQtyString(qtyStr, factor) {
-  if (!qtyStr || qtyStr === 'to taste') return qtyStr;
-  const normalizedQty = String(qtyStr).trim();
-  const match = normalizedQty.match(
-    /^(\s*~?\s*)(?:scant\s+)?(\d+(?:\s+\d+\/\d+|\/\d+)?|[½¼¾⅓⅔])\s*(.*)$/i,
-  );
-  if (!match) return qtyStr;
-  const [, estimatePrefix, amount, unit] = match;
-  const num = parseFraction(amount);
-  if (isNaN(num) || num === 0) return qtyStr;
-  if (factor === 1) return qtyStr;
-  const countUnit =
-    /\b(?:pc|pcs|piece|pieces|clove|cloves|slice|slices|stalk|stalks|pod|pods|link|links|egg|eggs|banana|tomato|onion|carrot|potato|shrimp|sachet|sachets|can|cans|disc|discs|portion|serving|breast|gourd|fish|squid|puto|saba)\b/i.test(
-      unit,
-    );
-  const denominator = countUnit ? 2 : 4;
-  const scaled = Math.max(1 / denominator, Math.round(num * factor * denominator) / denominator);
-  const formatted = formatQuantityNumber(scaled, denominator);
-  return estimatePrefix + formatted + (unit ? ' ' + unit : '');
-}
-function parseFraction(str) {
-  const fracts = { '\xBD': 0.5, '\xBC': 0.25, '\xBE': 0.75, '\u2153': 0.333, '\u2154': 0.667 };
-  if (fracts[str]) return fracts[str];
-  if (str.includes(' ')) {
-    const [whole, fraction] = str.split(/\s+/, 2);
-    return parseFloat(whole) + parseFraction(fraction);
-  }
-  if (str.includes('/')) {
-    const parts = str.split('/');
-    return parseFloat(parts[0]) / parseFloat(parts[1]);
-  }
-  return parseFloat(str);
-}
-function formatQuantityNumber(value, denominator) {
-  const rounded = Math.round(value * denominator) / denominator;
-  const whole = Math.floor(rounded);
-  const numerator = Math.round((rounded - whole) * denominator);
-  const fraction = denominator === 2 ? { 1: '1/2' } : { 1: '1/4', 2: '1/2', 3: '3/4' };
-  if (!numerator) return String(whole);
-  return whole ? `${whole} ${fraction[numerator]}` : fraction[numerator];
 }
 export { OptimizeButton, PortionOptimizerPanel as default };

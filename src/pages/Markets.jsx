@@ -19,11 +19,10 @@ import MarketsTour from '../components/MarketsTour';
 import { IngSeasonTag } from '../components/SeasonalBadges';
 import '../styles/markets.css';
 import 'leaflet/dist/leaflet.css';
-const FILTERS = ['All', 'Palengke', 'Supermarket', 'Talipapa', 'Grocery'];
+const FILTERS = ['All', 'Palengke', 'Supermarket', 'Grocery'];
 const TYPE_META = {
   palengke: { label: 'Palengke', color: '#60a5fa' },
   supermarket: { label: 'Supermarket', color: '#2ddc7a' },
-  talipapa: { label: 'Talipapa', color: '#fbbf24' },
   grocery: { label: 'Grocery', color: '#a78bfa' },
 };
 const initialLocationState = {
@@ -133,6 +132,7 @@ function Markets() {
     const query = marketSearch.trim().toLowerCase();
     return markets.filter(
       (market) =>
+        String(market.type || '').trim().toLowerCase() !== 'talipapa' &&
         (activeFilter === 'All' || market.type === activeFilter.toLowerCase()) &&
         (!query || `${market.name} ${market.address}`.toLowerCase().includes(query)),
     );

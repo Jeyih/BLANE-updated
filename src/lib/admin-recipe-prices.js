@@ -1,8 +1,9 @@
+import { singleDishIngredientRows } from './single-dish-catalogue.js';
 import { applyDynamicRecipePrices } from './pricing.js';
 
 export function adminRecipePrices(recipes, ingredients, records, references = {}, query = '', direction = null) {
   const grouped = new Map();
-  for (const ingredient of ingredients || []) {
+  for (const ingredient of singleDishIngredientRows(ingredients)) {
     const key = String(ingredient.recipe_id);
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key).push({ ...ingredient, qty: ingredient.quantity });

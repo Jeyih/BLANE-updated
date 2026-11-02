@@ -113,7 +113,7 @@ function DriftCard({ metric, emoji, label, unit, chartValues, isLiters, isBmi })
       ),
       React.createElement(
         'div',
-        { className: 'drift-card-value', style: { color: '#4d6e5a' } },
+        { className: 'drift-card-value', style: { color: '#c0d8c9' } },
         '--',
       ),
       React.createElement('div', { className: 'drift-card-context' }, 'No data logged yet'),
@@ -167,12 +167,13 @@ function MiniChart({ values, color }) {
   const valid = values.filter((v) => v != null);
   if (valid.length < 2) {
     return React.createElement(
-      'svg',
-      { className: 'drift-mini-svg', viewBox: '0 0 100 40', preserveAspectRatio: 'none' },
+      'div',
+      { className: 'drift-chart-empty' },
+      valid.length === 1 && React.createElement('span', { className: 'drift-chart-dot', style: { backgroundColor: color }, 'aria-hidden': true }),
       React.createElement(
-        'text',
-        { x: '0', y: '24', fill: '#4d6e5a', fontSize: '7', fontFamily: 'DM Sans,sans-serif' },
-        'First entry saved — trend pending',
+        'span',
+        { className: 'drift-chart-message' },
+        valid.length === 1 ? 'First entry — comparison pending' : 'No entries yet',
       ),
     );
   }

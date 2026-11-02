@@ -1,3 +1,4 @@
+import { singleDishRecipeRows, singleDishIngredientRows } from '../lib/single-dish-catalogue.js';
 import { weekStartKey, slotOptimizationKey } from '../lib/meal-calendar.js';
 import { WEEK_PLANS_KEY, readWeekPlan, writeWeekPlan, readSlotOptimizations } from '../lib/week-plans.js';
 import { generateMealPlan, emptyMealPlan } from '../lib/plan-generation.js';
@@ -166,7 +167,7 @@ function MealPlanWidget({ profile }) {
         .order('sort_order');
       if (cancelled) return;
       const ingByRecipe = {};
-      (ingData || []).forEach((ing) => {
+      singleDishIngredientRows(ingData).forEach((ing) => {
         if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
         ingByRecipe[ing.recipe_id].push({
           id: ing.id,
@@ -176,7 +177,7 @@ function MealPlanWidget({ profile }) {
           status: ing.status || 'avail',
         });
       });
-      const formattedRecipes = (recipesData || []).map((r) => ({
+      const formattedRecipes = singleDishRecipeRows(recipesData).map((r) => ({
         id: r.id,
         emoji: r.emoji || '\u{1F372}',
         name: r.name,

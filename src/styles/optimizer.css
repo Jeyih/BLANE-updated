@@ -1146,3 +1146,16 @@
     gap: 6px;
   }
 }
+
+/* Manual portion choices: keep controls readable and the full panel accessible. */
+.opt-manual-panel.open { max-height: none; }
+.opt-manual-controls { padding: 16px; margin-bottom: 16px; border: 1px solid rgba(45,220,122,.22); border-radius: 12px; background: #142c1f; color: #d4e7dc; }
+.opt-manual-controls label { display: block; font-size: 14px; margin-bottom: 12px; }
+.opt-manual-controls input[type='range'] { width: 100%; accent-color: #2ddc7a; min-height: 32px; cursor: pointer; }
+.opt-portion-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.opt-portion-presets button[aria-pressed='true'] { color: #06110b; background: #2ddc7a; border-color: #2ddc7a; }
+.opt-manual-controls p { font-size: 13px; line-height: 1.6; margin: 12px 0 0; }
+.opt-manual-panel .opt-sub, .opt-manual-panel .opt-target-chip-label, .opt-manual-panel .opt-section-title, .opt-manual-panel .opt-table-header, .opt-manual-panel .opt-ing-macro-line { color: #b4cdbd; }
+.opt-manual-panel .opt-close-btn { color: #d4e7dc; }
+.opt-manual-panel .opt-table-header, .opt-manual-panel .opt-ing-row { min-width: 740px; }
+.opt-manual-panel .opt-ing-quantity { white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }

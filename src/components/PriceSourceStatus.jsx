@@ -38,7 +38,7 @@ function PriceSourceStatus({ showCatalog = false }) {
     React.createElement(
       'p',
       null,
-      'Auto-checks every 15 seconds while this page is active. Retailer checks are shared for 30 seconds; the button requests a fresh check. Suppliers do not send instant change notifications.',
+      'Checks every 15 seconds on this page. Retailer results may be cached for 30 seconds.',
     ),
     lastCheckedAt &&
       React.createElement(
@@ -50,34 +50,34 @@ function PriceSourceStatus({ showCatalog = false }) {
     React.createElement(
       'p',
       null,
-      'DA NCR averages and Philippine store listings are reference estimates. Retail references are not confirmed quotes from every listed market.',
+      'Estimates use DA NCR reports and Philippine retailers. Local store prices may differ.',
     ),
     React.createElement(
       'p',
       null,
-      'Cooked foods may use labeled raw-ingredient estimates. Base-only subtotals exclude extra ingredients and are not complete meal costs.',
+      'Raw-input estimates exclude preparation costs. Partial subtotals are not full meal prices.',
     ),
     React.createElement(
       'p',
       null,
-      'Liquid household measures use 240 ml per cup, 15 ml per tablespoon and 5 ml per teaspoon. Approximate quantities are labeled; \u201Cscant\u201D uses the stated full measure as an upper estimate.',
+      'Measures: 1 cup = 240 ml, 1 tbsp = 15 ml, 1 tsp = 5 ml. Approximate amounts are labelled.',
     ),
     React.createElement(
       'p',
       null,
-      'Rare ingredients may use comparable Philippine product benchmarks for budgeting. These are labeled estimates, not exact prices for the requested species or cut; open the ingredients to see each comparison.',
+      'Comparable products are labelled as estimates. Open an ingredient to see its source.',
     ),
     React.createElement(
       'p',
       null,
-      'Prices use Philippine DA reports and Philippine store listings in pesos only. Unsupported assumptions are excluded from affordability results. Carrot, cabbage, squash and sitaw use labeled DOST-FNRI purchase/edible portion references; other cooked-food conversions still need documented evidence.',
+      'Prices are in pesos. FNRI portion conversions are labelled; unverified costs stay out of budget matches.',
     ),
     warning && React.createElement('p', { className: 'price-warning' }, warning),
     stale &&
       React.createElement(
         'p',
         { className: 'price-warning' },
-        'This report is over 14 days old. Check current prices before shopping.',
+        'Report older than 14 days. Check prices before shopping.',
       ),
     report &&
       React.createElement(
@@ -86,11 +86,11 @@ function PriceSourceStatus({ showCatalog = false }) {
         'View official DA report',
       ),
     showCatalog && React.createElement(IngredientPriceCatalogue, null),
-    React.createElement('p', null, 'Soy sauce, corn oil and liquid milk can use published FAO/INFOODS density estimates to convert recipe grams into litres. Exact declared metric volumes take priority. Open ingredient evidence for the calculation.'),
+    React.createElement('p', null, 'Soy sauce, corn oil and milk use published density estimates where needed. See ingredient evidence.'),
     showCatalog &&
       React.createElement(
         'details',
-        { className: 'price-catalog' },
+        { className: 'price-catalog price-reference-catalog' },
         React.createElement(
           'summary',
           null,
@@ -127,12 +127,12 @@ function PriceSourceStatus({ showCatalog = false }) {
                     null,
                     React.createElement(
                       'a',
-                      { href: p.sourceUrl, target: '_blank', rel: 'noreferrer' },
+                      { href: p.sourceUrl, target: '_blank', rel: 'noreferrer', title: p.name },
                       p.name,
                     ),
                     React.createElement(
                       'div',
-                      { className: 'price-estimate-note' },
+                      { className: 'price-estimate-note price-two-line', title: [p.description, p.notes, p.availability].filter(Boolean).join(' · ') },
                       p.description,
                       React.createElement('br', null),
                       p.notes,

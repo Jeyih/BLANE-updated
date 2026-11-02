@@ -1,5 +1,6 @@
 import { documentedPurchaseAmount } from './philippine-portions.js';
 import { densityPurchaseAmount, measuredPurchaseAmount } from './recipe-cost-basis.js';
+import { rawPurchaseReferences } from './raw-purchase-prices.js';
 function ingredientKey(name, aliases = {}) {
   const key = String(name || '')
     .normalize('NFD')
@@ -56,7 +57,7 @@ function isSourcedPrice(record) {
     const url = new URL(record.sourceUrl);
     if (url.protocol !== 'https:') return false;
     return (
-      url.hostname === 'www.da.gov.ph' ||
+      ['www.da.gov.ph', 'da.gov.ph'].includes(url.hostname) ||
       (record.sourceType === 'retailer' &&
         record.verified === true &&
         RETAIL_HOSTS.has(url.hostname))
@@ -69,6 +70,8 @@ function matchingReferences(name, prices, referenceData = {}) {
   const aliases = referenceData.aliases || {};
   const key = ingredientKey(name, aliases);
   const sourced = prices.filter(isSourcedPrice);
+  const rawPurchase = rawPurchaseReferences(name, sourced);
+  if (rawPurchase.length) return rawPurchase;
   const direct = sourced.filter((p) => (p.key || ingredientKey(p.name, aliases)) === key);
   if (direct.length) {
     const official = direct.filter((p) => p.sourceType !== 'retailer');

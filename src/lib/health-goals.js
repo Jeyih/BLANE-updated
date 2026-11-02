@@ -2,6 +2,21 @@ import { asList } from './constraint-rules.js';
 import { GOAL_ADJUST } from '../../supabase/functions/_shared/nutrition.js';
 
 export const MAX_HEALTH_GOALS = 3;
+export const HEALTH_GOAL_DESCRIPTIONS = {
+  lose_weight: 'Use a lower calorie target when chosen as your primary goal.',
+  gain_muscle: 'Use a slightly higher calorie target when chosen as your primary goal.',
+  maintain: 'Plan meals around your estimated maintenance calorie needs.',
+  improve_health: 'Prioritize meals matched to general wellness goals.',
+  boost_energy: 'Prioritize meals matched to your energy goal.',
+  manage_condition: 'Prioritize condition-related recipes. Your saved food restrictions still apply.',
+};
+
+export function healthGoalDescription(option) {
+  const stored = String(option?.description || option?.desc || '').trim();
+  return !stored || /^synced from goal_ideals\.?$/i.test(stored)
+    ? HEALTH_GOAL_DESCRIPTIONS[option?.key] || ''
+    : stored;
+}
 
 // The existing scalar goal remains the primary goal for every calorie calculation.
 export function selectedHealthGoals(profile) {

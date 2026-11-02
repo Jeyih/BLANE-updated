@@ -52,6 +52,8 @@
 }
 .price-catalog table {
   width: 100%;
+  table-layout: fixed;
+  min-width: 680px;
   border-collapse: collapse;
   text-align: left;
 }
@@ -59,11 +61,35 @@
 .price-catalog td {
   padding: 8px 10px;
   border-bottom: 1px solid rgba(45, 220, 122, 0.12);
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
 }
 .price-catalog th {
   color: #e8f5ee;
+  line-height: 1.4;
 }
+.price-coverage-catalog th:nth-child(1) { width: 21%; }
+.price-coverage-catalog th:nth-child(2) { width: 17%; }
+.price-coverage-catalog th:nth-child(3) { width: 29%; }
+.price-coverage-catalog th:nth-child(4) { width: 20%; }
+.price-coverage-catalog th:nth-child(5) { width: 13%; }
+.price-reference-catalog th:nth-child(1) { width: 52%; }
+.price-reference-catalog th:nth-child(2) { width: 22%; }
+.price-reference-catalog th:nth-child(3) { width: 26%; }
+.price-catalog td > a { display: inline-block; max-width: 100%; }
+.price-catalog .price-two-line,
+.price-catalog td > a {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.price-catalog .price-estimate-note { white-space: normal; overflow-wrap: anywhere; }
+.price-catalog td details { width: 100%; }
+.price-catalog-controls input { min-width: 0; flex-basis: 220px; }
 .price-catalog td details {
   max-width: 320px;
   white-space: normal;

@@ -1,3 +1,4 @@
+import { singleDishIngredientRows } from '../lib/single-dish-catalogue.js';
 import React from 'react';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
@@ -88,7 +89,7 @@ function PriceProvider({ children }) {
           foods: catalogue.status === 'fulfilled' ? catalogue.value.foods : prev.foods,
           recipeIngredients:
             catalogue.status === 'fulfilled'
-              ? catalogue.value.recipeIngredients
+              ? singleDishIngredientRows(catalogue.value.recipeIngredients)
               : prev.recipeIngredients,
           lastCheckedAt: feed?.lastCheckedAt || prev.lastCheckedAt,
           loading: false,

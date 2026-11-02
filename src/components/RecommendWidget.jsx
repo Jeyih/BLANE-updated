@@ -1,6 +1,8 @@
+import { singleDishRecipeRows, singleDishIngredientRows, singleDishStepRows } from '../lib/single-dish-catalogue.js';
 import { weekStartKey } from '../lib/meal-calendar.js';
 import { readWeekPlan } from '../lib/week-plans.js';
-import { loadConstraintDefinitions, canSelectRecipe } from '../lib/constraints';
+import { loadConstraintDefinitions, canSelectRecipe, getActiveConstraints } from '../lib/constraints';
+import ClinicalReviewNotice from './ClinicalReviewNotice';
 import { recommendRecipes } from '../lib/recommendations.js';
 import { localMealStorage as localStorage, sessionMealStorage as sessionStorage } from '../lib/account-storage.js';
 import React from 'react';
@@ -136,7 +138,7 @@ function RecommendWidget({ profile }) {
         return;
       }
       const ingByRecipe = {};
-      (ingData || []).forEach((ing) => {
+      singleDishIngredientRows(ingData).forEach((ing) => {
         if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
         ingByRecipe[ing.recipe_id].push({
           id: ing.id,
@@ -146,12 +148,12 @@ function RecommendWidget({ profile }) {
         });
       });
       const stepsByRecipe = {};
-      (stepResult.data || []).forEach((step) => {
+      singleDishStepRows(stepResult.data).forEach((step) => {
         if (!stepsByRecipe[step.recipe_id]) stepsByRecipe[step.recipe_id] = [];
         stepsByRecipe[step.recipe_id].push({ title: step.title, desc: step.description });
       });
       setRecipes(
-        (recipesData || []).map((r) => ({
+        singleDishRecipeRows(recipesData).map((r) => ({
           id: r.id,
           emoji: r.emoji,
           name: r.name,
@@ -240,6 +242,7 @@ function RecommendWidget({ profile }) {
       React.createElement('p', { className: 'meal-action-status', role: 'status' },
         `No ${mealType.toLowerCase()}-tagged recipes match your dietary checks. You can use these alternatives for ${mealType.toLowerCase()}.`),
     React.createElement(PriceEstimateNotice, null),
+    metadataReady && React.createElement(ClinicalReviewNotice, { active: getActiveConstraints(profile, definitions) }),
     actionMessage &&
       React.createElement('p', { className: 'meal-action-status', role: 'status' }, actionMessage),
     !isProfileComplete(profile)

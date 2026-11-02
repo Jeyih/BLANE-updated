@@ -19,11 +19,12 @@ function words(name, token) {
   const parts = normalized(token).split(' '), last = parts.pop();
   if (!last) return false;
   const forms = new Set([last, last + 's', last + 'es']);
+  if (last.endsWith('oes')) forms.add(last.slice(0, -2));
   if (last.endsWith('s') && !last.endsWith('ss')) forms.add(last.slice(0, -1));
   return [...forms].some(word => text.includes(` ${[...parts, word].join(' ')} `));
 }
 function ingredientText(value) {
-  return normalized(value).replace(/\beggs? (chicken|duck|quail)\b/g, 'egg').replace(/\b(coconut|soy|soya|oat|almond|rice) (milk|cream)\b/g, '$1 beverage').replace(/\bpeanut butter\b/g, 'peanut spread').replace(/\boyster mushroom\b/g, 'mushroom');
+  return normalized(value).replace(/\brice well milled\b/g, 'white rice').replace(/\beggs? (chicken|duck|quail)\b/g, 'egg').replace(/\b(coconut|soy|soya|oat|almond|rice) (milk|cream)\b/g, '$1 beverage').replace(/\bpeanut butter\b/g, 'peanut spread').replace(/\boyster mushroom\b/g, 'mushroom');
 }
 export function ingredientMatches(name, blocked) {
   const token = normalized(blocked), text = ingredientText(name);
@@ -37,6 +38,9 @@ export function constraintTokens(key, definition) {
   else if (/\bvegetarian\b/.test(label)) tokens.push('meat', 'seafood');
   if (/dairy free|milk allergy|dairy allergy|lactose/.test(label)) tokens.push('dairy');
   if (/egg allergy|allergy egg/.test(label)) tokens.push('egg');
+  // Catalogue names cannot establish gluten-free certification for oats.
+  if (/celiac|coeliac/.test(label)) tokens.push('oats');
+  if (/five pungent roots/.test(label)) tokens.push('meat', 'seafood', 'garlic', 'onion', 'leek', 'chive', 'scallion');
   return [...new Set(tokens)];
 }
 export function activeConstraintKeys(profile, definitions) {
@@ -67,6 +71,11 @@ export function recipeViolations(recipe, active, filterOn = true, definitions = 
     const add = (ingredient, reason = def.reason || 'Conflicts with your recorded dietary rules.') => {
       if (!violations.some(v => v.constraintKey === key && v.ingredient === ingredient)) violations.push({ constraintKey: key, constraintLabel: def.label || key, severity: def.severity || 'dietary', icon: def.icon || '\u26A0', ingredient, reason });
     };
+    const reviewTags = [...asList(recipe.diet_tags), ...asList(recipe.diet)];
+    const review = clinicalReviewRequirements([key])[0];
+    if (reviewTags.includes('clinical_review_required') && review) {
+      add('Qualified recipe review pending', review.reason);
+    }
     const ingredients = recipe.ingredients || [];
     if (!ingredients.length || ingredients.some(i => !normalized(typeof i === 'string' ? i : i.name || i.ingredient_name || i.food_name))) add('Ingredient data incomplete', 'This recipe cannot be checked until its ingredient records are complete.');
     const components = ingredients.map(i => typeof i === 'string' ? i : [i.name, i.ingredient_name, i.food_name].filter(Boolean).join(' '));
@@ -79,6 +88,23 @@ export function recipeViolations(recipe, active, filterOn = true, definitions = 
     }
   }
   return violations;
+}
+const CLINICAL_REVIEW_REQUIREMENTS = {
+  phenylketonuria_pku: {
+    label: 'PKU',
+    reason: 'Phenylalanine amounts per portion and the prescribed allowance have not been validated. This research recipe is excluded until a qualified dietitian reviews them.',
+  },
+  chronic_kidney_disease_ckd_renal_diet: {
+    label: 'Kidney disease (CKD)',
+    reason: 'Potassium, phosphorus, sodium and individual protein or fluid limits have not been validated. This research recipe is excluded until a qualified dietitian reviews them.',
+  },
+  dysphagia_diet_pureed_thickened_liquids: {
+    label: 'Swallowing difficulties',
+    reason: 'The prescribed food texture and liquid thickness have not been assessed. This research recipe is excluded until a qualified clinician reviews them.',
+  },
+};
+export function clinicalReviewRequirements(active = []) {
+  return [...new Set(active)].flatMap(key => CLINICAL_REVIEW_REQUIREMENTS[key] ? [{ key, ...CLINICAL_REVIEW_REQUIREMENTS[key] }] : []);
 }
 export function recipeEligible(recipe, profile, definitions, ready = true) {
   return Boolean(recipe && profile && ready && !unmatchedConstraints(profile, definitions).length && recipeViolations(recipe, activeConstraintKeys(profile, definitions), true, definitions).length === 0);

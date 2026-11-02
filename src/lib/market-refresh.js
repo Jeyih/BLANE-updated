@@ -1,3 +1,4 @@
+import { singleDishIngredientRows } from './single-dish-catalogue.js';
 import { weekStartKey } from './meal-calendar.js';
 import { readWeekPlan } from './week-plans.js';
 const MARKET_REFRESH_MS = 15e3;
@@ -30,7 +31,7 @@ async function fetchMarketSnapshot(client, signal, recipeIds = []) {
       ? readRows(client, 'recipe_ingredients', signal, recipeIds)
       : Promise.resolve([]),
   ]);
-  return { markets, ingredients, recipeIngredients };
+  return { markets, ingredients, recipeIngredients: singleDishIngredientRows(recipeIngredients) };
 }
 function getMealPlanRecipeIds(storage) {
   try {
