@@ -10,14 +10,16 @@ const TOUR_STEPS = [
   {
     target: '[data-dashboard-tour="check-in"]',
     title: 'Check in with yourself',
+    interactionTargets: ['[data-dashboard-tour="check-in"] button'],
     description:
       'Choose a mood to get a quick note about how BLANE considers your energy, recovery, and food balance today.',
   },
   {
     target: '[data-dashboard-tour="meal-plan"]',
     title: 'Your meals for today',
+    interactionTargets: ['[data-dashboard-tour="meal-plan"] .meal-tab-btn'],
     description:
-      'Switch between meal times to review recipes, ingredients, macros, prep time, and estimated cost. The bar tracks calories and protein against your daily goal. Open Meal Plan to make changes.',
+      'Try switching between meal times to review recipes and nutrition. The bar tracks calories and protein against your daily goal. After the tour, open Meal Plan to make changes.',
   },
   {
     target: '[data-dashboard-tour="body-stats"]',
@@ -29,19 +31,19 @@ const TOUR_STEPS = [
     target: '[data-dashboard-tour="recommendations"]',
     title: 'Recommendations picked for you',
     description:
-      'Review recipe matches with their match scores, nutrition, cost, and reasons they fit your goal and dietary profile. Select a recipe or view all recipes to explore.',
+      'Review recipe matches with their match scores, nutrition, cost, and reasons they fit your goal and dietary profile. After the tour, select a recipe or view all recipes to explore.',
   },
   {
     target: '[data-dashboard-tour="feedback"]',
     title: 'Log your daily health',
     description:
-      'Record weight, sleep, water, and calories burned. BLANE uses your entries to refresh nutrition targets, show alerts, and track your recent history.',
+      'After the tour, record weight, sleep, water, and calories burned here. BLANE uses your entries to refresh nutrition targets, show alerts, and track your recent history.',
   },
   {
     target: '[data-dashboard-tour="drift"]',
     title: 'Follow your health trends',
     description:
-      'Health Drift Detection summarizes your recent weight, sleep, hydration, and BMI trends in a health score. Log at least two days of data to see the analysis.',
+      'Health Drift Detection shows your recorded measurements after the first saved entry. Trends develop as you add more entries. This summary is not a clinical health assessment.',
   },
 ];
 function DashboardTour({ isOpen, onClose }) {

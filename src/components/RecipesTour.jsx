@@ -16,12 +16,14 @@ const TOUR_STEPS = [
   {
     target: '[data-recipes-tour="search"]',
     title: 'Search recipes your way',
+    interactionTargets: ['[data-recipes-tour="search"] input'],
     description:
       'Search by recipe name, meal type, or ingredient to quickly narrow down the collection.',
   },
   {
     target: '[data-recipes-tour="filters"]',
     title: 'Filter by meal and diet',
+    interactionTargets: ['[data-recipes-tour="filters"] button'],
     description:
       'Choose a meal type or dietary tag. Select the same filter again to clear it; search and filters can be combined.',
   },
@@ -29,7 +31,7 @@ const TOUR_STEPS = [
     target: '[data-recipes-tour="results"]',
     title: 'Compare recipe cards',
     description:
-      'Cards show cooking time, servings, macros, calories, estimated cost, seasonality, and constraint warnings. Select a card to see full nutrition details, ingredients, seasonal alternatives, cooking steps, and add it to your Meal Plan.',
+      'Cards show cooking time, servings, nutrition, estimated cost, and constraint warnings. After the tour, select a card to review full details, cooking steps, and add it to your Meal Plan.',
   },
 ];
 function RecipesTour({ isOpen, onClose }) {

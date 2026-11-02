@@ -1,3 +1,10 @@
+import AllergyLabel from '../components/AllergyLabel';
+import { ALLERGY_GUIDANCE } from '../lib/allergy-copy.js';
+import { SEX_CHOICES, isSexChoice, UNDISCLOSED_SEX_NOTE } from '../lib/sex-choice.js';
+import MedicalConditionLabel from '../components/MedicalConditionLabel';
+import { MEDICAL_CONDITION_GUIDANCE } from '../lib/medical-condition-copy.js';
+import HealthGoalPicker from '../components/HealthGoalPicker';
+import { healthGoalError, healthGoalFields, saveHealthProfile } from '../lib/health-goals.js';
 import { validateMeasurements } from '../../supabase/functions/_shared/nutrition.js';
 import React from 'react';
 import { useEffect, useState } from 'react';
@@ -5,13 +12,14 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase, REDIRECT_AFTER_ONBOARD } from '../lib/supabase';
 import { hasInitialProfile, onboardingFormFromProfile } from '../lib/onboarding-profile';
+import { resolveConstraintKey } from '../lib/constraint-rules.js';
 import '../styles/onboarding.css';
 const TOTAL_STEPS = 5;
 const STEP_LABELS = [
   'Basic Info',
   'Health Goals',
   'Dietary Restrictions',
-  'Medical Conditions',
+  'Health Conditions',
   'Allergies',
 ];
 const emptyForm = {
@@ -22,6 +30,7 @@ const emptyForm = {
   weight: '',
   activity: '',
   goal: '',
+  health_goals: [],
   dietary: [],
   dietaryOther: '',
   medical: [],
@@ -43,6 +52,11 @@ function Onboarding() {
   const [dietaryList, setDietaryList] = useState([]);
   const [medicalList, setMedicalList] = useState([]);
   const [allergyList, setAllergyList] = useState([]);
+  const entryKey = (value, options) => resolveConstraintKey(value, Object.fromEntries(options.map(option => [option.key, option]))) || value.trim();
+  const customNotice = (value, options) => value.trim() && React.createElement('p', { className: 'form-hint', role: 'status' },
+    entryKey(value, options) !== value.trim() || options.some(option => option.key === value.trim())
+      ? 'This entry matches a supported rule.'
+      : 'This entry will stay recorded. Automatic meal selection stays blocked until a matching dietary rule is available. Choose a listed option if it accurately matches.');
   useEffect(() => {
     let mounted = true;
     async function loadOptions() {
@@ -122,9 +136,6 @@ function Onboarding() {
   function updateField(key, value) {
     setForm((f) => ({ ...f, [key]: value }));
   }
-  function toggleGoal(key) {
-    setForm((f) => ({ ...f, goal: key }));
-  }
   function toggleTag(field, key) {
     setForm((f) => {
       const list = f[field];
@@ -139,13 +150,14 @@ function Onboarding() {
       if (measurementError) return fail(measurementError);
       if (!form.fullName.trim()) return fail('Please enter your full name.');
       if (!form.age) return fail('Please enter your age.');
-      if (!form.sex) return fail('Please select your biological sex.');
+      if (!isSexChoice(form.sex)) return fail('Choose Male, Female or Prefer not to say.');
       if (!form.height) return fail('Please enter your height.');
       if (!form.weight) return fail('Please enter your weight.');
       if (!form.activity) return fail('Please select your activity level.');
     }
     if (step === 2) {
-      if (!form.goal) return fail('Please select a health goal.');
+      const goalError = healthGoalError(form);
+      if (goalError) return fail(goalError);
     }
     return true;
   }
@@ -173,27 +185,25 @@ function Onboarding() {
     if (!validateStep(1) || !validateStep(2)) { setCurrentStep(1); return; }
     setSaving(true);
     const dietary = [...form.dietary];
-    if (form.dietaryOther.trim()) dietary.push(form.dietaryOther.trim());
+    if (form.dietaryOther.trim()) dietary.push(entryKey(form.dietaryOther, dietaryList));
     const medical = [...form.medical];
-    if (form.medicalOther.trim()) medical.push(form.medicalOther.trim());
+    if (form.medicalOther.trim()) medical.push(entryKey(form.medicalOther, medicalList));
     const allergies = [...form.allergies];
-    if (form.allergiesOther.trim()) allergies.push(form.allergiesOther.trim());
-    const { error: dbError } = await supabase
-      .from('profiles')
-      .upsert({
-        id: session.user.id,
-        full_name: form.fullName.trim(),
-        age: parseInt(form.age),
-        sex: form.sex,
-        height_cm: parseFloat(form.height),
-        weight_kg: parseFloat(form.weight),
-        activity_level: form.activity,
-        goal: form.goal,
-        dietary_restrictions: dietary,
-        medical_conditions: medical,
-        allergies,
-        updated_at: new Date().toISOString(),
-      });
+    if (form.allergiesOther.trim()) allergies.push(entryKey(form.allergiesOther, allergyList));
+    const { error: dbError } = await saveHealthProfile(supabase, {
+      id: session.user.id,
+      full_name: form.fullName.trim(),
+      age: parseInt(form.age),
+      sex: form.sex,
+      height_cm: parseFloat(form.height),
+      weight_kg: parseFloat(form.weight),
+      activity_level: form.activity,
+      ...healthGoalFields(form),
+      dietary_restrictions: dietary,
+      medical_conditions: medical,
+      allergies,
+      updated_at: new Date().toISOString(),
+    });
     setSaving(false);
     if (dbError) {
       setError('Could not save: ' + dbError.message);
@@ -333,9 +343,9 @@ function Onboarding() {
                   onChange: (e) => updateField('sex', e.target.value),
                 },
                 React.createElement('option', { value: '' }, 'Select...'),
-                React.createElement('option', { value: 'male' }, 'Male'),
-                React.createElement('option', { value: 'female' }, 'Female'),
+                SEX_CHOICES.map(choice => React.createElement('option', { key: choice.value, value: choice.value }, choice.label)),
               ),
+              React.createElement('p', { className: 'sub', style: { marginTop: 8, fontSize: 12 } }, UNDISCLOSED_SEX_NOTE),
             ),
           ),
           React.createElement(
@@ -411,29 +421,11 @@ function Onboarding() {
           'div',
           { className: 'onboard-step' + (currentStep === 2 ? ' active' : '') },
           React.createElement('div', { className: 'onboard-step-icon' }, '\u{1F3AF}'),
-          React.createElement('h2', null, 'What is your main goal?'),
-          React.createElement(
-            'p',
-            { className: 'sub' },
-            'BLANE tailors your calorie targets and macro ratios around this.',
-          ),
-          React.createElement(
-            'div',
-            { className: 'goal-grid' },
-            goalsList.map((g) =>
-              React.createElement(
-                'div',
-                {
-                  key: g.key,
-                  className: 'goal-card' + (form.goal === g.key ? ' selected' : ''),
-                  onClick: () => toggleGoal(g.key),
-                },
-                React.createElement('span', { className: 'goal-card-icon' }, g.icon),
-                React.createElement('span', { className: 'goal-card-label' }, g.label),
-                React.createElement('span', { className: 'goal-card-desc' }, g.desc),
-              ),
-            ),
-          ),
+          React.createElement('h2', null, 'What are your health goals?'),
+          React.createElement(HealthGoalPicker, {
+            options: goalsList, value: form, disabled: saving,
+            onChange: next => setForm(previous => ({ ...previous, ...next })),
+          }),
         ),
         React.createElement(
           'div',
@@ -477,32 +469,35 @@ function Onboarding() {
               value: form.dietaryOther,
               onChange: (e) => updateField('dietaryOther', e.target.value),
             }),
+            customNotice(form.dietaryOther, dietaryList),
           ),
         ),
         React.createElement(
           'div',
           { className: 'onboard-step' + (currentStep === 4 ? ' active' : '') },
           React.createElement('div', { className: 'onboard-step-icon' }, '\u{1FA7A}'),
-          React.createElement('h2', null, 'Any medical conditions?'),
+          React.createElement('h2', null, 'Any health conditions or prescribed diets?'),
           React.createElement(
             'p',
             { className: 'sub' },
-            'Select conditions to guide configured checks. Seek qualified advice for medical dietary needs. Skip if none apply.',
+            MEDICAL_CONDITION_GUIDANCE,
           ),
           React.createElement(
             'div',
-            { className: 'tag-grid' },
+            { className: 'tag-grid medical-options-grid' },
             medicalList.map((opt) =>
               React.createElement(
-                'div',
+                'button',
                 {
                   key: opt.key,
-                  className: 'tag-pill' + (form.medical.includes(opt.key) ? ' selected' : ''),
+                  type: 'button',
+                  'aria-pressed': form.medical.includes(opt.key),
+                  className: 'tag-pill medical-option' + (form.medical.includes(opt.key) ? ' selected' : ''),
                   onClick: () => toggleTag('medical', opt.key),
                 },
                 React.createElement('span', { className: 'tag-pill-icon' }, opt.icon),
                 ' ',
-                opt.label,
+                React.createElement(MedicalConditionLabel, { option: opt }),
               ),
             ),
           ),
@@ -513,34 +508,37 @@ function Onboarding() {
             React.createElement('input', {
               className: 'form-input',
               type: 'text',
-              placeholder: "e.g. Lupus, Crohn's disease...",
+              placeholder: 'Enter another diagnosed condition',
               value: form.medicalOther,
               onChange: (e) => updateField('medicalOther', e.target.value),
             }),
+            customNotice(form.medicalOther, medicalList),
           ),
         ),
         React.createElement(
           'div',
           { className: 'onboard-step' + (currentStep === 5 ? ' active' : '') },
           React.createElement('div', { className: 'onboard-step-icon' }, '\u26A0\uFE0F'),
-          React.createElement('h2', null, 'Any food allergies?'),
+          React.createElement('h2', null, 'Do you have any food allergies?'),
           React.createElement(
             'p',
             { className: 'sub' },
-            'Select allergies to guide recorded ingredient checks. Verify ingredient labels before eating. Skip if none apply.',
+            ALLERGY_GUIDANCE,
           ),
           React.createElement(
             'div',
-            { className: 'tag-grid' },
+            { className: 'tag-grid medical-options-grid' },
             allergyList.map((opt) =>
               React.createElement(
-                'div',
+                'button',
                 {
                   key: opt.key,
-                  className: 'tag-pill' + (form.allergies.includes(opt.key) ? ' selected' : ''),
+                  type: 'button',
+                  'aria-pressed': form.allergies.includes(opt.key),
+                  className: 'tag-pill medical-option' + (form.allergies.includes(opt.key) ? ' selected' : ''),
                   onClick: () => toggleTag('allergies', opt.key),
                 },
-                opt.label,
+                React.createElement(AllergyLabel, { option: opt }),
               ),
             ),
           ),
@@ -551,10 +549,11 @@ function Onboarding() {
             React.createElement('input', {
               className: 'form-input',
               type: 'text',
-              placeholder: 'e.g. Shellfish, Peanuts...',
+              placeholder: 'Enter another food allergy',
               value: form.allergiesOther,
               onChange: (e) => updateField('allergiesOther', e.target.value),
             }),
+            customNotice(form.allergiesOther, allergyList),
           ),
         ),
         React.createElement(

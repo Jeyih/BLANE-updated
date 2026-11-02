@@ -1,4 +1,5 @@
 import { ingredientKey, parsePriceQuantity } from '../src/lib/pricing.js';
+import { reviewedMetroBackup, reviewedShopifyBackup, reviewedCakeBackup } from './retail-backups.js';
 function parseDuckBreastPrice(html, config) {
   const products = [];
   function walk(value) {
@@ -57,7 +58,9 @@ function parseWholeDuckPrice(html, config) {
   const section = html.match(
     new RegExp(config.priceSectionPattern),
   )?.[0];
-  const price = section?.match(new RegExp(config.pricePattern));
+  // The legacy database seed lost the peso symbol and contains an invalid *??.
+  // This strict parser still requires the reviewed product, PHP section and /kg basis.
+  const price = section?.match(/class=["']?priceUnit["']?[^>]*>[\s\S]*?(?:₱|&#8369;|&#x20b1;|PHP)\s*([\d,]+(?:\.\d+)?)\s*\/kg/i);
   if (!new RegExp(config.productPattern).test(html) || !price)
     throw new Error('Reviewed whole-duck identity or PHP/kg price changed.');
   const amount = Number(price[1].replace(/,/g, ''));
@@ -80,6 +83,25 @@ function parseWholeDuckPrice(html, config) {
     estimateType: 'product reference',
     notes: config.note,
   };
+}
+function parseProductPagePrice(html, config, url) {
+  const products = [];
+  function walk(value) {
+    if (!value || typeof value !== 'object') return;
+    if (value['@type'] === 'Product' || (Array.isArray(value['@type']) && value['@type'].includes('Product'))) products.push(value);
+    Object.values(value).forEach(child => Array.isArray(child) ? child.forEach(walk) : walk(child));
+  }
+  for (const [, json] of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try { walk(JSON.parse(json)); } catch {}
+  }
+  const product = products.find(p => ingredientKey(decodeProductName(p.name)) === ingredientKey(config.title));
+  const offers = product ? (Array.isArray(product.offers) ? product.offers : [product.offers]).filter(Boolean) : [];
+  const valid = offers.filter(o => o.priceCurrency === config.currency && o.url === url && Number(o.price) > 0 && Number.isFinite(Number(o.price)));
+  if (!valid.length || new Set(valid.map(o => Number(o.price))).size !== 1)
+    throw new Error('Exact product page, PHP offer or pack identity could not be verified.');
+  return productRecords(config, product.name, Number(valid[0].price), config.source, url, product.description || '').map(record => ({ ...record,
+    availability: /\/InStock$/.test(valid[0].availability || '') ? 'Listed in stock' : 'Stock status not confirmed',
+  }));
 }
 function parseRetailPrice(html, config) {
   const products = [];
@@ -200,19 +222,29 @@ async function fetchRetailPrices(previousRecords = [], referenceData) {
   }
   const records = [];
   const warnings = [];
+  const deadline = Date.now() + 20000;
   async function get(url) {
-    const response = await fetch(url, { signal: AbortSignal.timeout(12e3) });
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error('Source check time budget reached');
+    const response = await fetch(url, { signal: AbortSignal.timeout(Math.min(12e3, remaining)) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response;
   }
+  async function metroPage(config) {
+    const previous = previousRecords.find(p => config.names.includes(p.name) && p.sourceType === 'retailer' && p.sourceUrl);
+    const url = new URL(previous?.sourceUrl || config.url || 'https://shopmetro.ph/');
+    if (url.protocol !== 'https:' || url.hostname !== 'shopmetro.ph' || !url.pathname.startsWith('/product/'))
+      throw new Error('No reviewed Metro product page is available.');
+    return parseProductPagePrice(await (await get(url.href)).text(), config, url.href);
+  }
   function fallback(config, error) {
-    for (const name of config.names) {
+    for (const name of config.names || [config.name].filter(Boolean)) {
       const previous = previousRecords.find(
         (p) => p.key === ingredientKey(name) && p.sourceType === 'retailer' && p.sourceUrl,
       );
       if (previous) records.push({ ...previous, refreshStatus: 'cached' });
     }
-    warnings.push(`${config.names[0]}: source refresh unavailable (${error.message}).`);
+    warnings.push(`${config.names?.[0] || config.name || 'Retail product'}: source refresh unavailable (${error.message}).`);
   }
   const metroUrl = new URL('https://shopmetro.ph/wp-json/wc/store/v1/products');
   metroUrl.searchParams.set('include', metroSources.map((c) => c.id).join(','));
@@ -240,13 +272,34 @@ async function fetchRetailPrices(previousRecords = [], referenceData) {
           })),
         );
       } catch (error) {
-        fallback(config, error);
+        try { records.push(...await metroPage(config)); }
+        catch { fallback(config, error); }
       }
     }
   } catch (error) {
-    for (const config of metroSources) fallback(config, error);
+    // Limit page fallbacks to a few workers when the batched API is down.
+    let pageIndex = 0;
+    async function pageWorker() {
+      while (pageIndex < metroSources.length) {
+        const config = metroSources[pageIndex++];
+        try { records.push(...await metroPage(config)); } catch { fallback(config, error); }
+      }
+    }
+    await Promise.all([pageWorker(), pageWorker(), pageWorker()]);
   }
   let index = 0;
+  async function shopifyRecords(config) {
+    const url = `https://${config.host}/products/${config.handle}`;
+    const data = await (await get(`${url}.js`)).json();
+    const variant = config.variantTitle
+      ? data.variants?.find(v => v.title === config.variantTitle)
+      : data.variants?.length === 1 ? data.variants[0] : null;
+    if (!variant) throw new Error('Reviewed product variant is unavailable.');
+    return productRecords(config, data.title, Number(variant.price) / 100, config.source, url).map(p => ({
+      ...p, variant: config.variantTitle || null,
+      availability: variant.available ? 'Listed in stock' : 'Listed out of stock',
+    }));
+  }
   async function worker() {
     while (index < shopifySources.length) {
       const config = shopifySources[index++];
@@ -268,7 +321,29 @@ async function fetchRetailPrices(previousRecords = [], referenceData) {
           })),
         );
       } catch (error) {
-        fallback(config, error);
+        const backup = reviewedMetroBackup(config);
+        try {
+          const cake = reviewedCakeBackup(config);
+          if (cake) {
+            records.push(...parseCakeVariantPrice(await (await get(cake.url)).text(), cake));
+            continue;
+          }
+          const shopifyBackup = reviewedShopifyBackup(config);
+          if (shopifyBackup) {
+            records.push(...await shopifyRecords(shopifyBackup));
+            continue;
+          }
+          if (!backup) throw error;
+          const product = await (await get(`https://shopmetro.ph/wp-json/wc/store/v1/products/${backup.id}`)).json();
+          if (product.id !== backup.id || product.permalink !== backup.url ||
+              product.prices?.currency_code !== 'PHP' || product.prices.price_range)
+            throw new Error('Alternative product identity or PHP quote changed.');
+          records.push(...productRecords(backup, product.name,
+            Number(product.prices.price) / 10 ** Number(product.prices.currency_minor_unit),
+            backup.source, product.permalink, product.description).map(record => ({ ...record,
+              availability: product.is_in_stock ? 'Listed in stock' : 'Listed out of stock',
+            })));
+        } catch { fallback(config, error); }
       }
     }
   }
@@ -308,10 +383,41 @@ async function fetchRetailPrices(previousRecords = [], referenceData) {
   };
 }
 export {
+  parseCakeVariantPrice,
   decodeProductName,
   fetchRetailPrices,
   parseDuckBreastPrice,
   parseRetailPrice,
   parseWholeDuckPrice,
   productRecords,
+  parseProductPagePrice,
 };
+
+function parseCakeVariantPrice(html, config) {
+  const products = [];
+  for (const [, json] of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      const value = JSON.parse(json);
+      if (value['@type'] === 'Product') products.push(value);
+    } catch {}
+  }
+  const product = products.find(p => p.name === config.title && p.url === config.url);
+  const offers = product ? (Array.isArray(product.offers) ? product.offers : [product.offers]) : [];
+  const raw = html.match(/data-product_variations="([^"]*)"/)?.[1];
+  let variants;
+  try { variants = JSON.parse(decodeProductName(raw)); } catch { throw new Error('Cake size prices are unavailable.'); }
+  if (!Array.isArray(variants)) throw new Error('Cake size prices are unavailable.');
+  const variant = variants.find(v => v.variation_id === config.variationId
+    && v.attributes?.attribute_sizes === config.variantTitle);
+  const price = Number(variant?.display_price);
+  // The reviewed Solo size is also the public minimum PHP offer. Cross-check
+  // both representations instead of treating a range or a different tray as its price.
+  if (!product || !variant || !Number.isFinite(price) || price <= 0 || !offers.some(o =>
+    o.priceCurrency === 'PHP' && o.url === config.url && Number(o.lowPrice) === price
+    && Number(o.highPrice) >= price)) throw new Error('Exact cake variant or PHP offer changed.');
+  return productRecords(config, product.name, price, config.source, config.url).map(record => ({
+    ...record, description: `${product.name} — ${config.variantTitle}`, variant: config.variantTitle,
+    packQuantity: '1 Solo tub', requiresMeasuredQuantity: true,
+    availability: variant.is_in_stock ? 'Listed in stock' : 'Listed out of stock',
+  }));
+}

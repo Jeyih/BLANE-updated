@@ -13,6 +13,7 @@ const PRICE_REFERENCE_CATEGORIES = [
   'partial_raw_food',
   'fnri_portion',
   'fnri_portion_meta',
+  'recipe_cost_basis',
 ];
 
 function groupPriceReferenceRows(rows) {
@@ -40,6 +41,7 @@ function groupPriceReferenceRows(rows) {
     partialRawFoods: new Set(grouped.partial_raw_food.map((row) => row.entry_key)),
     fnriPortions: mapValues('fnri_portion', (data) => data),
     fnriPortionMeta: values('fnri_portion_meta')[0] || null,
+    recipeCostBases: mapValues('recipe_cost_basis', (data) => data),
   };
 }
 

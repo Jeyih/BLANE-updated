@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, SUPABASE_URL } from '../lib/supabase';
 import '../styles/explainai.css';
-import { mealReviewKey } from '../lib/meal-review';
+import { mealReviewKey, storeMealReview } from '../lib/meal-review';
+import { localMealStorage } from '../lib/account-storage';
 function getExplainMealUrl() {
   return SUPABASE_URL.replace('.supabase.co', '.functions.supabase.co') + '/explain-meal';
 }
@@ -85,16 +86,23 @@ async function requestMealExplanation(meal, profile, violations) {
     clearTimeout(timeout);
   }
 }
-function getMealExplanation(meal, profile, violations) {
-  const key = mealReviewKey(meal, profile, violations);
+export function getMealExplanation(meal, profile, violations = []) {
+  const accountKey = localMealStorage.keyFor('meal-review');
+  const key = accountKey + ':' + mealReviewKey(meal, profile, violations);
+  const cached = explanationCache.get(key);
+  if (cached && Date.now() - cached.savedAt >= 24 * 60 * 60 * 1000) explanationCache.delete(key);
   if (!explanationCache.has(key)) {
-    const request = requestMealExplanation(meal, profile, violations).catch((error) => {
+    const request = requestMealExplanation(meal, profile, violations).then(result => {
+      if (accountKey === localMealStorage.keyFor('meal-review')) storeMealReview(meal, profile, violations, result.verdict);
+      return result;
+    }).catch((error) => {
       explanationCache.delete(key);
       throw error;
     });
-    explanationCache.set(key, request);
+    explanationCache.set(key, { request, savedAt: Date.now() });
+    if (explanationCache.size > 100) explanationCache.delete(explanationCache.keys().next().value);
   }
-  return explanationCache.get(key);
+  return explanationCache.get(key).request;
 }
 function WhyButton({ meal, profile, violations = [], onReview }) {
   const [open, setOpen] = useState(false);

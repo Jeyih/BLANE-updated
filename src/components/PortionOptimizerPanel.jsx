@@ -1,3 +1,4 @@
+import { SLOT_OPTIMIZATIONS_KEY } from '../lib/week-plans.js';
 import { sessionMealStorage as sessionStorage, readStoredJson } from '../lib/account-storage.js';
 import { computeDailyTargets as sharedDailyTargets, nutritionProfile, mealForAi, normalizePortionResult } from '../../supabase/functions/_shared/nutrition.js';
 import React from 'react';
@@ -6,7 +7,7 @@ import { supabase, SUPABASE_URL } from '../lib/supabase';
 import '../styles/optimizer.css';
 const OPT_MIN_SCALE = 0.5;
 const OPT_MAX_SCALE = 2;
-function OptimizeButton({ open, onToggle, disabled = false }) {
+function OptimizeButton({ open, onToggle, disabled = false, disabledReason }) {
   return React.createElement(
     'button',
     {
@@ -14,7 +15,7 @@ function OptimizeButton({ open, onToggle, disabled = false }) {
       style: { borderColor: 'rgba(96,165,250,0.25)', color: '#60a5fa' },
       onClick: onToggle,
       disabled,
-      title: disabled ? 'Resolve dietary warnings or missing nutrition data first.' : 'Adjust portion size',
+      title: disabled ? (disabledReason || 'Resolve dietary warnings or missing nutrition data first.') : 'Adjust portion size',
     },
     React.createElement(
       'svg',
@@ -44,6 +45,7 @@ function getOptimizeMealUrl() {
   return SUPABASE_URL.replace('.supabase.co', '.functions.supabase.co') + '/optimize-meal';
 }
 function PortionOptimizerPanel({
+  optimizationKey,
   meal,
   profile,
   totalMealsToday,
@@ -51,7 +53,10 @@ function PortionOptimizerPanel({
   onClose,
   onApplied,
   onOriginalMeal,
+  blocked = false,
 }) {
+  const optimizationStorageKey = optimizationKey ? SLOT_OPTIMIZATIONS_KEY : 'blane_optimized_v2';
+  const storedMealKey = optimizationKey || meal?.id;
   const [applied, setApplied] = useState(false);
   const [originalRestored, setOriginalRestored] = useState(false);
   const [aiResult, setAiResult] = useState(null);
@@ -163,14 +168,15 @@ function PortionOptimizerPanel({
         : '\u2192 ' + result.scaleFactor.toFixed(2) + '\xD7 (Optimal)';
   const pBar = (val, target) => Math.min(Math.round((val / target) * 100), 120);
   function handleApply() {
-    const saved = readStoredJson(sessionStorage, 'blane_optimized_v2', {});
-    saved[meal.id] = {
+    if (blocked || aiLoading) return;
+    const saved = readStoredJson(sessionStorage, optimizationStorageKey, {});
+    saved[storedMealKey] = {
       scaleFactor: result.scaleFactor,
       ingredients: result.ingredients,
       optimizedKcal: result.optimizedKcal,
       appliedAt: new Date().toISOString(),
     };
-    sessionStorage.setItem('blane_optimized_v2', JSON.stringify(saved));
+    sessionStorage.setItem(optimizationStorageKey, JSON.stringify(saved));
     window.dispatchEvent(new Event('blane-portions-updated'));
     setApplied(true);
     setOriginalRestored(false);
@@ -179,12 +185,12 @@ function PortionOptimizerPanel({
   function handleOriginalMeal() {
     let saved = {};
     try {
-      saved = JSON.parse(sessionStorage.getItem('blane_optimized_v2') || '{}');
+      saved = JSON.parse(sessionStorage.getItem(optimizationStorageKey) || '{}');
     } catch {
       saved = {};
     }
-    delete saved[meal.id];
-    sessionStorage.setItem('blane_optimized_v2', JSON.stringify(saved));
+    delete saved[storedMealKey];
+    sessionStorage.setItem(optimizationStorageKey, JSON.stringify(saved));
     window.dispatchEvent(new Event('blane-portions-updated'));
     setApplied(false);
     setOriginalRestored(true);
@@ -464,7 +470,7 @@ function PortionOptimizerPanel({
         { className: 'opt-apply-row' },
         React.createElement(
           'button',
-          { className: 'opt-btn opt-btn-primary', onClick: handleApply, disabled: aiLoading },
+          { className: 'opt-btn opt-btn-primary', onClick: handleApply, disabled: aiLoading || blocked },
           React.createElement(
             'svg',
             {

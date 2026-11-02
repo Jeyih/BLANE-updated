@@ -1,3 +1,5 @@
+import { allergyCopy } from './allergy-copy.js';
+import { medicalConditionCopy } from './medical-condition-copy.js';
 export const normalized = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 export function asList(value) {
   if (Array.isArray(value)) return value.flatMap(asList);
@@ -38,10 +40,19 @@ export function constraintTokens(key, definition) {
   return [...new Set(tokens)];
 }
 export function activeConstraintKeys(profile, definitions) {
-  return [...asList(profile?.dietary_restrictions), ...asList(profile?.medical_conditions), ...asList(profile?.allergies)].map(v => Object.keys(definitions).find(k => normalized(k) === normalized(v) || normalized(definitions[k].label) === normalized(v))).filter((v,i,a) => v && a.indexOf(v) === i);
+  return [...asList(profile?.dietary_restrictions), ...asList(profile?.medical_conditions), ...asList(profile?.allergies)].map(v => resolveConstraintKey(v, definitions)).filter((v,i,a) => v && a.indexOf(v) === i);
 }
 export function unmatchedConstraints(profile, definitions) {
-  return [...asList(profile?.dietary_restrictions), ...asList(profile?.medical_conditions), ...asList(profile?.allergies)].filter(v => !Object.keys(definitions).some(k => normalized(k) === normalized(v) || normalized(definitions[k].label) === normalized(v)));
+  return [...asList(profile?.dietary_restrictions), ...asList(profile?.medical_conditions), ...asList(profile?.allergies)].filter(v => !resolveConstraintKey(v, definitions));
+}
+export function resolveConstraintKey(value, definitions) {
+  const matches = Object.keys(definitions).filter(key => {
+    const option = { key, ...definitions[key] };
+    return [key, option.label, allergyCopy(option).label, medicalConditionCopy(option).label]
+      .some(label => normalized(label) === normalized(value));
+  });
+  // Ambiguous matches require review; never guess from a partial name.
+  return matches.length === 1 ? matches[0] : null;
 }
 export function recipeViolations(recipe, active, filterOn = true, definitions = {}) {
   if (!filterOn || !active.length) return [];

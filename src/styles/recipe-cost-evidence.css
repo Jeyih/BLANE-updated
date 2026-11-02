@@ -1,0 +1,11 @@
+.cost-evidence { margin-top: 18px; }
+.cost-evidence summary { cursor: pointer; color: #dff7e8; }
+.cost-evidence label { display: grid; gap: 6px; margin: 12px 0; color: #dff7e8; }
+.cost-evidence input, .cost-evidence select, .cost-evidence textarea { width: 100%; box-sizing: border-box; background: #11291c; color: #ecfff3; border: 1px solid #356347; border-radius: 8px; padding: 10px; font: inherit; }
+.cost-evidence textarea { min-height: 100px; resize: vertical; }
+.cost-evidence .cost-evidence-confirm { display: flex; align-items: flex-start; gap: 10px; }
+.cost-evidence-confirm input { width: auto; margin-top: 5px; }
+.cost-evidence th, .cost-evidence td { text-align: left; padding: 12px; vertical-align: top; }
+.cost-evidence table { width: 100%; min-width: 620px; }
+.cost-evidence form { max-width: 720px; }
+.cost-evidence button { margin: 8px 10px 8px 0; }

@@ -1,0 +1,48 @@
+.health-goals-help, .health-goals-count {
+  color: #a2b9ac;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+.health-goals-count { color: #2ddc7a; }
+.health-goals-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.health-goal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 16px 12px;
+  background: #111f16;
+  border: 2px solid rgba(45, 220, 122, 0.14);
+  border-radius: 16px;
+  color: #e8f5ee;
+  font: inherit;
+  text-align: center;
+}
+button.health-goal { cursor: pointer; }
+button.health-goal:hover:not(:disabled), .health-goal.selected { border-color: #2ddc7a; }
+.health-goal.selected { background: rgba(45, 220, 122, 0.1); }
+button.health-goal:disabled { cursor: default; opacity: 0.5; }
+button.health-goal:disabled.selected { opacity: 1; }
+.health-goal-icon { font-size: 26px; }
+.health-goal-label { font-size: 13px; font-weight: 600; }
+.health-goal-desc { font-size: 12px; color: #a2b9ac; line-height: 1.5; }
+.health-goal-primary { color: #2ddc7a; font-size: 11px; font-weight: 600; }
+.health-goal-primary-field { margin-top: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.health-goal-primary-field label { color: #a2b9ac; font-size: 13px; }
+.health-goal-primary-field select {
+  background: #111f16;
+  border: 1px solid rgba(45, 220, 122, 0.3);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #e8f5ee;
+  font: inherit;
+  max-width: 100%;
+}
+.health-goals button:focus-visible, .health-goals select:focus-visible { outline: 2px solid #2ddc7a; outline-offset: 3px; }
+@media (max-width: 640px) { .health-goals-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 360px) { .health-goals-grid { grid-template-columns: 1fr; } }

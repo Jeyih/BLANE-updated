@@ -1,0 +1,324 @@
+[
+  {
+    "ingredient": "Banana heart, butuan, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3293",
+    "existingEvidence": "Fresh banana-heart price found, but exact butuan variety, trimming loss and cooking yield are not established. FNRI 100% applies to the boiled item, not an untrimmed raw blossom."
+  },
+  {
+    "ingredient": "Banana, saba, w/ sugar, fried",
+    "route": "Complete raw-component recipe costing",
+    "action": "Replace base-ingredient-only costing with all raw components, their purchase quantities, actual batch output and serving size. Check separately listed oil, garlic and milk for duplication; keep costing and nutrition bases explicit.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3683",
+    "existingEvidence": "FNRI identifies the prepared banana-cue food. A raw saba price excludes sugar and absorbed oil. The BLANE recipe also lists extra oil; review the prepared-food composition before adding more oil to its cost or nutrition. Ready-to-eat seller listings with piece counts do not establish a 70 g serving."
+  },
+  {
+    "ingredient": "Banana, saba, w/ sugar, wrapped, fried",
+    "route": "Complete raw-component recipe costing",
+    "action": "Replace base-ingredient-only costing with all raw components, their purchase quantities, actual batch output and serving size. Check separately listed oil, garlic and milk for duplication; keep costing and nutrition bases explicit.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3684",
+    "existingEvidence": "FNRI identifies turon. Raw banana alone excludes wrapper, sugar and absorbed oil. Found recipes/listings do not establish the exact cost and final weight of this stored 70 g turon."
+  },
+  {
+    "ingredient": "Bread, w/ margarine & sugar filling",
+    "route": "Use a matching packaged/ready-to-eat product",
+    "action": "Choose the exact plain/flavoured/prepared product used. Record edible net/drained weight or a genuine piece count. Fetch price automatically; calculate the portion from the same pack basis. Approximate piece-to-gram mappings stay unapproved.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/2992",
+    "existingEvidence": "Existing Spanish Bread X4 price is per piece. Its exact edible grams per piece were not established; the stored approximate one-piece / 90 g entry is not proof that one vendor piece weighs 90 g."
+  },
+  {
+    "ingredient": "Cassava fritter",
+    "route": "Complete raw-component recipe costing",
+    "action": "Replace base-ingredient-only costing with all raw components, their purchase quantities, actual batch output and serving size. Check separately listed oil, garlic and milk for duplication; keep costing and nutrition bases explicit.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3195",
+    "existingEvidence": "FNRI confirms the prepared cassava fritter, not raw cassava. A manufacturer catalogue contains a frozen tapioca fritter, but it is not a matching Philippine ready-to-eat weighed quote. Whole cassava excludes sugar/oil and cooking yield."
+  },
+  {
+    "ingredient": "Cassava, suman",
+    "route": "Complete raw-component recipe costing",
+    "action": "Replace base-ingredient-only costing with all raw components, their purchase quantities, actual batch output and serving size. Check separately listed oil, garlic and milk for duplication; keep costing and nutrition bases explicit.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3198",
+    "existingEvidence": "FNRI identifies cassava suman. Rice-based suman and raw cassava are different price bases. The app also lists coconut milk separately; establish the composite recipe and topping before costing the 130 g portion."
+  },
+  {
+    "ingredient": "Chicken, white meat, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3818",
+    "existingEvidence": "FNRI gives the edible fraction of the named cooked chicken item. Published whole-chicken yields cannot automatically become a white-meat yield, and a raw chicken quote still needs the matching cut, bones/skin basis and cooking factor."
+  },
+  {
+    "ingredient": "Chickpea, dried, boiled",
+    "route": "Use a matching packaged/ready-to-eat product",
+    "action": "Choose the exact plain/flavoured/prepared product used. Record edible net/drained weight or a genuine piece count. Fetch price automatically; calculate the portion from the same pack basis. Approximate piece-to-gram mappings stay unapproved.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3215",
+    "existingEvidence": "Current Ram 450 g price includes liquid. FNRI 86% is not a Ram brine-drain conversion. A Molinera seller states 400 g net / 240 g drained, but that is another brand/pack and is not transferable to Ram."
+  },
+  {
+    "ingredient": "Clam, halaan, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/4002",
+    "existingEvidence": "FNRI provides 52% edible portion for boiled halaan. The linked price is raw whole clam, so this still needs raw-to-cooked yield and confirmation of shell-inclusive purchase weight. Do not use cooked EP alone as a raw purchase conversion."
+  },
+  {
+    "ingredient": "Coconut milk",
+    "route": "Record actual recipe millilitres",
+    "action": "Specify the actual ml of the matching product used per serving or batch, then use its automatically refreshed price per litre. Published generic measures can guide a reference recipe but must not be called measurements of this batch.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/4262",
+    "existingEvidence": "A USDA canned-coconut-milk reference provides 15 g per tablespoon and 226 g per cup. This is published household-portion evidence, not measured Jolly density. Jolly 400 ml price is verified; confirm actual ml used or an appropriate product density for the stored grams."
+  },
+  {
+    "ingredient": "Cookies, polvoron",
+    "route": "Use a matching packaged/ready-to-eat product",
+    "action": "Choose the exact plain/flavoured/prepared product used. Record edible net/drained weight or a genuine piece count. Fetch price automatically; calculate the portion from the same pack basis. Approximate piece-to-gram mappings stay unapproved.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3060",
+    "existingEvidence": "Found Goldilocks Classic Polvoron 300 g / 12 pieces listing, a better plain-polvoron candidate than the current pinipig variant. Search-index price was PHP 214.50; live storefront requires JavaScript, so current checkout price was not independently confirmed."
+  },
+  {
+    "ingredient": "Corn, fried, seasoned",
+    "route": "Use a matching packaged/ready-to-eat product",
+    "action": "Choose the exact plain/flavoured/prepared product used. Record edible net/drained weight or a genuine piece count. Fetch price automatically; calculate the portion from the same pack basis. Approximate piece-to-gram mappings stay unapproved.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3070",
+    "existingEvidence": "Current Boy Bawang Cornick 100 g has a known ready-to-eat pack basis. It is garlic-flavoured, so confirm that this is the intended seasoned-corn product. A generic FNRI label does not verify a specific brand formulation."
+  },
+  {
+    "ingredient": "Crab, blue swimming, w/o fat, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/4018",
+    "existingEvidence": "FNRI provides 30% edible portion for cooked crab without fat. Current alimasag quote is raw whole crab; cooking loss and removal of shell/fat still need the correct basis. Generic foreign shellfish yields are not a species-specific local measurement."
+  },
+  {
+    "ingredient": "Duck liver",
+    "route": "Obtain exact supplier or revise the recipe",
+    "action": "Use a verified chicken-liver product in a renamed recipe if the team chooses that substitution. Rename the recipe/ingredient where necessary; recalculate nutrition and repeat dietary checks.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3827",
+    "existingEvidence": "FNRI exact food identity and EP found. Existing chicken-liver comparison is a different product; French foie gras and pet treats were rejected. No verified ordinary duck-liver Philippine retail quote with matching edible pack weight was found."
+  },
+  {
+    "ingredient": "Egg, chicken, whole, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/4216",
+    "existingEvidence": "FNRI provides 89% edible portion for the cooked egg. Bognar table 2 separately reports a boiled-egg edible yield of 0.90 from raw product. Current egg quotes are per piece, so egg size/raw weight or an exact piece basis remains necessary; these two factors must not be multiplied blindly."
+  },
+  {
+    "ingredient": "Eggplant, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3353",
+    "existingEvidence": "FNRI matches the cooked item. The raw whole-eggplant quote needs trimming and cooking yield. An eggplant stew factor is not a factor for plain boiled eggplant."
+  },
+  {
+    "ingredient": "Fish sauce",
+    "route": "Record actual recipe millilitres",
+    "action": "Specify the actual ml of the matching product used per serving or batch, then use its automatically refreshed price per litre. Published generic measures can guide a reference recipe but must not be called measurements of this batch.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/4334",
+    "existingEvidence": "USDA/FDA/NIH reference gives 18 g per tablespoon for ready-to-serve fish sauce. This supports a generic portion reference, not measured Tiparos density. The Tiparos 300 ml quote is current; record actual ml or a justified conversion."
+  },
+  {
+    "ingredient": "Glutinous rice w/ mung bean & cocomilk",
+    "route": "Complete raw-component recipe costing",
+    "action": "Replace base-ingredient-only costing with all raw components, their purchase quantities, actual batch output and serving size. Check separately listed oil, garlic and milk for duplication; keep costing and nutrition bases explicit.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/4426",
+    "existingEvidence": "Exact FNRI R006 record found, named Ginataang munggo. BLANE currently prices only the raw glutinous-rice base. Manufacturer recipe confirms that the composite food needs other components; its evaporated-milk variant and unmeasured final yield cannot silently replace this recipe."
+  },
+  {
+    "ingredient": "Lima bean pod, boiled",
+    "route": "Obtain exact supplier or revise the recipe",
+    "action": "First confirm the new species-specific farm offer and pod/shelled basis; otherwise choose a sourced alternative only after revising the recipe. A change to sitaw or another bean requires new names, nutrition and dietary checks.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3398",
+    "existingEvidence": "Found a Philippine farm listing for Lima beans / Patani at PHP 150/kg. It does not specify shelled versus pod weight or cooking state. This is a promising species-specific lead, not a complete cooked-pod quote. Planting seeds and Baguio beans were rejected."
+  },
+  {
+    "ingredient": "Mango, Manila super, ripe",
+    "route": "Confirm product form, then edible-yield estimate",
+    "action": "Confirm whole/shell-on versus cleaned form and raw/cooked state. Use the matched FNRI edible fraction only for the matching purchase basis; add a cooking factor if states differ.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3633",
+    "existingEvidence": "Exact FNRI E051 gives 67% edible portion and identifies manggang kalabaw. This can support a labelled purchase-weight reference if the quoted kinalabaw mango is the matching whole ripe variety. Divide edible grams by 0.67, rather than pricing pulp grams as whole fruit. Retail refresh returned 429, so its old quote date is retained."
+  },
+  {
+    "ingredient": "Milk, cow",
+    "route": "Published density estimate",
+    "action": "Use declared recipe grams with the appropriate published density and the latest litre-based source price. Retain an explicit reference-estimate label and source metadata.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/4248",
+    "existingEvidence": "FAO/INFOODS provides 1.03 g/ml for liquid milk. Together with the current Selecta 1 L listing, this supports a labelled generic density estimate; it is not a laboratory measurement of that brand or proof of the approximate household cup text."
+  },
+  {
+    "ingredient": "Milkfish, fried",
+    "route": "Complete raw-component recipe costing",
+    "action": "Replace base-ingredient-only costing with all raw components, their purchase quantities, actual batch output and serving size. Check separately listed oil, garlic and milk for duplication; keep costing and nutrition bases explicit.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/4056",
+    "existingEvidence": "FNRI provides 82% edible portion for fried milkfish. Current raw whole-bangus price lacks a matching raw-to-fried edible yield and absorbed-oil amount. Smoked or marinated boneless products are different prepared foods."
+  },
+  {
+    "ingredient": "Mung bean seed, green, dried, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3238",
+    "existingEvidence": "FNRI matches cooked green mung beans. The raw dry-bean quote needs a hydration/cooking factor. Factors for white/red beans are not automatically valid for mung beans; no exact applicable local factor was approved."
+  },
+  {
+    "ingredient": "Mussel, green, boiled",
+    "route": "Confirm product form, then edible-yield estimate",
+    "action": "Confirm whole/shell-on versus cleaned form and raw/cooked state. Use the matched FNRI edible fraction only for the matching purchase basis; add a cooking factor if states differ.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/4066",
+    "existingEvidence": "Current retailer offers blanched mussels per kg; FNRI cooked green-mussel EP is 48%. Confirm whether that retailer kg includes shell and whether blanching matches the cooked basis before dividing meat grams by 0.48."
+  },
+  {
+    "ingredient": "Oats, quick-cooking, ckd",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3112",
+    "existingEvidence": "Raw quick-cooking oats have a known 800 g pack. The app amount is cooked porridge, so dry oats plus water/milk and final batch weight must be specified. Serving instructions alone do not establish final cooked grams."
+  },
+  {
+    "ingredient": "Oil, corn",
+    "route": "Published density estimate",
+    "action": "Use declared recipe grams with the appropriate published density and the latest litre-based source price. Retain an explicit reference-estimate label and source metadata.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/4269",
+    "existingEvidence": "FAO/INFOODS provides 0.922 g/ml for vegetable corn oil. Current Marca Leon quote is per litre; recorded grams divided by 0.922 gives reference ml. Preserve this selected entry; another temperature-specific corn-oil value also exists."
+  },
+  {
+    "ingredient": "Okra, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3419",
+    "existingEvidence": "Exact FNRI cooked-okra EP is 90%, but this does not establish the raw-to-cooked factor. Found a current farm price for raw okra as an alternative lead; raw-to-boiled quantity still needs support."
+  },
+  {
+    "ingredient": "Peanut w/ shell, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3245",
+    "existingEvidence": "FNRI cooked in-shell peanut EP is 48%. The current quoted product is fresh raw peanuts, so raw purchase weight, water uptake during boiling and final shell/edible basis remain distinct. The cooked 48% fraction alone is not a raw conversion."
+  },
+  {
+    "ingredient": "Popcorn, salted",
+    "route": "Use a matching packaged/ready-to-eat product",
+    "action": "Choose the exact plain/flavoured/prepared product used. Record edible net/drained weight or a genuine piece count. Fetch price automatically; calculate the portion from the same pack basis. Approximate piece-to-gram mappings stay unapproved.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3118",
+    "existingEvidence": "The current source is microwave popcorn before popping, not weighed ready-to-eat salted popcorn. Need popped output weight and unpopped-kernel loss, or a matching salted ready-to-eat product with edible net grams."
+  },
+  {
+    "ingredient": "Pork, suckling, leg",
+    "route": "Obtain exact supplier or revise the recipe",
+    "action": "Specify a commonly sourced adult pork cut such as the actual cut used, rather than calling it suckling-pig leg. Match that cut to its own FNRI entry and source quote; recalculate nutrition and edible yield.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3904",
+    "existingEvidence": "Exact FNRI food is a suckling-pig leg with 56% EP. Adult pork shoulder is not the same cut/age. Whole roast cochinillo menus and approximate imported quarters do not establish a matching raw-leg edible-weight quote."
+  },
+  {
+    "ingredient": "Potato, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3175",
+    "existingEvidence": "FNRI matches boiled potato. Published potato-without-peel cooking-yield evidence exists, but a whole-potato quote also requires peel/trimming yield; do not equate whole purchase weight with peeled cooked weight."
+  },
+  {
+    "ingredient": "Quail meat",
+    "route": "Obtain exact supplier or revise the recipe",
+    "action": "Use verified chicken in a renamed chicken recipe if a valid quail supplier cannot be established. Do not keep an Adobong Pugo label after substituting chicken; recalculate nutrition and repeat dietary checks.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3910",
+    "existingEvidence": "Exact FNRI F203 gives 69% EP. Classified listings offer birds per pack with approximate weights and unclear current seller/food suitability. No acceptable current matching human-food quote was approved; chicken remains an explicitly different-product comparison."
+  },
+  {
+    "ingredient": "Rice cake, bibingka",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3135",
+    "existingEvidence": "FNRI A173 is bibingkang galapong. Existing supplier is bibingka malagkit, a separately identified FNRI food (A167). A known tray weight does not remove this recipe/variant mismatch."
+  },
+  {
+    "ingredient": "Rice cake, puto, brown",
+    "route": "Complete raw-component recipe costing",
+    "action": "Replace base-ingredient-only costing with all raw components, their purchase quantities, actual batch output and serving size. Check separately listed oil, garlic and milk for duplication; keep costing and nutrition bases explicit.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3138",
+    "existingEvidence": "FNRI identifies the prepared brown puto. Raw puto mix is not a finished 120 g serving. Need matching brown ready-to-eat puto with pack weight or every ingredient and final batch yield."
+  },
+  {
+    "ingredient": "Rice, well-milled, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/2982",
+    "existingEvidence": "Published rice-yield references exist, but vary by method/variety (including FAO polished-rice and Bognar long-grain polished-rice entries). Choose and label an applicable method, or measure the actual cooked batch. Never equate cooked grams with dry purchased grams."
+  },
+  {
+    "ingredient": "Rice, well-milled, fried",
+    "route": "Complete raw-component recipe costing",
+    "action": "Replace base-ingredient-only costing with all raw components, their purchase quantities, actual batch output and serving size. Check separately listed oil, garlic and milk for duplication; keep costing and nutrition bases explicit.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/2983",
+    "existingEvidence": "FNRI describes prepared fried rice, whereas current pricing uses raw rice alone. Manufacturer recipe confirms added oil/garlic/seasoning. The app sometimes lists garlic/oil separately too, so define the composite base before costing to avoid omissions or double counting."
+  },
+  {
+    "ingredient": "Shrimp paste, alamang",
+    "route": "Use a matching packaged/ready-to-eat product",
+    "action": "Choose the exact plain/flavoured/prepared product used. Record edible net/drained weight or a genuine piece count. Fetch price automatically; calculate the portion from the same pack basis. Approximate piece-to-gram mappings stay unapproved.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/4344",
+    "existingEvidence": "Manufacturer distinguishes Salted Shrimp Fry (Bagoong Alamang) from sauteed products, providing a better identity lead. A DOST paper documents a 340 g Lutong Bahay salted-shrimp product and a 2020-2021 price; that historical price is not a current retail quote. Current dried-shrimp/sauteed mappings are not automatically exact."
+  },
+  {
+    "ingredient": "Shrimp, giant tiger prawn",
+    "route": "Confirm product form, then edible-yield estimate",
+    "action": "Confirm whole/shell-on versus cleaned form and raw/cooked state. Use the matched FNRI edible fraction only for the matching purchase basis; add a cooking factor if states differ.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/4097",
+    "existingEvidence": "Exact FNRI G117 gives 63% edible portion. This can support an edible-weight estimate only when the supplier quote is whole raw prawns with the same head/shell basis. If already peeled/deheaded, 63% would wrongly add waste again. Retail live refresh was unavailable."
+  },
+  {
+    "ingredient": "Soy sauce",
+    "route": "Published density estimate",
+    "action": "Use declared recipe grams with the appropriate published density and the latest litre-based source price. Retain an explicit reference-estimate label and source metadata.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/4346",
+    "existingEvidence": "FAO/INFOODS provides 1.12 g/ml. Current Datu Puti 1 L quote plus stored grams supports a labelled density-based estimate; approximate teaspoons are not independently verified measurements."
+  },
+  {
+    "ingredient": "Sponge gourd fruit, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3499",
+    "existingEvidence": "Exact FNRI patola record found. A raw-gourd quote still needs peeling/trimming and cooking yield for the recorded boiled grams. A generic squash or zucchini factor is not automatically a patola factor."
+  },
+  {
+    "ingredient": "Squid, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/4112",
+    "existingEvidence": "Exact FNRI cooked squid EP is 98%. Raw whole squid may include innards and other waste not reflected by this cooked-stage percentage; cooking shrinkage still needs an applicable factor."
+  },
+  {
+    "ingredient": "Swamp cabbage lvs, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3522",
+    "existingEvidence": "FNRI matches cooked kangkong leaves. The raw market bunch may contain stems and trim; confirm the purchased form and boiling yield. Spinach is another species and its published factor is not an exact kangkong measurement."
+  },
+  {
+    "ingredient": "Sweet potato, w/ sugar, fried",
+    "route": "Complete raw-component recipe costing",
+    "action": "Replace base-ingredient-only costing with all raw components, their purchase quantities, actual batch output and serving size. Check separately listed oil, garlic and milk for duplication; keep costing and nutrition bases explicit.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3204",
+    "existingEvidence": "FNRI confirms the sugar-fried prepared food. Found manufacturer kamote-fries recipe is breaded/egg-based, not the same sugar-coated kamote cue, so it was not accepted as an exact replacement. Raw potato excludes coating and absorbed oil; review separately listed oil."
+  },
+  {
+    "ingredient": "Tamarind, unripe, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3677",
+    "existingEvidence": "FNRI matches boiled unripe tamarind. Raw whole tamarind quote needs confirmation of husk/seed handling and cooking yield for the edible portion used. Do not use paste or ripe tamarind as exact substitutes."
+  },
+  {
+    "ingredient": "Taro lvs, boiled",
+    "route": "Record or justify a raw-to-cooked batch yield",
+    "action": "Record raw purchased weight, trimmed/edible raw weight, cooked batch weight and number of servings once for the defined method, or document an applicable published yield as an estimate. Continue fetching unit prices automatically.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/3533",
+    "existingEvidence": "FNRI matches cooked taro leaves. Fresh or dried raw leaf quotes have different moisture and stem bases; no exact transferable cooking-yield factor was verified. The particular preparation needs a batch yield."
+  },
+  {
+    "ingredient": "Vinegar, coconut",
+    "route": "Record actual recipe millilitres",
+    "action": "Specify the actual ml of the matching product used per serving or batch, then use its automatically refreshed price per litre. Published generic measures can guide a reference recipe but must not be called measurements of this batch.",
+    "sourceUrl": "https://i.fnri.dost.gov.ph/fct/library/report/4350",
+    "existingEvidence": "Found plain coconut-sap vinegar from the producer: PHP 95 / 375 ml, listed sold out. It matches the plain-food concept better than spiced vinegar, but the recipe still needs measured ml or product-appropriate density. Stock and price are reference observations, not local availability."
+  }
+]

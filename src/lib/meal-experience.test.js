@@ -5,6 +5,8 @@ import {
   slotMinutes,
   timedSlotIndex,
   currentMealType,
+  mealScheduleForDay,
+  dashboardMealChoices,
   availableMealSlots,
   DEFAULT_SLOTS,
   isDessert,
@@ -21,6 +23,34 @@ test('Dashboard changes meal at Philippine schedule boundaries and midnight', ()
   assert.equal(currentMealType(new Date('2026-10-14T10:30:00Z')), 'Dinner');
   assert.equal(currentMealType(new Date('2026-10-14T16:00:00Z')), 'Breakfast');
   assert.equal(philippineClock(new Date('2026-10-14T16:00:00Z')).dateKey, '2026-10-15');
+});
+
+test('the recommendation schedule uses the current Philippine day and counts custom slots without crashing on malformed storage', () => {
+  const date = new Date('2026-10-31T23:00:00Z'); // Sunday morning in the Philippines.
+  const slots = [...DEFAULT_SLOTS, { type: 'Evening snack', time: '9:00 PM' }];
+  const plan = { 0: slots, 6: [{ type: 'Breakfast' }] };
+  assert.deepEqual(mealScheduleForDay(plan, date), slots);
+  assert.equal(mealScheduleForDay(plan, date).length, 5);
+  for (const value of [null, {}, { 0: [] }, { 0: 'invalid' }, { 0: [null, {}] }]) {
+    assert.deepEqual(mealScheduleForDay(value, date), DEFAULT_SLOTS);
+  }
+});
+
+test('Dashboard choices include Brunch, custom meals and each repeated meal slot with a distinct label', () => {
+  const morning = new Date('2026-11-01T00:00:00Z');
+  const slots = [
+    { id:'a', type:'Breakfast', time:'7:00 AM', mealId:'rice' },
+    { id:'b', type:'Breakfast', time:'8:00 AM', mealId:'rice' },
+    { id:'c', type:'Brunch', time:'10:00 AM', mealId:'soup' },
+    { id:'d', type:'Extra snack', time:'Your own', mealId:'corn' },
+    { id:'e', type:'Dinner', time:'6:30 PM', mealId:'soup' },
+  ];
+  const choices = dashboardMealChoices(slots, morning);
+  assert.deepEqual(choices.map(choice => choice.id), ['a','b','c','d','e']);
+  assert.notEqual(choices[0].label, choices[1].label);
+  assert.equal(choices[timedSlotIndex(choices.map(choice=>choice.slot), morning)].id, 'b');
+  assert.deepEqual(dashboardMealChoices(slots, new Date('2026-11-01T06:00:00Z')).map(choice=>choice.id), ['d','e']);
+  assert.deepEqual(dashboardMealChoices([], morning), []);
 });
 test('expired Dashboard options stay hidden until Philippine midnight without changing saved slots', () => {
   const slots = DEFAULT_SLOTS.map((slot, i) => ({ ...slot, mealId: `meal-${i}` }));
@@ -70,12 +100,8 @@ test('one-click meal selection preserves other meals, custom times and other day
     ],
     4: [{ mealId: 'tomorrow' }],
   });
-  const storage = {
-    getItem: () => value,
-    setItem: (_, next) => {
-      value = next;
-    },
-  };
+  const data = new Map([['blane_meal_plan', value]]);
+  const storage = { getItem: key => data.get(key) ?? null, setItem: (key, next) => { data.set(key, next); if (key === 'blane_meal_plan') value = next; } };
   const date = new Date('2026-10-14T04:00:00Z');
   addMealForToday({ id: 'new', type: 'Lunch' }, { date, storage });
   const plan = JSON.parse(value);
@@ -96,12 +122,8 @@ test('dessert records use their database meal type and are added to the snack sl
   assert.equal(isDessert({ name: 'Chicken Curry', type: 'Lunch', ingredients: [] }), false);
   assert.equal(isDessert({ name: 'Old dessert', type: 'Dessert' }), true);
   let value = 'broken data';
-  const storage = {
-    getItem: () => value,
-    setItem: (_, v) => {
-      value = v;
-    },
-  };
+  const data = new Map([['blane_meal_plan', value]]);
+  const storage = { getItem: key => data.get(key) ?? null, setItem: (key, next) => { data.set(key, next); if (key === 'blane_meal_plan') value = next; } };
   addMealForToday(
     { id: 'cake', type: 'Snack', is_dessert: true },
     { date: new Date('2026-10-14T07:00:00Z'), storage },

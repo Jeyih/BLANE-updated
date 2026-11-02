@@ -5,7 +5,42 @@ import {
   productRecords,
   parseWholeDuckPrice,
   parseDuckBreastPrice,
+  parseProductPagePrice,
+  fetchRetailPrices,
 } from './retail-prices.js';
+
+test('Metro public product page recovers a missing API product with exact identity and PHP pack price', () => {
+  const config = { title: 'Guzto Banana Chips 100g', names: ['Banana chips, sweetn'], basis: '100 g', currency: 'PHP', sourceCountry: 'PH' };
+  const url = 'https://shopmetro.ph/product/guzto-banana-chips-100g/';
+  const product = { '@type': 'Product', name: config.title, offers: { price: '70.50', priceCurrency: 'PHP', url, availability: 'http://schema.org/InStock' } };
+  const wrap = p => `<script type="application/ld+json">${JSON.stringify(p)}</script>`;
+  const result = parseProductPagePrice(wrap(product),config,url)[0];
+  assert.equal(result.price,705);
+  assert.equal(result.packPrice,70.5);
+  assert.equal(result.verified,true);
+  for (const changed of [{ ...product,name:'Other Chips 200g' }, { ...product,offers:{ ...product.offers,priceCurrency:'USD' } }, { ...product,offers:{ ...product.offers,url:'https://shopmetro.ph/product/different/' } }])
+    assert.throws(()=>parseProductPagePrice(wrap(changed),config,url));
+});
+
+test('password-protected supplier can use the reviewed live okra alternative without clearing cooked-yield uncertainty', async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async url => String(url).endsWith('/products/9649')
+    ? new Response(JSON.stringify({ id:9649,name:'Q Okra',permalink:'https://shopmetro.ph/product/okra-1kg/',description:'<p>Net Weight: 1KG</p>',prices:{price:'9500',currency_code:'PHP',currency_minor_unit:2,price_range:null},is_in_stock:true }))
+    : new Response('',{status:401});
+  try {
+    const result = await fetchRetailPrices([], {metroSources:[],shopifySources:[{host:'pindotlang.com',handle:'okra',names:['Okra, boiled']}],retailSpecials:{tocino:tocinoConfig,whole_duck:wholeDuckConfig,duck_breast:duckBreastConfig}});
+    const okra=result.records.find(r=>r.name==='Okra, boiled');
+    assert.equal(okra.price,95);assert.equal(okra.unit,'kg');assert.equal(okra.estimateType,'raw');
+    assert.equal(okra.sourceUrl,'https://shopmetro.ph/product/okra-1kg/');
+  } finally {globalThis.fetch=original;}
+});
+
+test('whole duck parser tolerates the malformed legacy rule while enforcing PHP per kg', () => {
+  const html = '<h1>Whole Duck Headless</h1><div class=product-price><span class=priceUnit>2.4 kg per bag<br> ₱ 598 /kg</span><span>1435</span><meta itemprop=priceCurrency content=PHP>';
+  const legacy = { ...wholeDuckConfig, pricePattern: '[\\s\\S]*??' };
+  assert.equal(parseWholeDuckPrice(html,legacy).price,598);
+  assert.throws(()=>parseWholeDuckPrice(html.replace('₱ 598 /kg','₱ 1435 /bag'),legacy));
+});
 const html = (product) =>
   `<script type="application/ld+json">${JSON.stringify({ '@graph': [product] })}<\/script>`;
 const duckBreastConfig = {

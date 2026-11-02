@@ -1,3 +1,12 @@
+import CustomProfileEntries from '../components/CustomProfileEntries';
+import { asList } from '../lib/constraint-rules.js';
+import { SEX_CHOICES, isSexChoice, sexChoiceLabel, UNDISCLOSED_SEX_NOTE } from '../lib/sex-choice.js';
+import AllergyLabel from '../components/AllergyLabel';
+import { ALLERGY_GUIDANCE } from '../lib/allergy-copy.js';
+import MedicalConditionLabel from '../components/MedicalConditionLabel';
+import { MEDICAL_CONDITION_GUIDANCE } from '../lib/medical-condition-copy.js';
+import HealthGoalPicker from '../components/HealthGoalPicker';
+import { selectedHealthGoals, healthGoalError, healthGoalFields, saveHealthProfile } from '../lib/health-goals.js';
 import { computeDailyTargets, validateMeasurements } from '../../supabase/functions/_shared/nutrition.js';
 import React from 'react';
 import { isProfileComplete } from '../lib/profile-readiness';
@@ -22,6 +31,7 @@ const EMPTY_PROFILE = {
   weight_kg: '',
   activity_level: '',
   goal: '',
+  health_goals: [],
   dietary_restrictions: [],
   medical_conditions: [],
   allergies: [],
@@ -48,6 +58,7 @@ function Profile() {
   });
   const [healthForm, setHealthForm] = useState({
     goal: '',
+    health_goals: [],
     dietary: [],
     medical: [],
     allergies: [],
@@ -57,11 +68,13 @@ function Profile() {
   const [toast, setToast] = useState({ message: '', error: false, visible: false });
   const [basicSaving, setBasicSaving] = useState(false);
   const [healthSaving, setHealthSaving] = useState(false);
+  const [pendingCustomEdits, setPendingCustomEdits] = useState({});
+  const hasPendingCustomEdits = Object.values(pendingCustomEdits).some(Boolean);
   const [passwordSaving, setPasswordSaving] = useState(false);
   useEffect(() => {
     if (!user) return;
     loadProfile();
-  }, [user]);
+  }, [user?.id]);
   useEffect(() => {
     let mounted = true;
     async function loadOptions() {
@@ -144,7 +157,12 @@ function Profile() {
       setLoading(false);
       return;
     }
-    const nextProfile = data || EMPTY_PROFILE;
+    const nextProfile = {
+      ...(data || EMPTY_PROFILE),
+      dietary_restrictions: asList(data?.dietary_restrictions),
+      medical_conditions: asList(data?.medical_conditions),
+      allergies: asList(data?.allergies),
+    };
     setProfile(nextProfile);
     setBasicForm({
       full_name: nextProfile.full_name || '',
@@ -156,6 +174,7 @@ function Profile() {
     });
     setHealthForm({
       goal: nextProfile.goal || '',
+      health_goals: selectedHealthGoals(nextProfile),
       dietary: nextProfile.dietary_restrictions || [],
       medical: nextProfile.medical_conditions || [],
       allergies: nextProfile.allergies || [],
@@ -185,7 +204,6 @@ function Profile() {
     const height = parseFloat(profile.height_cm) || 0;
     const weight = parseFloat(profile.weight_kg) || 0;
     const age = parseInt(profile.age, 10) || 0;
-    const sex = profile.sex || 'male';
     let bmi = null;
     let bmiCategory = 'Fill in profile';
     let bmiColor = '#2ddc7a';
@@ -211,7 +229,8 @@ function Profile() {
       const targets = isProfileComplete(profile) ? computeDailyTargets(profile) : null;
       calorieTdee = targets ? Math.round(targets.tdee) : null;
       calorieTarget = targets?.calories ?? null;
-      const label = targets ? "TDEE: " + calorieTdee.toLocaleString() + " kcal/day" : 'Complete your profile';
+      const label = targets ? "TDEE: " + calorieTdee.toLocaleString() + " kcal/day"
+        : profile.sex === 'prefer_not_to_say' ? 'Not estimated — biological sex not shared' : 'Complete your profile';
       const bmiMarkerPct = Math.min(Math.max((bmi - 10) / 30, 0), 1) * 100;
       return {
         bmiValue: bmiFixed,
@@ -274,6 +293,7 @@ function Profile() {
   function openHealthEdit() {
     setHealthForm({
       goal: profile.goal || '',
+      health_goals: selectedHealthGoals(profile),
       dietary: profile.dietary_restrictions || [],
       medical: profile.medical_conditions || [],
       allergies: profile.allergies || [],
@@ -286,8 +306,8 @@ function Profile() {
   function updateBasicForm(key, value) {
     setBasicForm((prev) => ({ ...prev, [key]: value }));
   }
-  function updateHealthGoal(key) {
-    setHealthForm((prev) => ({ ...prev, goal: key }));
+  function setCustomEntryEditing(field, pending) {
+    setPendingCustomEdits(previous => previous[field] === pending ? previous : { ...previous, [field]: pending });
   }
   function toggleHealthTag(field, value) {
     setHealthForm((prev) => {
@@ -298,6 +318,7 @@ function Profile() {
     });
   }
   async function saveBasicInfo() {
+    if (!isSexChoice(basicForm.sex)) { showToast('Choose Male, Female or Prefer not to say.', true); return; }
     const name = basicForm.full_name.trim();
     const age = Number(basicForm.age);
     const height = Number(basicForm.height_cm);
@@ -353,21 +374,21 @@ function Profile() {
     showToast('\u2713 Basic info saved successfully');
   }
   async function saveHealthInfo() {
-    if (!healthForm.goal) {
-      showToast('Please choose a health goal.', true);
+    if (hasPendingCustomEdits) { showToast('Apply or cancel the custom entry edit first.', true); return; }
+    const goalError = healthGoalError(healthForm);
+    if (goalError) {
+      showToast(goalError, true);
       return;
     }
     setHealthSaving(true);
-    const { error } = await supabase
-      .from('profiles')
-      .upsert({
-        id: user.id,
-        goal: healthForm.goal,
-        dietary_restrictions: healthForm.dietary,
-        medical_conditions: healthForm.medical,
-        allergies: healthForm.allergies,
-        updated_at: new Date().toISOString(),
-      });
+    const { error } = await saveHealthProfile(supabase, {
+      id: user.id,
+      ...healthGoalFields(healthForm),
+      dietary_restrictions: healthForm.dietary,
+      medical_conditions: healthForm.medical,
+      allergies: healthForm.allergies,
+      updated_at: new Date().toISOString(),
+    });
     setHealthSaving(false);
     if (error) {
       showToast('Error: ' + error.message, true);
@@ -375,7 +396,7 @@ function Profile() {
     }
     setProfile((prev) => ({
       ...prev,
-      goal: healthForm.goal,
+      ...healthGoalFields(healthForm),
       dietary_restrictions: healthForm.dietary,
       medical_conditions: healthForm.medical,
       allergies: healthForm.allergies,
@@ -677,9 +698,7 @@ function Profile() {
                     React.createElement(
                       'div',
                       { className: `pf-field-value${profile.sex ? '' : ' muted'}` },
-                      profile.sex
-                        ? profile.sex.charAt(0).toUpperCase() + profile.sex.slice(1)
-                        : '\u2014',
+                      sexChoiceLabel(profile.sex),
                     ),
                   ),
                   React.createElement(
@@ -775,9 +794,9 @@ function Profile() {
                           onChange: (e) => updateBasicForm('sex', e.target.value),
                         },
                         React.createElement('option', { value: '' }, 'Select...'),
-                        React.createElement('option', { value: 'male' }, 'Male'),
-                        React.createElement('option', { value: 'female' }, 'Female'),
+                        SEX_CHOICES.map(choice => React.createElement('option', { key: choice.value, value: choice.value }, choice.label)),
                       ),
+                      React.createElement('p', { className: 'pf-custom-note' }, UNDISCLOSED_SEX_NOTE),
                     ),
                     React.createElement(
                       'div',
@@ -965,26 +984,14 @@ function Profile() {
               React.createElement(
                 'div',
                 { className: 'pf-field-label', style: { marginBottom: 10 } },
-                'Health Goal',
+                'Health Goals',
               ),
-              React.createElement(
-                'div',
-                { className: 'pf-goal-display' },
-                allGoals.map((key) => {
-                  const meta = goalMeta[key] || { icon: '', label: key };
-                  const selected = (editingHealth ? healthForm.goal : profile.goal) === key;
-                  return React.createElement(
-                    'div',
-                    {
-                      key,
-                      className: `pf-goal-option${selected ? ' selected' : ''}${editingHealth ? '' : ' readonly'}`,
-                      onClick: editingHealth ? () => updateHealthGoal(key) : void 0,
-                    },
-                    React.createElement('span', { className: 'pf-goal-icon' }, meta.icon),
-                    React.createElement('span', { className: 'pf-goal-label' }, meta.label),
-                  );
-                }),
-              ),
+              React.createElement(HealthGoalPicker, {
+                options: allGoals.map(key => ({ key, ...(goalMeta[key] || { label: key }) })),
+                value: editingHealth ? healthForm : profile,
+                readOnly: !editingHealth, disabled: healthSaving,
+                onChange: next => setHealthForm(previous => ({ ...previous, ...next })),
+              }),
               React.createElement('div', { className: 'pf-section-divider' }),
               React.createElement(
                 'div',
@@ -1017,15 +1024,22 @@ function Profile() {
                   (!profile.dietary_restrictions || profile.dietary_restrictions.length === 0) &&
                   React.createElement('span', { className: 'pf-empty-tag' }, 'None selected'),
               ),
+              React.createElement(CustomProfileEntries, {
+                values: editingHealth ? healthForm.dietary : profile.dietary_restrictions,
+                options: dietaryOpts, editing: editingHealth, disabled: healthSaving, label: 'dietary restriction', allowAdd: true, addButtonLabel: 'Add restriction',
+                onChange: values => setHealthForm(previous => ({ ...previous, dietary: values })),
+                onEditingChange: pending => setCustomEntryEditing('dietary', pending),
+              }),
               React.createElement('div', { className: 'pf-section-divider' }),
               React.createElement(
                 'div',
                 { className: 'pf-field-label', style: { marginBottom: 10 } },
-                'Medical Conditions',
+                'Health conditions or prescribed diets',
               ),
+              editingHealth && React.createElement('p', { className: 'medical-condition-guidance' }, MEDICAL_CONDITION_GUIDANCE),
               React.createElement(
                 'div',
-                { className: 'pf-tag-grid' },
+                { className: 'pf-tag-grid medical-options-grid' },
                 (editingHealth
                   ? medicalOpts
                   : medicalOpts.filter((opt) =>
@@ -1035,29 +1049,38 @@ function Profile() {
                   const selected = editingHealth ? healthForm.medical.includes(opt.key) : true;
                   if (!editingHealth && !selected) return null;
                   return React.createElement(
-                    'div',
+                    editingHealth ? 'button' : 'div',
                     {
                       key: opt.key,
-                      className: `pf-tag-pill${selected ? ' selected' : ''}${editingHealth ? '' : ' readonly'}`,
+                      type: editingHealth ? 'button' : undefined,
+                      'aria-pressed': editingHealth ? selected : undefined,
+                      className: `pf-tag-pill medical-option${selected ? ' selected' : ''}${editingHealth ? '' : ' readonly'}`,
                       'data-value': opt.key,
                       onClick: editingHealth ? () => toggleHealthTag('medical', opt.key) : void 0,
                     },
-                    opt.label,
+                    React.createElement(MedicalConditionLabel, { option: opt }),
                   );
                 }),
                 !editingHealth &&
                   (!profile.medical_conditions || profile.medical_conditions.length === 0) &&
                   React.createElement('span', { className: 'pf-empty-tag' }, 'None selected'),
               ),
+              React.createElement(CustomProfileEntries, {
+                values: editingHealth ? healthForm.medical : profile.medical_conditions,
+                options: medicalOpts, editing: editingHealth, disabled: healthSaving, label: 'health condition', allowAdd: true, addButtonLabel: 'Add condition',
+                onChange: values => setHealthForm(previous => ({ ...previous, medical: values })),
+                onEditingChange: pending => setCustomEntryEditing('medical', pending),
+              }),
               React.createElement('div', { className: 'pf-section-divider' }),
               React.createElement(
                 'div',
                 { className: 'pf-field-label', style: { marginBottom: 10 } },
-                'Allergies',
+                'Food allergies',
               ),
+              editingHealth && React.createElement('p', { className: 'medical-condition-guidance' }, ALLERGY_GUIDANCE),
               React.createElement(
                 'div',
-                { className: 'pf-tag-grid' },
+                { className: 'pf-tag-grid medical-options-grid' },
                 (editingHealth
                   ? allergyOpts
                   : allergyOpts.filter((opt) => (profile.allergies || []).includes(opt.key))
@@ -1065,20 +1088,28 @@ function Profile() {
                   const selected = editingHealth ? healthForm.allergies.includes(opt.key) : true;
                   if (!editingHealth && !selected) return null;
                   return React.createElement(
-                    'div',
+                    editingHealth ? 'button' : 'div',
                     {
                       key: opt.key,
-                      className: `pf-tag-pill${selected ? ' selected' : ''}${editingHealth ? '' : ' readonly'}`,
+                      type: editingHealth ? 'button' : undefined,
+                      'aria-pressed': editingHealth ? selected : undefined,
+                      className: `pf-tag-pill medical-option${selected ? ' selected' : ''}${editingHealth ? '' : ' readonly'}`,
                       'data-value': opt.key,
                       onClick: editingHealth ? () => toggleHealthTag('allergies', opt.key) : void 0,
                     },
-                    opt.label,
+                    React.createElement(AllergyLabel, { option: opt }),
                   );
                 }),
                 !editingHealth &&
                   (!profile.allergies || profile.allergies.length === 0) &&
                   React.createElement('span', { className: 'pf-empty-tag' }, 'None selected'),
               ),
+              React.createElement(CustomProfileEntries, {
+                values: editingHealth ? healthForm.allergies : profile.allergies,
+                options: allergyOpts, editing: editingHealth, disabled: healthSaving, label: 'food allergy', allowAdd: true,
+                onChange: values => setHealthForm(previous => ({ ...previous, allergies: values })),
+                onEditingChange: pending => setCustomEntryEditing('allergies', pending),
+              }),
               editingHealth &&
                 React.createElement(
                   'div',
@@ -1098,7 +1129,7 @@ function Profile() {
                       className: 'pf-btn pf-btn-primary',
                       type: 'button',
                       onClick: saveHealthInfo,
-                      disabled: healthSaving,
+                      disabled: healthSaving || hasPendingCustomEdits,
                     },
                     healthSaving ? 'Saving\u2026' : 'Save Changes',
                   ),

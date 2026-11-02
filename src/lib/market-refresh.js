@@ -1,3 +1,5 @@
+import { weekStartKey } from './meal-calendar.js';
+import { readWeekPlan } from './week-plans.js';
 const MARKET_REFRESH_MS = 15e3;
 function isTarlacCityMarket(market) {
   const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -32,7 +34,8 @@ async function fetchMarketSnapshot(client, signal, recipeIds = []) {
 }
 function getMealPlanRecipeIds(storage) {
   try {
-    const plan = JSON.parse(storage.getItem('blane_meal_plan') || '{}');
+    const week = storage.getItem('blane_meal_plan_week') || weekStartKey();
+    const plan = readWeekPlan(storage, week) || {};
     const day = Number(storage.getItem('blane_meal_plan_day') || 0);
     const slots = Number.isInteger(day) && Array.isArray(plan?.[day]) ? plan[day] : [];
     return [

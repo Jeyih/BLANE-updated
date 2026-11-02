@@ -50,7 +50,7 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
         setWaterCups(todayLog2.water_ml == null ? '' : todayLog2.water_ml / 300);
         setCalories(todayLog2.calories_burned ?? '');
       }
-      if (data.length >= 2) setAlerts(detectDrift(data, profile));
+      setAlerts(detectDrift(data, profile));
       onLogsChange?.(data);
     }
     return true;
@@ -96,7 +96,8 @@ function FeedbackWidget({ profile, onProfileUpdate, onLogsChange }) {
   return React.createElement(
     'div',
     { className: 'fb-widget col-12', 'data-dashboard-tour': 'feedback' },
-    logsError && React.createElement('p', { role: 'alert' }, logsError),
+    logsError && React.createElement('div', { role: 'alert' }, logsError,
+      React.createElement('button', { type: 'button', onClick: loadRecentLogs, disabled: saving }, 'Retry health history')),
     React.createElement(
       'div',
       { className: 'fb-widget-header' },

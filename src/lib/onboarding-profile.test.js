@@ -30,3 +30,12 @@ test('a new account receives blank measurements rather than another user’s det
   assert.equal(fresh.fullName,'New user'); assert.equal(fresh.height,''); assert.equal(fresh.weight,'');
   assert.deepEqual(fresh.dietary,[]); assert.deepEqual(fresh.medical,[]); assert.deepEqual(fresh.allergies,[]);
 });
+
+test('preferring not to disclose sex completes registration and reloads without repeating setup', () => {
+  const undisclosed = { ...saved, sex: 'prefer_not_to_say' };
+  assert.equal(hasInitialProfile(undisclosed), true);
+  assert.equal(onboardingFormFromProfile(undisclosed).sex, 'prefer_not_to_say');
+  assert.equal(isProfileComplete(undisclosed), false);
+  assert.equal(hasInitialProfile({ ...saved, sex: '' }), false);
+  assert.equal(hasInitialProfile({ ...saved, sex: 'unknown' }), false);
+});

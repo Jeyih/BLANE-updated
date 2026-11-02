@@ -1,10 +1,9 @@
 import React from 'react';
 import { useMemo } from 'react';
 import '../styles/drift.css';
-const WEIGHTS = { weight: 0.3, sleep: 0.25, hydration: 0.2, bmi: 0.25 };
 function DriftWidget({ logs, profile }) {
   const analysis = useMemo(() => {
-    if (!logs || logs.length < 2) return null;
+    if (!logs || logs.length === 0) return null;
     return analyzeDrift(logs, profile);
   }, [logs, profile]);
   if (!analysis) {
@@ -25,98 +24,20 @@ function DriftWidget({ logs, profile }) {
           React.createElement('strong', null, 'Body Feedback Loop'),
           ' widget above to start logging your daily metrics.',
           React.createElement('br', null),
-          'Drift analysis will appear after ',
-          React.createElement('strong', null, '2+ days'),
-          ' of data.',
+          'Your summary will appear as soon as you save your first entry.',
         ),
       ),
     );
   }
-  const healthScore = computeHealthScore(analysis);
-  const scoreColor = getScoreColor(healthScore);
-  const scoreStatus = getScoreStatus(healthScore);
-  const scoreDesc = getScoreDesc(healthScore);
-  const circumf = 2 * Math.PI * 28;
-  const arcFill = healthScore != null ? (healthScore / 100) * circumf : 0;
   return React.createElement(
     'div',
     { className: 'drift-section col-12', 'data-dashboard-tour': 'drift' },
     React.createElement(Header, null),
-    React.createElement(
-      'div',
-      { className: 'drift-score-row' },
-      React.createElement(
-        'div',
-        { className: 'drift-score-circle-wrap' },
-        React.createElement(
-          'svg',
-          { viewBox: '0 0 72 72', width: '72', height: '72' },
-          React.createElement('circle', {
-            cx: '36',
-            cy: '36',
-            r: '28',
-            fill: 'none',
-            stroke: '#111f16',
-            strokeWidth: '7',
-          }),
-          React.createElement('circle', {
-            cx: '36',
-            cy: '36',
-            r: '28',
-            fill: 'none',
-            stroke: scoreColor,
-            strokeWidth: '7',
-            strokeDasharray: arcFill.toFixed(1) + ' ' + circumf.toFixed(1),
-            strokeLinecap: 'round',
-            transform: 'rotate(-90 36 36)',
-            style: { transition: 'stroke-dasharray 1s ease' },
-          }),
-        ),
-        React.createElement(
-          'div',
-          { className: 'drift-score-center' },
-          React.createElement(
-            'div',
-            { className: 'drift-score-num', style: { color: scoreColor } },
-            healthScore ?? '--',
-          ),
-          React.createElement('div', { className: 'drift-score-label-sm' }, '/ 100'),
-        ),
-      ),
-      React.createElement(
-        'div',
-        { className: 'drift-score-info' },
-        React.createElement(
-          'div',
-          { className: 'drift-score-status', style: { color: scoreColor } },
-          scoreStatus,
-        ),
-        React.createElement('div', { className: 'drift-score-desc' }, scoreDesc),
-      ),
-      React.createElement(
-        'div',
-        { className: 'drift-score-bar-wrap' },
-        React.createElement(
-          'div',
-          { className: 'drift-score-bar-label' },
-          React.createElement('span', null, 'Health Score'),
-          React.createElement(
-            'span',
-            { style: { color: scoreColor } },
-            healthScore ?? '--',
-            '/100',
-          ),
-        ),
-        React.createElement(
-          'div',
-          { className: 'drift-score-bar-bg' },
-          React.createElement('div', {
-            className: 'drift-score-bar-fill',
-            style: { width: (healthScore || 0) + '%', background: scoreColor },
-          }),
-        ),
-      ),
-    ),
+    React.createElement('div', { className: 'drift-score-info', style: { marginBottom: 20 }, role: 'status' },
+      React.createElement('strong', null, analysis.rawLogs.length === 1 ? 'First entry recorded' : 'Your recorded health summary'),
+      React.createElement('p', { className: 'drift-score-desc' },
+        'Based on your self-reported measurements. This is not a clinical health assessment. ',
+        analysis.rawLogs.length === 1 ? 'Add more entries to compare changes over time.' : 'Review the individual measurements and trends below.')),
     React.createElement(
       'div',
       { className: 'drift-cards-grid' },
@@ -168,7 +89,7 @@ function Header() {
         React.createElement(
           'div',
           { className: 'drift-sub' },
-          '7-day trend analysis \xB7 Auto-updated when you log health data',
+          'Latest summary and 7-day trends \xB7 Updated after each saved entry',
         ),
       ),
     ),
@@ -176,7 +97,7 @@ function Header() {
   );
 }
 function DriftCard({ metric, emoji, label, unit, chartValues, isLiters, isBmi }) {
-  if (!metric || metric.score == null) {
+  if (!metric || metric.latest == null) {
     return React.createElement(
       'div',
       { className: 'drift-card status-neutral' },
@@ -205,7 +126,7 @@ function DriftCard({ metric, emoji, label, unit, chartValues, isLiters, isBmi })
       ? metric.latest.toFixed(1)
       : metric.latest;
   const arrow = getTrendArrow(metric.trend);
-  const riskText = getRiskText(metric.key, metric.riskLevel);
+  const riskText = metric.riskLevel === 'neutral' ? 'Starting point' : getRiskText(metric.key, metric.riskLevel);
   const color = getChartColor(metric.riskLevel);
   return React.createElement(
     'div',
@@ -251,7 +172,7 @@ function MiniChart({ values, color }) {
       React.createElement(
         'text',
         { x: '0', y: '24', fill: '#4d6e5a', fontSize: '7', fontFamily: 'DM Sans,sans-serif' },
-        'Logging data\u2026',
+        'First entry saved — trend pending',
       ),
     );
   }
@@ -344,9 +265,9 @@ function analyzeDrift(logs, profile) {
   const weightVals = sorted.map((l) => l.weight_kg);
   const sleepVals = sorted.map((l) => l.sleep_hours);
   const waterVals = sorted.map((l) => l.water_ml);
-  const h = parseFloat(profile.height_cm) || 170;
+  const h = parseFloat(profile.height_cm);
   const bmiVals = weightVals.map((w) =>
-    w ? parseFloat((w / ((h / 100) * (h / 100))).toFixed(2)) : null,
+    w && h > 0 ? parseFloat((w / ((h / 100) * (h / 100))).toFixed(2)) : null,
   );
   return {
     weight: analyzeMetric('weight', weightVals, profile),
@@ -444,6 +365,19 @@ function analyzeMetric(key, values, profile) {
     riskLevel = score >= 80 ? 'good' : score >= 55 ? 'warning' : 'danger';
     contextText = '\u0394 ' + (weekChange >= 0 ? '+' : '') + weekChange.toFixed(2) + ' this week';
   }
+  if (valid.length === 1) {
+    trend = 'first entry';
+    trendBadge = 'stable';
+    if (key === 'weight') {
+      score = null;
+      riskLevel = 'neutral';
+      contextText = 'Starting weight recorded. Add another entry to compare.';
+    } else if (key === 'bmi') {
+      contextText = 'BMI from your recorded weight and profile height; no trend yet.';
+    } else {
+      contextText = 'Latest entry: ' + (key === 'hydration' ? (latest / 1000).toFixed(1) + ' L' : latest + ' hrs') + '; no trend yet.';
+    }
+  }
   return {
     key,
     values,
@@ -457,19 +391,6 @@ function analyzeMetric(key, values, profile) {
     riskLevel,
     contextText,
   };
-}
-function computeHealthScore(analysis) {
-  let totalWeight = 0,
-    weightedSum = 0;
-  Object.keys(WEIGHTS).forEach((key) => {
-    const m = analysis[key];
-    if (m?.score != null) {
-      weightedSum += m.score * WEIGHTS[key];
-      totalWeight += WEIGHTS[key];
-    }
-  });
-  if (totalWeight === 0) return null;
-  return Math.round(weightedSum / totalWeight);
 }
 function linearRegressionSlope(values) {
   const valid = values.filter((v) => v != null);
@@ -489,29 +410,6 @@ function standardDeviation(values) {
   const avg = values.reduce((s, v) => s + v, 0) / n;
   const sq = values.map((v) => (v - avg) ** 2);
   return Math.sqrt(sq.reduce((s, v) => s + v, 0) / n);
-}
-function getScoreColor(score) {
-  if (score == null) return '#4d6e5a';
-  if (score >= 80) return '#2ddc7a';
-  if (score >= 55) return '#fbbf24';
-  return '#f87171';
-}
-function getScoreStatus(score) {
-  if (score == null) return 'Insufficient Data';
-  if (score >= 85) return 'Excellent';
-  if (score >= 70) return 'Good';
-  if (score >= 55) return 'Fair';
-  if (score >= 40) return 'Needs Attention';
-  return 'At Risk';
-}
-function getScoreDesc(score) {
-  if (score == null) return 'Log more health data to generate your score.';
-  if (score >= 85) return 'Your health metrics are trending positively. Keep up the great habits!';
-  if (score >= 70) return 'Most metrics are on track. Minor improvements could boost your score.';
-  if (score >= 55) return 'Some metrics need attention. Review the drift cards below for details.';
-  if (score >= 40)
-    return 'Several metrics are showing unfavorable trends. Consider adjusting your routine.';
-  return 'Multiple risk signals detected. Review each metric and consult a health professional if needed.';
 }
 function getTrendArrow(trend) {
   const map = {

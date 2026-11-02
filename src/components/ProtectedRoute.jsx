@@ -4,6 +4,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { hasInitialProfile } from '../lib/onboarding-profile';
+import MealStateSync from './MealStateSync';
 function ProtectedRoute() {
   const { session, loading } = useAuth();
   const { pathname } = useLocation();
@@ -55,6 +56,6 @@ function ProtectedRoute() {
       React.createElement('button', { type: 'button', onClick: () => setRetry(value => value + 1) }, 'Try again'));
   }
   if (!setupOrProfile && profileState === 'needs-setup') return React.createElement(Navigate, { to: '/onboarding', replace: true });
-  return React.createElement(Outlet, null);
+  return React.createElement(MealStateSync, { key: session.user.id, userId: session.user.id }, React.createElement(Outlet, null));
 }
 export { ProtectedRoute as default };

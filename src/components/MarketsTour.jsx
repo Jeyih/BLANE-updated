@@ -10,24 +10,32 @@ const TOUR_STEPS = [
   {
     target: '[data-markets-tour="location"]',
     title: 'Set your location',
+    interactionTargets: ['[data-markets-tour="location"] .mk-locate-btn'],
     description:
       'Use Update Location to request your device\u2019s GPS position and update distances. Your browser may ask for location permission.',
   },
   {
     target: '[data-markets-tour="pin"]',
     title: 'Pin your location',
+    mobileLayoutTarget: '[data-markets-tour="map"]',
+    interactionLayers: ['[data-markets-tour="map"]'],
+    interactionTargets: ['[data-markets-tour="pin"]', '[data-markets-tour="map"] .leaflet-container', '[data-markets-tour="map"] .mk-map-controls button'],
     description:
-      'If GPS is unavailable, select Pin location and click the map. Distances update while market coverage stays within Tarlac City.',
+      'If GPS is unavailable, select Pin location and click the map. Use the map controls to zoom or recenter if needed. Distances update while market coverage stays within Tarlac City.',
   },
   {
     target: '[data-markets-tour="filters"]',
     title: 'Filter nearby market types',
+    interactionTargets: ['[data-markets-tour="filters"] button'],
     description:
       'Show all listed Tarlac City markets or filter by palengke, supermarket, talipapa, or grocery. The count shows how many match.',
   },
   {
     target: '[data-markets-tour="map"]',
     title: 'Explore the map',
+    mobileLayoutTarget: '[data-markets-tour="map"]',
+    interactionLayers: ['[data-markets-tour="map"]'],
+    interactionTargets: ['[data-markets-tour="map"] .leaflet-container', '[data-markets-tour="map"] .mk-map-controls button'],
     description:
       'Colored pins distinguish market types. Select a pin to focus its market, and use the controls to zoom or recenter the map. The legend explains the pin colors.',
   },
@@ -40,6 +48,7 @@ const TOUR_STEPS = [
   {
     target: '[data-markets-tour="list"]',
     title: 'Click a store to open it',
+    interactionTargets: ['[data-markets-tour="list"] .mk-market-card'],
     description:
       'Click any store card in the list above. Its details will open below, and Next will become available once a store is selected.',
     requiresSelection: true,
@@ -61,3 +70,4 @@ function MarketsTour({ isOpen, onClose, hasSelectedMarket }) {
   });
 }
 export { MarketsTour as default };
+export { TOUR_STEPS as MARKET_TOUR_STEPS };

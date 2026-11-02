@@ -10,7 +10,7 @@ function reportLinks(html, now = Date.now()) {
       } catch {
         return [];
       }
-      if (url.hostname !== 'www.da.gov.ph' || !/Weekly-Average-Prices.*\.pdf$/i.test(url.pathname))
+      if (!['www.da.gov.ph', 'da.gov.ph'].includes(url.hostname) || url.protocol !== 'https:' || !/Weekly-Average-Prices.*\.pdf$/i.test(url.pathname))
         return [];
       const label = raw
         .replace(/<[^>]+>/g, '')

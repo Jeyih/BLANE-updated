@@ -40,6 +40,20 @@ test('configured writer persists both refreshed sources using the restricted RPC
   assert.ok(writes.every(w => w.name === 'replace_price_reference_data'));
   assert.equal(writes.find(w => w.payload.p_catalogues.includes('retail_price')).payload.p_entries[0].data.price, 40);
 });
+
+test('a configured writer failure is reported as memory mode while fresh source quotes stay available', async () => {
+  const client = database();
+  client.rpc = async () => ({ error: { message: 'database unavailable' } });
+  const handler = createHandler({ ...loaders, access: () => ({ client, canPersist: true }) });
+  const error = console.error; console.error = () => {};
+  try {
+    const data = JSON.parse((await handler({ httpMethod: 'GET' })).body);
+    assert.equal(data.persistence, 'memory');
+    assert.equal(data.persistenceFailed, true);
+    assert.equal(data.records[1].price, 40);
+    assert.match(data.warning, /could not be saved/);
+  } finally { console.error = error; }
+});
 test('initial configuration errors are retryable and do not leak credentials in responses', async () => {
   let failed = true;
   const handler = createHandler({ ...loaders, access: () => {

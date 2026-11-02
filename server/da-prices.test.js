@@ -49,6 +49,12 @@ const daCatalog = [
   { name: 'Tomato', pattern: '^Tomato\\b' },
 ];
 
+test('accepts both official DA hosts but rejects lookalikes and insecure links', () => {
+  const link = host => `<a href="${host}/Weekly-Average-Prices-October-5-11-2026.pdf">October 5-11, 2026</a>`;
+  const rows = reportLinks(['https://da.gov.ph', 'https://www.da.gov.ph', 'https://da.gov.ph.example.com', 'http://da.gov.ph'].map(link).join(''), Date.parse('2026-11-02'));
+  assert.equal(rows.length, 2);
+});
+
 test('selects the newest completed report across month and year boundaries', () => {
   const link = (label) =>
     `<a href="https://www.da.gov.ph/Weekly-Average-Prices-${label}.pdf">${label}</a>`;

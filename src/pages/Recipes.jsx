@@ -7,7 +7,6 @@ import { supabase } from '../lib/supabase';
 import { useIngredientPrices } from '../context/PriceContext';
 import {
   applyDynamicRecipePrices,
-  formatPrice,
   formatEstimatedPrice,
   pricingLabel,
 } from '../lib/pricing';
@@ -16,11 +15,10 @@ import PriceEstimateNotice from '../components/PriceEstimateNotice';
 import '../styles/meal-experience.css';
 import Navbar from '../components/Navbar';
 import RecipesTour from '../components/RecipesTour';
+import RecipeIngredient from '../components/RecipeIngredient';
 import { scoreRecipe } from '../lib/seasonal';
 import {
   SeasonBadge,
-  IngSeasonTag,
-  SeasonalAltBanner,
   CurrentSeasonPill,
 } from '../components/SeasonalBadges';
 import {
@@ -143,6 +141,7 @@ function Recipes() {
     (ingRes.data || []).forEach((ing) => {
       if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
       ingByRecipe[ing.recipe_id].push({
+        id: ing.id,
         name: ing.name || ing.ingredient_name || ing.food_name,
         ingredient_name: ing.ingredient_name,
         food_name: ing.food_name,
@@ -415,16 +414,13 @@ function Recipes() {
 function RecipeCard({ recipe, activeConstraints, constraintDefinitions, onClick, onUse }) {
   const seasonScore = scoreRecipe(recipe.ingredients);
   const violations = checkRecipeViolations(recipe, activeConstraints, true, constraintDefinitions);
-  const bannerGlow = seasonScore.cssClass === 'in-season' ? ' in-season-glow' : '';
-  const stripeClass = violations.some((v) => v.severity === 'allergy') ? ' violation-stripe' : '';
   const hasViolation = violations.length > 0;
   return React.createElement(
     'div',
     { className: 'recipe-card' + (hasViolation ? ' has-violation' : ''), onClick },
     React.createElement(
       'div',
-      { className: 'recipe-card-banner' + bannerGlow + stripeClass },
-      recipe.emoji,
+      { className: 'recipe-card-labels' },
       React.createElement('span', { className: 'recipe-card-type-tag' }, recipe.type),
       React.createElement(
         'span',
@@ -439,11 +435,10 @@ function RecipeCard({ recipe, activeConstraints, constraintDefinitions, onClick,
       React.createElement(
         'div',
         { className: 'recipe-card-meta' },
-        React.createElement('span', null, '\u23F1 ', recipe.cookTime, ' min'),
+        React.createElement('span', null, recipe.cookTime, ' min'),
         React.createElement(
           'span',
           null,
-          '\u{1F37D}\uFE0F ',
           recipe.servings,
           ' ',
           recipe.servings === 1 ? 'serving' : 'servings',
@@ -470,8 +465,8 @@ function RecipeCard({ recipe, activeConstraints, constraintDefinitions, onClick,
           React.createElement('b', null, recipe.fats, 'g'),
           ' F',
         ),
-        React.createElement(SeasonBadge, { scoreResult: seasonScore }),
-        React.createElement(ViolationBadge, { violations }),
+        React.createElement(SeasonBadge, { scoreResult: seasonScore, textOnly: true }),
+        React.createElement(ViolationBadge, { violations, textOnly: true }),
       ),
       React.createElement(
         'div',
@@ -488,7 +483,7 @@ function RecipeCard({ recipe, activeConstraints, constraintDefinitions, onClick,
           formatEstimatedPrice(recipe.cost),
           React.createElement('div', { className: 'price-estimate-note' }, pricingLabel(recipe)),
         ),
-        React.createElement('div', { className: 'recipe-card-view-btn' }, 'View recipe \u2192'),
+        React.createElement('div', { className: 'recipe-card-view-btn' }, 'View recipe'),
         React.createElement(
           'button',
           {
@@ -663,74 +658,16 @@ function RecipeModal({
         React.createElement(
           'p',
           { className: 'modal-section-note' },
-          'Amounts are in grams (g), unless another unit is listed.',
+          'Recipe quantities and source pack prices are shown separately.',
         ),
         React.createElement(
           'div',
           { className: 'modal-ingredients' },
-          recipe.ingredients.map((ing) =>
-            React.createElement(
-              'div',
-              { key: ing.name },
-              React.createElement(
-                'div',
-                { className: 'modal-ingredient-row' },
-                React.createElement('div', { className: 'modal-ing-dot' }),
-                React.createElement('span', { className: 'modal-ing-name' }, ing.name),
-                React.createElement(
-                  'span',
-                  { className: 'modal-ing-qty' },
-                  formatIngredientQuantity(ing.qty),
-                ),
-                React.createElement(IngSeasonTag, { ingredientName: ing.name }),
-                React.createElement(
-                  'span',
-                  { className: 'modal-ing-status ' + ing.status },
-                  ing.status === 'avail' ? '\u2713' : '\u26A0',
-                ),
-              ),
-              React.createElement(
-                'div',
-                { className: 'price-estimate-note' },
-                formatEstimatedPrice(ing.cost),
-                ' \xB7 ',
-                ing.evidence?.label,
-                ing.priceRecords?.map((p) =>
-                  React.createElement(
-                    'div',
-                    { key: p.sourceUrl },
-                    React.createElement(
-                      'a',
-                      { href: p.sourceUrl, target: '_blank', rel: 'noreferrer' },
-                      p.source,
-                    ),
-                    ' \xB7 ',
-                    p.observedAt,
-                    React.createElement('br', null),
-                    p.description,
-                    ' \xB7 ',
-                    formatPrice(p.price),
-                    ' / ',
-                    p.unit,
-                    React.createElement('br', null),
-                    p.notes,
-                    p.conversionNote && React.createElement('div', null, p.conversionNote),
-                    p.conversionSourceUrl &&
-                      React.createElement(
-                        'div',
-                        null,
-                        React.createElement(
-                          'a',
-                          { href: p.conversionSourceUrl, target: '_blank', rel: 'noreferrer' },
-                          'View Philippine portion reference',
-                        ),
-                      ),
-                  ),
-                ),
-              ),
-              React.createElement(SeasonalAltBanner, { ingredientName: ing.name }),
-            ),
-          ),
+          recipe.ingredients.map((ing, index) => React.createElement(RecipeIngredient, {
+            key: ing.id || ing.name + '-' + index,
+            ingredient: ing,
+            quantity: formatIngredientQuantity(ing.qty),
+          })),
         ),
         React.createElement('div', { className: 'modal-section-title' }, 'How to Cook'),
         React.createElement(

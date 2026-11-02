@@ -101,7 +101,9 @@ function Markets() {
     function handleMealPlanStorage(event) {
       if (
         localStorage.matches(event.key, 'blane_meal_plan') ||
-        localStorage.matches(event.key, 'blane_meal_plan_day')
+        localStorage.matches(event.key, 'blane_meal_plan_day') ||
+        localStorage.matches(event.key, 'blane_meal_plan_week') ||
+        localStorage.matches(event.key, 'blane_meal_plan_weeks_v1')
       ) {
         refreshMealPlanIngredients();
       }

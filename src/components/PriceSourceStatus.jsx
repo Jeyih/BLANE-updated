@@ -1,6 +1,6 @@
 import React from 'react';
 import { useIngredientPrices } from '../context/PriceContext';
-import { formatPrice } from '../lib/pricing';
+import { formatSourcePrice } from '../lib/pricing';
 import IngredientPriceCatalogue from './IngredientPriceCatalogue';
 import '../styles/prices.css';
 function PriceSourceStatus({ showCatalog = false }) {
@@ -86,6 +86,7 @@ function PriceSourceStatus({ showCatalog = false }) {
         'View official DA report',
       ),
     showCatalog && React.createElement(IngredientPriceCatalogue, null),
+    React.createElement('p', null, 'Soy sauce, corn oil and liquid milk can use published FAO/INFOODS density estimates to convert recipe grams into litres. Exact declared metric volumes take priority. Open ingredient evidence for the calculation.'),
     showCatalog &&
       React.createElement(
         'details',
@@ -142,17 +143,7 @@ function PriceSourceStatus({ showCatalog = false }) {
                   React.createElement(
                     'td',
                     null,
-                    formatPrice(p.price),
-                    ' / ',
-                    p.unit,
-                    p.packPrice &&
-                      React.createElement(
-                        'div',
-                        { className: 'price-estimate-note' },
-                        formatPrice(p.packPrice),
-                        ' / ',
-                        p.packQuantity,
-                      ),
+                    formatSourcePrice(p),
                   ),
                   React.createElement('td', null, p.region, ' \xB7 ', p.observedAt),
                 ),

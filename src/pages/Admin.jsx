@@ -4,10 +4,13 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useIngredientPrices } from '../context/PriceContext';
-import { marketIngredientPriceText } from '../lib/pricing';
+import { marketIngredientPriceText, loadAllPriceRows, formatEstimatedPrice, pricingLabel } from '../lib/pricing';
+import { adminRecipePrices } from '../lib/admin-recipe-prices.js';
+import { sortFoodData } from '../lib/admin-food-data.js';
 import { isAdmin } from '../lib/admin-auth';
 import { loadConstraintDefinitions } from '../lib/constraints';
 import PriceSourceStatus from '../components/PriceSourceStatus';
+import RecipeCostEvidence from '../components/RecipeCostEvidence';
 import '../styles/admin.css';
 import '../styles/nav.css';
 const MARKET_TYPES = [
@@ -104,7 +107,7 @@ const EMPTY_FNRI = {
 };
 function Admin() {
   const { user, loading, logout } = useAuth();
-  const { records: priceRecords, referenceData } = useIngredientPrices();
+  const { records: priceRecords, referenceData, recipeIngredients: catalogueIngredients, loading: pricesLoading, refresh: refreshPrices } = useIngredientPrices();
   const navigate = useNavigate();
   const [adminStatus, setAdminStatus] = useState('checking');
   const [activeTab, setActiveTab] = useState('markets');
@@ -116,7 +119,10 @@ function Admin() {
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [searchMarkets, setSearchMarkets] = useState('');
   const [searchRecipes, setSearchRecipes] = useState('');
+  const [recipePriceSort, setRecipePriceSort] = useState(null);
   const [searchFnri, setSearchFnri] = useState('');
+  const [fnriSort, setFnriSort] = useState({ key: 'food_name', direction: 'asc' });
+  const [fnriPage, setFnriPage] = useState(0);
   const [searchOptions, setSearchOptions] = useState('');
   const [marketModalOpen, setMarketModalOpen] = useState(false);
   const [marketModalMode, setMarketModalMode] = useState('add');
@@ -200,9 +206,8 @@ function Admin() {
     return markets.filter((market) => market.name.toLowerCase().includes(query));
   }, [markets, searchMarkets]);
   const filteredRecipes = useMemo(() => {
-    const query = searchRecipes.toLowerCase();
-    return recipes.filter((recipe) => recipe.name.toLowerCase().includes(query));
-  }, [recipes, searchRecipes]);
+    return adminRecipePrices(recipes, catalogueIngredients, priceRecords, referenceData || {}, searchRecipes, recipePriceSort);
+  }, [recipes, searchRecipes, recipePriceSort, catalogueIngredients, priceRecords, referenceData]);
   const computedNutrition = useMemo(() => {
     let kcal = 0;
     let protein = 0;
@@ -234,13 +239,24 @@ function Admin() {
     };
   }, [recipeIngredients, fnriNutrientCache, recipeForm.servings]);
   const filteredFnri = useMemo(() => {
-    const query = searchFnri.toLowerCase();
-    return fnriItems.filter(
+    const query = searchFnri.toLowerCase().trim();
+    return sortFoodData(fnriItems.filter(
       (item) =>
         item.food_name.toLowerCase().includes(query) ||
+        String(item.fct_id).toLowerCase().includes(query) ||
         (item.alternate_name || '').toLowerCase().includes(query),
-    );
-  }, [fnriItems, searchFnri]);
+    ), fnriSort, priceRecords, referenceData || {});
+  }, [fnriItems, searchFnri, fnriSort, priceRecords, referenceData]);
+  const currentFnriPage = Math.min(fnriPage, Math.max(0, Math.ceil(filteredFnri.length / 100) - 1));
+  const visibleFnri = filteredFnri.slice(currentFnriPage * 100, (currentFnriPage + 1) * 100);
+  function foodSortHeader(key, label) {
+    const active = fnriSort.key === key;
+    return React.createElement('th', { 'aria-sort': active ? (fnriSort.direction === 'asc' ? 'ascending' : 'descending') : 'none' },
+      React.createElement('button', { type: 'button', className: 'ad-sort-btn',
+        title: key === 'price' ? 'Shows original source packs; sorting compares the price per kg, litre or piece.' : undefined,
+        onClick: () => { setFnriPage(0); setFnriSort({ key, direction: active && fnriSort.direction === 'asc' ? 'desc' : 'asc' }); },
+      }, `${label} ${active ? (fnriSort.direction === 'asc' ? '↑' : '↓') : '↕'}`));
+  }
   const filteredOptionLists = useMemo(() => {
     const query = searchOptions.toLowerCase();
     return optionLists
@@ -368,15 +384,12 @@ function Admin() {
     setRecipes(data || []);
   }
   async function loadFnri() {
-    const { data, error } = await supabase
-      .from('fnri_food_composition')
-      .select('*')
-      .order('food_name');
-    if (error) {
+    try {
+      const data = await loadAllPriceRows(supabase, 'fnri_food_composition', '*', 'fct_id');
+      setFnriItems(data);
+    } catch (error) {
       showToast('Error loading FNRI items: ' + error.message, true);
-      return;
     }
-    setFnriItems(data || []);
   }
   async function loadOptionLists() {
     const { data, error } = await supabase
@@ -429,15 +442,12 @@ function Admin() {
     setConstraintDefs(data || []);
   }
   async function loadSeasonRecords() {
-    const { data, error } = await supabase
-      .from('ingredient_seasons')
-      .select('*')
-      .order('ingredient_name');
-    if (error) {
+    try {
+      const data = await loadAllPriceRows(supabase, 'ingredient_seasons', '*', 'id');
+      setSeasonRecords(data.sort((a, b) => a.ingredient_name.localeCompare(b.ingredient_name)));
+    } catch (error) {
       showToast('Error loading seasonal ingredients: ' + error.message, true);
-      return;
     }
-    setSeasonRecords(data || []);
   }
   function showToast(message, error = false) {
     setToast({ message, error, visible: true });
@@ -859,7 +869,7 @@ function Admin() {
       difficulty: recipe.difficulty || 'easy',
       cookTime: recipe.cook_time_min?.toString() || '15',
       servings: recipe.servings?.toString() || '1',
-      cost: recipe.cost?.toString() || '0',
+      cost: (recipe.savedCost ?? recipe.cost)?.toString() || '0',
       dietTags: recipe.diet_tags || [],
       goalTags: recipe.goal_tags || [],
     });
@@ -1091,6 +1101,7 @@ function Admin() {
     showToast('\u2713 Recipe saved successfully');
     closeRecipeModal();
     await loadRecipes();
+    await refreshPrices({ reloadCatalogue: true, silent: true });
   }
   async function deleteRecipe(id) {
     if (
@@ -1106,6 +1117,7 @@ function Admin() {
     }
     showToast('\u2713 Recipe deleted');
     await loadRecipes();
+    await refreshPrices({ reloadCatalogue: true, silent: true });
   }
   function openFnriModal(fctId) {
     const item = fnriItems.find((row) => row.fct_id === fctId);
@@ -1311,6 +1323,7 @@ function Admin() {
           'div',
           { className: activeTab === 'markets' ? 'ad-tab-panel active' : 'ad-tab-panel' },
           React.createElement(PriceSourceStatus, { showCatalog: true }),
+          React.createElement(RecipeCostEvidence, null),
           React.createElement(
             'div',
             { className: 'ad-toolbar' },
@@ -1529,7 +1542,12 @@ function Admin() {
                   React.createElement('th', null, 'Recipe'),
                   React.createElement('th', null, 'Type'),
                   React.createElement('th', null, 'Calories'),
-                  React.createElement('th', null, 'Cost'),
+                  React.createElement('th', { 'aria-sort': recipePriceSort === 'asc' ? 'ascending' : recipePriceSort === 'desc' ? 'descending' : 'none' },
+                    React.createElement('button', {
+                      className: 'ad-sort-btn', type: 'button',
+                      title: 'Sort source-based estimated cost per serving. Unavailable estimates appear last.',
+                      onClick: () => setRecipePriceSort(previous => previous === 'asc' ? 'desc' : 'asc'),
+                    }, 'Cost ', recipePriceSort === 'asc' ? '↑ Low to high' : recipePriceSort === 'desc' ? '↓ High to low' : '↕')),
                   React.createElement('th', null, 'Macros'),
                   React.createElement('th', null, 'Details'),
                   React.createElement('th', null, 'Actions'),
@@ -1555,7 +1573,9 @@ function Admin() {
                         ),
                         React.createElement('td', null, recipe.type),
                         React.createElement('td', null, recipe.kcal ?? '\u2014', ' kcal'),
-                        React.createElement('td', null, '\u20B1', recipe.cost ?? '\u2014'),
+                        React.createElement('td', null,
+                          pricesLoading && recipe.cost == null ? 'Checking prices…' : formatEstimatedPrice(recipe.cost),
+                          React.createElement('div', { className: 'price-estimate-note' }, pricingLabel(recipe))),
                         React.createElement(
                           'td',
                           null,
@@ -1650,13 +1670,13 @@ function Admin() {
               className: 'ad-search-input',
               placeholder: 'Search FNRI food items...',
               value: searchFnri,
-              onChange: (e) => setSearchFnri(e.target.value),
+              onChange: (e) => { setSearchFnri(e.target.value); setFnriPage(0); },
             }),
             React.createElement(
               'span',
               { className: 'ad-result-count' },
               React.createElement('span', null, filteredFnri.length),
-              ' items (showing first 200)',
+              ` items · showing ${filteredFnri.length ? currentFnriPage * 100 + 1 : 0}–${Math.min((currentFnriPage + 1) * 100, filteredFnri.length)}`,
             ),
             React.createElement(
               'button',
@@ -1690,11 +1710,11 @@ function Admin() {
                   'tr',
                   null,
                   React.createElement('th', null, 'Food Item'),
-                  React.createElement('th', null, 'Calories'),
-                  React.createElement('th', null, 'Protein'),
-                  React.createElement('th', null, 'Fat'),
-                  React.createElement('th', null, 'Carbs'),
-                  React.createElement('th', null, 'Estimated Price'),
+                  foodSortHeader('energy_kcal', 'Calories'),
+                  foodSortHeader('protein_g', 'Protein'),
+                  foodSortHeader('total_fat_g', 'Fat'),
+                  foodSortHeader('available_carbohydrate_g', 'Carbs'),
+                  foodSortHeader('price', 'Estimated Price'),
                   React.createElement('th', null, 'Actions'),
                 ),
               ),
@@ -1707,7 +1727,7 @@ function Admin() {
                       { className: 'ad-empty-row' },
                       React.createElement('td', { colSpan: '7' }, 'No food items found.'),
                     )
-                  : filteredFnri.map((item) =>
+                  : visibleFnri.map((item) =>
                       React.createElement(
                         'tr',
                         { key: item.fct_id },
@@ -1806,6 +1826,13 @@ function Admin() {
               ),
             ),
           ),
+        ),
+        React.createElement(
+          'div',
+          { className: activeTab === 'fnri' ? 'ad-food-pagination' : 'ad-food-pagination hidden', hidden: activeTab !== 'fnri' },
+          React.createElement('button', { type: 'button', disabled: currentFnriPage === 0, onClick: () => setFnriPage(currentFnriPage - 1) }, 'Previous foods'),
+          React.createElement('span', null, `Page ${currentFnriPage + 1} of ${Math.max(1, Math.ceil(filteredFnri.length / 100))} · search and sort cover every loaded food`),
+          React.createElement('button', { type: 'button', disabled: (currentFnriPage + 1) * 100 >= filteredFnri.length, onClick: () => setFnriPage(currentFnriPage + 1) }, 'Next foods'),
         ),
         React.createElement(
           'div',

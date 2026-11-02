@@ -1,3 +1,5 @@
+import { weekStartKey, slotOptimizationKey } from '../lib/meal-calendar.js';
+import { WEEK_PLANS_KEY, readWeekPlan, writeWeekPlan, readSlotOptimizations } from '../lib/week-plans.js';
 import { generateMealPlan, emptyMealPlan } from '../lib/plan-generation.js';
 import { appliedMeal } from '../lib/portions.js';
 import { loadConstraintDefinitions } from '../lib/constraints';
@@ -15,8 +17,8 @@ import {
 import {
   philippineClock,
   timedSlotIndex,
-  availableMealSlots,
-  DEFAULT_SLOTS,
+  dashboardMealChoices,
+  slotMinutes,
 } from '../lib/meal-experience';
 import useMealClock from '../hooks/useMealClock';
 import PriceEstimateNotice from '../components/PriceEstimateNotice';
@@ -43,7 +45,7 @@ function Dashboard() {
   const [tourOpen, setTourOpen] = useState(false);
   useEffect(() => {
     loadProfile();
-  }, [user]);
+  }, [user?.id]);
   useEffect(() => {
     if (!user?.id) return;
     const newUserKey = `blane_dashboard_tour_new_user_${user.id}`;
@@ -57,7 +59,7 @@ function Dashboard() {
     setProfileLoading(true);
     setProfileError(false);
     try {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle().abortSignal(AbortSignal.timeout(15000));
       if (error) throw error;
       setProfile(data || {});
       setFirstName((data?.full_name || user.email.split('@')[0]).split(' ')[0]);
@@ -248,6 +250,7 @@ function Dashboard() {
 }
 function MealPlanWidget({ profile }) {
   const now = useMealClock();
+  const currentWeek = weekStartKey(now);
   const [savedRecipes, setRecipes] = useState([]);
   const { records, referenceData } = useIngredientPrices();
   const recipes = useMemo(
@@ -256,7 +259,7 @@ function MealPlanWidget({ profile }) {
   );
   const [daySlots, setDaySlots] = useState({});
   const [loading, setLoading] = useState(true);
-  const [activeTabIdx, setActiveTabIdx] = useState(0);
+  const [activeSlotId, setActiveSlotId] = useState(null);
   useEffect(() => {
     let cancelled = false;
     async function loadData() {
@@ -271,6 +274,7 @@ function MealPlanWidget({ profile }) {
       (ingData || []).forEach((ing) => {
         if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
         ingByRecipe[ing.recipe_id].push({
+          id: ing.id,
           name: ing.name || ing.ingredient_name || ing.food_name,
           qty: ing.quantity ?? ing.qty,
           grams: ing.grams,
@@ -294,18 +298,11 @@ function MealPlanWidget({ profile }) {
         ingredients: ingByRecipe[r.id] || [],
       }));
       setRecipes(formattedRecipes);
-      const saved = localStorage.getItem('blane_meal_plan');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (parsed && Object.keys(parsed).length > 0) {
-            setDaySlots(parsed);
-            setLoading(false);
-            return;
-          }
-        } catch (e) {
-          console.error(e);
-        }
+      const saved = readWeekPlan(localStorage, currentWeek);
+      if (saved && Object.keys(saved).length) {
+        setDaySlots(saved);
+        setLoading(false);
+        return;
       }
       if (formattedRecipes.length > 0) {
         const definitions = await loadConstraintDefinitions();
@@ -313,27 +310,24 @@ function MealPlanWidget({ profile }) {
         const defaultPlan = isProfileComplete(profile)
           ? generateMealPlan(formattedRecipes, profile, definitions || {}, { ready: Boolean(definitions) })
           : emptyMealPlan();
-        setDaySlots(defaultPlan);
-        localStorage.setItem('blane_meal_plan', JSON.stringify(defaultPlan));
+        const initialized = Object.keys(defaultPlan).length ? defaultPlan : emptyMealPlan();
+        setDaySlots(writeWeekPlan(localStorage, currentWeek, initialized));
       }
       setLoading(false);
     }
     if (profile) loadData();
     return () => { cancelled = true; };
-  }, [profile]);
-  function getMeal(id) {
+  }, [profile, currentWeek]);
+  function getMeal(id, slot) {
     if (!id) return null;
-    let optimizations = {};
-    try { optimizations = JSON.parse(sessionStorage.getItem('blane_optimized_v2') || '{}'); } catch {}
-    return appliedMeal(recipes.find((r) => r.id === id || String(r.id) === String(id)) || null, optimizations[id]);
+    const optimizations = readSlotOptimizations(sessionStorage, currentWeek, daySlots);
+    return appliedMeal(recipes.find((r) => r.id === id || String(r.id) === String(id)) || null, optimizations[slotOptimizationKey(currentWeek, philippineClock(now).dayIndex, slot)]);
   }
   useEffect(() => {
     const syncPlan = (event) => {
-      if (event?.key && !localStorage.matches(event.key, 'blane_meal_plan')) return;
-      try {
-        const saved = JSON.parse(localStorage.getItem('blane_meal_plan') || '{}');
-        if (saved && typeof saved === 'object') setDaySlots(saved);
-      } catch {}
+      if (event?.key && !localStorage.matches(event.key, 'blane_meal_plan') && !localStorage.matches(event.key, WEEK_PLANS_KEY)) return;
+      const saved = readWeekPlan(localStorage, weekStartKey());
+      if (saved) setDaySlots(saved);
     };
     window.addEventListener('blane-meal-plan-updated', syncPlan);
     window.addEventListener('blane-portions-updated', syncPlan);
@@ -347,36 +341,26 @@ function MealPlanWidget({ profile }) {
   const clock = philippineClock(now);
   const todayIndex = clock.dayIndex;
   const todaySlots = daySlots[todayIndex] || [];
-  const visibleMealTypes = availableMealSlots(DEFAULT_SLOTS, now).map((slot) => slot.type);
+  const choices = dashboardMealChoices(todaySlots, now);
   const allPlannedMeals = todaySlots
-    .map((s) => ({ slot: s, meal: getMeal(s.mealId) }))
-    .filter((item) => item.meal);
-  const plannedMeals = todaySlots
-    .filter((slot) => visibleMealTypes.includes(slot.type))
-    .map((s) => ({ slot: s, meal: getMeal(s.mealId) }))
-    .filter((item) => item.meal);
-  const autoIndex = timedSlotIndex(
-    visibleMealTypes.map((type) => DEFAULT_SLOTS.find((slot) => slot.type === type)),
-    now,
-  );
-  const availableSlotKey = visibleMealTypes.join('|');
-  useEffect(() => {
-    setActiveTabIdx(autoIndex);
-  }, [autoIndex, clock.dateKey, availableSlotKey]);
+    .map(slot => ({ slot, meal: getMeal(slot.mealId, slot) }))
+    .filter(item => item.meal);
+  const autoIndex = timedSlotIndex(choices.map(choice => choice.slot), now);
+  const autoSlotId = choices[autoIndex]?.id || null;
+  const availableSlotKey = choices.map(choice => choice.id).join('|');
+  useEffect(() => { setActiveSlotId(autoSlotId); }, [autoSlotId, clock.dateKey, availableSlotKey]);
   const totalKcal = allPlannedMeals.reduce((acc, item) => acc + item.meal.kcal, 0);
   const totalProtein = Math.round(allPlannedMeals.reduce((acc, item) => acc + Number(item.meal.protein || 0), 0) * 10) / 10;
   const totalCost = allPlannedMeals.reduce((acc, item) => acc + (item.meal.cost || 0), 0);
   const missingCosts = allPlannedMeals.some((item) => item.meal.priceIncomplete);
   const calGoal = getCalorieGoal(profile);
   const calPct = calGoal ? Math.min(Math.round((totalKcal / calGoal) * 100), 100) : 0;
-  const activeMealType = visibleMealTypes[Math.min(activeTabIdx, visibleMealTypes.length - 1)];
-  const currentItem = plannedMeals.find((item) => item.slot.type === activeMealType);
-  const mealTimeGuide = {
-    Breakfast: 'Breakfast: Until 10:30am',
-    Lunch: 'Lunch: 10:30am to 2:30pm',
-    Snack: 'Snack: 2:30pm to 7:00pm',
-    Dinner: 'Dinner: 7:00pm to 11:59pm',
-  }[activeMealType];
+  const activeChoice = choices.find(choice => choice.id === activeSlotId) || choices[autoIndex] || choices[0];
+  const activeMealType = activeChoice?.slot.type || 'meal';
+  const currentItem = activeChoice ? { slot: activeChoice.slot, meal: getMeal(activeChoice.slot.mealId, activeChoice.slot) } : null;
+  const mealTimeGuide = activeChoice
+    ? activeMealType + ': ' + (slotMinutes(activeChoice.slot.time) !== null ? activeChoice.slot.time : 'Time not set') + ' · Philippine time'
+    : 'No remaining meal slots. Open Meal Plan to review your full day.';
   return React.createElement(
     'div',
     { className: 'widget col-8', 'data-dashboard-tour': 'meal-plan' },
@@ -407,25 +391,16 @@ function MealPlanWidget({ profile }) {
     React.createElement(
       'div',
       {
-        className: 'meal-tabs' + (visibleMealTypes.length === 1 ? ' single' : ''),
+        className: 'meal-tabs' + (choices.length === 1 ? ' single' : ''),
         role: 'group',
-        'aria-label': 'Meal type',
+        'aria-label': 'Meal slot',
       },
-      DEFAULT_SLOTS.map((slot) => {
-        const index = visibleMealTypes.indexOf(slot.type);
-        if (index === -1) return null;
-        return React.createElement(
-          'button',
-          {
-            key: slot.type,
-            type: 'button',
-            className: 'meal-tab-btn' + (slot.type === activeMealType ? ' active' : ''),
-            'aria-pressed': slot.type === activeMealType,
-            onClick: () => setActiveTabIdx(index),
-          },
-          slot.type,
-        );
-      }),
+      choices.map(choice => React.createElement('button', {
+        key: choice.id, type: 'button',
+        className: 'meal-tab-btn' + (choice.id === activeChoice?.id ? ' active' : ''),
+        'aria-pressed': choice.id === activeChoice?.id,
+        onClick: () => setActiveSlotId(choice.id),
+      }, choice.label)),
     ),
     React.createElement(
       'div',
@@ -441,7 +416,7 @@ function MealPlanWidget({ profile }) {
       : React.createElement(
           React.Fragment,
           null,
-          currentItem
+          currentItem?.meal
             ? React.createElement(
                 'div',
                 { className: 'meal-panel active' },
@@ -572,16 +547,12 @@ function MealPlanWidget({ profile }) {
                 React.createElement(
                   'div',
                   { className: 'meal-empty-title' },
-                  'No ',
-                  activeMealType.toLowerCase(),
-                  ' planned yet',
+                  activeChoice ? 'No recipe assigned to this ' + activeMealType.toLowerCase() + ' slot' : 'No remaining meals today',
                 ),
                 React.createElement(
                   'div',
                   { className: 'meal-empty-description' },
-                  'Add a ',
-                  activeMealType.toLowerCase(),
-                  " to today's plan to see it here.",
+                  activeChoice ? 'Open Meal Plan to choose a recipe for this slot.' : 'Open Meal Plan to review your full day or add another meal.',
                 ),
                 React.createElement(
                   Link,

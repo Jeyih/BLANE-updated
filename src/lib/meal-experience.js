@@ -1,3 +1,5 @@
+import { philippineClock, weekStartKey } from './meal-calendar.js';
+import { readWeekPlan, writeWeekPlan } from './week-plans.js';
 import { localMealStorage as localStorage } from './account-storage.js';
 const DEFAULT_SLOTS = [
   { type: 'Breakfast', time: '7:00 AM' },
@@ -5,28 +7,6 @@ const DEFAULT_SLOTS = [
   { type: 'Snack', time: '3:00 PM' },
   { type: 'Dinner', time: '6:30 PM' },
 ];
-function philippineClock(date = new Date()) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Asia/Manila',
-      weekday: 'short',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    })
-      .formatToParts(date)
-      .filter((p) => p.type !== 'literal')
-      .map((p) => [p.type, p.value]),
-  );
-  return {
-    dayIndex: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday),
-    dateKey: `${parts.year}-${parts.month}-${parts.day}`,
-    minutes: Number(parts.hour) * 60 + Number(parts.minute),
-  };
-}
 function slotMinutes(time) {
   const match = String(time || '')
     .trim()
@@ -63,6 +43,29 @@ function currentMealType(date = new Date(), slots = DEFAULT_SLOTS) {
   if (!available.length) available = availableMealSlots(DEFAULT_SLOTS, date);
   return available[timedSlotIndex(available, date)].type;
 }
+function mealScheduleForDay(plan, date = new Date()) {
+  const slots = plan?.[philippineClock(date).dayIndex];
+  if (!Array.isArray(slots)) return DEFAULT_SLOTS;
+  const valid = slots.filter(slot => slot && typeof slot.type === 'string' && slot.type.trim());
+  return valid.length ? valid : DEFAULT_SLOTS;
+}
+function dashboardMealChoices(slots, date = new Date()) {
+  const visible = availableMealSlots(slots.filter(slot => slot && typeof slot.type === 'string' && slot.type.trim()), date);
+  const counts = new Map();
+  visible.forEach(slot => counts.set(slot.type, (counts.get(slot.type) || 0) + 1));
+  const seen = new Map();
+  return visible.map((slot, index) => {
+    const ordinal = (seen.get(slot.type) || 0) + 1;
+    seen.set(slot.type, ordinal);
+    const repeated = counts.get(slot.type) > 1;
+    const time = slotMinutes(slot.time) !== null ? slot.time : '';
+    return {
+      id: slot.id || `dashboard-slot-${index}`,
+      slot,
+      label: repeated ? `${slot.type} ${ordinal}${time ? ` · ${time}` : ''}` : slot.type,
+    };
+  });
+}
 function isDessert(recipe) {
   return recipe.is_dessert === true || recipe.type === 'Dessert';
 }
@@ -75,11 +78,8 @@ function addMealForToday(
   } = {},
 ) {
   if (!recipe.id || !type) throw new Error('Choose a meal first.');
-  let plan = {};
-  try {
-    const saved = JSON.parse(storage.getItem('blane_meal_plan') || '{}');
-    if (saved && typeof saved === 'object' && !Array.isArray(saved)) plan = saved;
-  } catch {}
+  const week = weekStartKey(date);
+  const plan = readWeekPlan(storage, week, date) || {};
   const day = philippineClock(date).dayIndex;
   const slots = Array.isArray(plan[day])
     ? [...plan[day]]
@@ -94,7 +94,7 @@ function addMealForToday(
   if (index >= 0) slots[index] = slot;
   else slots.push(slot);
   plan[day] = slots;
-  storage.setItem('blane_meal_plan', JSON.stringify(plan));
+  writeWeekPlan(storage, week, plan, date);
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('blane-meal-plan-updated'));
   return { day, type, recipeId: recipe.id };
 }
@@ -103,6 +103,8 @@ export {
   addMealForToday,
   availableMealSlots,
   currentMealType,
+  mealScheduleForDay,
+  dashboardMealChoices,
   isDessert,
   philippineClock,
   slotMinutes,

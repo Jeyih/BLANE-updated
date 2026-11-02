@@ -22,6 +22,7 @@ test('browsing without complete details never gets a guessed personalized target
   assert.equal(personalizedCalorieTarget(null), null);
   assert.equal(personalizedCalorieTarget({ goal: 'maintain' }), null);
   assert.equal(personalizedCalorieTarget(complete), 2147);
+  assert.equal(personalizedCalorieTarget({ ...complete, sex: 'prefer_not_to_say' }), null);
 });
 test('manual planning starts with independent empty slots and retains known restrictions', () => {
   const week = emptyMealPlan();

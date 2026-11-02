@@ -1,7 +1,8 @@
-import { loadConstraintDefinitions, CB_CONSTRAINTS, canSelectRecipe } from '../lib/constraints';
-import { asList } from '../lib/constraint-rules.js';
+import { weekStartKey } from '../lib/meal-calendar.js';
+import { readWeekPlan } from '../lib/week-plans.js';
+import { loadConstraintDefinitions, canSelectRecipe } from '../lib/constraints';
+import { recommendRecipes } from '../lib/recommendations.js';
 import { localMealStorage as localStorage, sessionMealStorage as sessionStorage } from '../lib/account-storage.js';
-import { computeDailyTargets } from '../../supabase/functions/_shared/nutrition.js';
 import React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -15,7 +16,7 @@ import {
 import {
   addMealForToday,
   currentMealType,
-  philippineClock,
+  mealScheduleForDay,
   DEFAULT_SLOTS,
 } from '../lib/meal-experience';
 import useMealClock from '../hooks/useMealClock';
@@ -23,12 +24,15 @@ import PriceEstimateNotice from './PriceEstimateNotice';
 import '../styles/meal-experience.css';
 import '../styles/recommend.css';
 import { isProfileComplete } from '../lib/profile-readiness';
+import { MEAL_REVIEWS_KEY, readMealReview, mealReviewKey, aiReviewBlocksMeal } from '../lib/meal-review';
+import { subscribeAccountStorage } from '../lib/account-storage';
+import { getMealExplanation } from './WhyButton';
 async function loadRecommendationData() {
   const definitions = await loadConstraintDefinitions();
   const { data: goalData, error: goalErr } = await supabase.from('goal_ideals').select('*');
   if (goalErr) {
     console.error('Failed to load goal ideals:', goalErr);
-    return { ready: false, goalIdeals: {} };
+    return { ready: false, goalIdeals: {}, definitions: {} };
   }
   const goalIdeals = Object.fromEntries(
     (goalData || [])
@@ -46,35 +50,62 @@ async function loadRecommendationData() {
   return {
     ready: Boolean(definitions) && Object.keys(goalIdeals).length > 0,
     goalIdeals,
+    definitions: definitions || {},
   };
 }
 function RecommendWidget({ profile }) {
   const now = useMealClock();
   let schedule = DEFAULT_SLOTS;
   try {
-    const plan = JSON.parse(localStorage.getItem('blane_meal_plan') || '{}');
-    schedule = plan[philippineClock(now).dayIndex]?.length
-      ? plan[philippineClock(now).dayIndex]
-      : DEFAULT_SLOTS;
+    const plan = readWeekPlan(localStorage, weekStartKey(now), now) || {};
+    schedule = mealScheduleForDay(plan, now);
   } catch {}
   const mealType = currentMealType(now, schedule);
+  const mealCount = schedule.length;
   const [metadataReady, setMetadataReady] = useState(false);
   const [metadataError, setMetadataError] = useState('');
   const [goalIdeals, setGoalIdeals] = useState({});
   const [actionMessage, setActionMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [savedRecipes, setRecipes] = useState([]);
+  const [recipeError, setRecipeError] = useState('');
+  const [definitions, setDefinitions] = useState({});
+  const [reviewRevision, setReviewRevision] = useState(0);
+  const [pendingReviews, setPendingReviews] = useState([]);
+  useEffect(() => subscribeAccountStorage(event => {
+    if (event.key === MEAL_REVIEWS_KEY) setReviewRevision(v => v + 1);
+  }), []);
   const { records, referenceData } = useIngredientPrices();
   const recipes = useMemo(
     () => applyDynamicRecipePrices(savedRecipes, records, referenceData || {}),
     [savedRecipes, records, referenceData],
   );
-  const [top3, setTop3] = useState([]);
-  const matchesMealType = (recipe) =>
-    recipe.type === mealType ||
-    (mealType === 'Brunch' && recipe.type === 'Breakfast') ||
-    (mealType === 'Dessert' && recipe.type === 'Snack');
-  const visibleTop3 = top3.filter((item) => matchesMealType(item.recipe));
+  const recommendation = useMemo(
+    () => recommendRecipes(profile, recipes, mealType, goalIdeals, definitions, metadataReady, mealCount),
+    [profile, recipes, mealType, goalIdeals, definitions, metadataReady, mealCount, reviewRevision],
+  );
+  const visibleTop3 = recommendation.items;
+  // Review only the initial top three, sharing WhyButton's deduplicated requests.
+  // Backfilled alternatives keep their rule-only status until separately reviewed.
+  const reviewBatch = recommendRecipes(profile, recipes, mealType, goalIdeals, definitions, metadataReady, mealCount, () => null).items;
+  const reviewBatchKey = JSON.stringify(reviewBatch.map(item => mealReviewKey(item.recipe, profile)));
+  useEffect(() => {
+    let active = true;
+    const pending = reviewBatch.filter(item => !readMealReview(item.recipe, profile));
+    setPendingReviews(pending.map(item => mealReviewKey(item.recipe, profile)));
+    pending.forEach(item => {
+      const key = mealReviewKey(item.recipe, profile);
+      getMealExplanation(item.recipe, profile).catch(() => {
+        // Quota/network failures retain local checks rather than implying AI approval.
+      }).finally(() => {
+        if (active) {
+          setPendingReviews(keys => keys.filter(k => k !== key));
+          setReviewRevision(v => v + 1);
+        }
+      });
+    });
+    return () => { active = false; };
+  }, [reviewBatchKey]);
   useEffect(() => {
     let cancelled = false;
     async function loadRecipes() {
@@ -86,17 +117,20 @@ function RecommendWidget({ profile }) {
       if (cancelled) return;
       if (recipesErr) {
         console.error('Failed to load recommended recipes:', recipesErr.message);
+        setRecipeError('Recipes could not be loaded. Please reload to try again.');
         setRecipes([]);
         setLoading(false);
         return;
       }
-      const { data: ingData, error: ingErr } = await supabase
-        .from('recipe_ingredients')
-        .select('*')
-        .order('sort_order');
+      const [ingredientResult, stepResult] = await Promise.all([
+        supabase.from('recipe_ingredients').select('*').order('sort_order'),
+        supabase.from('recipe_steps').select('*').order('step_order'),
+      ]);
+      const { data: ingData, error: ingErr } = ingredientResult;
       if (cancelled) return;
-      if (ingErr) {
-        console.error('Failed to load recipe ingredients:', ingErr.message);
+      if (ingErr || stepResult.error) {
+        console.error('Failed to load recipe details:', (ingErr || stepResult.error).message);
+        setRecipeError('Recipes could not be loaded. Please reload to try again.');
         setRecipes([]);
         setLoading(false);
         return;
@@ -105,10 +139,16 @@ function RecommendWidget({ profile }) {
       (ingData || []).forEach((ing) => {
         if (!ingByRecipe[ing.recipe_id]) ingByRecipe[ing.recipe_id] = [];
         ingByRecipe[ing.recipe_id].push({
+          id: ing.id,
           name: ing.name || ing.ingredient_name || ing.food_name,
           qty: ing.quantity ?? ing.qty,
           grams: ing.grams,
         });
+      });
+      const stepsByRecipe = {};
+      (stepResult.data || []).forEach((step) => {
+        if (!stepsByRecipe[step.recipe_id]) stepsByRecipe[step.recipe_id] = [];
+        stepsByRecipe[step.recipe_id].push({ title: step.title, desc: step.description });
       });
       setRecipes(
         (recipesData || []).map((r) => ({
@@ -125,11 +165,17 @@ function RecommendWidget({ profile }) {
           carbs: r.carbs_g,
           fats: r.fats_g,
           ingredients: ingByRecipe[r.id] || [],
+          steps: stepsByRecipe[r.id] || [],
         })),
       );
       setLoading(false);
     }
-    loadRecipes();
+    loadRecipes().catch(() => {
+      if (!cancelled) {
+        setRecipeError('Recipes could not be loaded. Please reload to try again.');
+        setLoading(false);
+      }
+    });
     return () => {
       cancelled = true;
     };
@@ -141,46 +187,20 @@ function RecommendWidget({ profile }) {
       if (!cancelled) {
         setMetadataReady(metadata.ready);
         setGoalIdeals(metadata.goalIdeals);
+        setDefinitions(metadata.definitions);
         if (!metadata.ready)
           setMetadataError(
             'Recommendation rules could not be loaded. Please reload before requesting meal recommendations.',
           );
       }
     }
-    prepareMetadata();
+    prepareMetadata().catch(() => {
+      if (!cancelled) setMetadataError('Recommendation rules could not be loaded. Please reload to try again.');
+    });
     return () => {
       cancelled = true;
     };
   }, []);
-  useEffect(() => {
-    let cancelled = false;
-    if (!metadataReady || !isProfileComplete(profile) || recipes.length === 0) {
-      setTop3([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    const timer = setTimeout(() => {
-      if (cancelled) return;
-      setTop3(
-        scoreAndRankRecipes(
-          profile,
-          recipes.filter(
-            (recipe) =>
-              recipe.type === mealType ||
-              (mealType === 'Brunch' && recipe.type === 'Breakfast') ||
-              (mealType === 'Dessert' && recipe.type === 'Snack'),
-          ),
-          goalIdeals,
-        ),
-      );
-      setLoading(false);
-    }, 400);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [profile, recipes, mealType, metadataReady, goalIdeals]);
   return React.createElement(
     'div',
     { className: 'rec-widget col-12', 'data-dashboard-tour': 'recommendations' },
@@ -197,14 +217,16 @@ function RecommendWidget({ profile }) {
           React.createElement(
             'div',
             { className: 'rec-header-title' },
-            'Recommended for ',
-            mealType,
-            ' now',
+            recommendation.status === 'other-periods'
+              ? `Meal ideas for ${mealType} now`
+              : `Recommended for ${mealType} now`,
           ),
           React.createElement(
             'div',
             { className: 'rec-header-sub' },
-            'Ready for this time of day \xB7 Use a meal in one tap',
+            recommendation.status === 'other-periods'
+              ? 'Alternative recipes \xB7 Use for your current meal'
+              : 'Ready for this time of day \xB7 Use a meal in one tap',
           ),
         ),
       ),
@@ -214,13 +236,18 @@ function RecommendWidget({ profile }) {
         'View all recipes \u2192',
       ),
     ),
+    !loading && !metadataError && !recipeError && recommendation.status === 'other-periods' &&
+      React.createElement('p', { className: 'meal-action-status', role: 'status' },
+        `No ${mealType.toLowerCase()}-tagged recipes match your dietary checks. You can use these alternatives for ${mealType.toLowerCase()}.`),
     React.createElement(PriceEstimateNotice, null),
     actionMessage &&
       React.createElement('p', { className: 'meal-action-status', role: 'status' }, actionMessage),
     !isProfileComplete(profile)
-      ? React.createElement('p', { className: 'rec-no-profile' }, 'Update your ', React.createElement(Link, { to: '/profile' }, 'health profile'), ' before receiving personalized recommendations.')
-      : metadataError
-      ? React.createElement('p', { className: 'meal-action-status' }, metadataError)
+      ? profile?.sex === 'prefer_not_to_say'
+        ? React.createElement('p', { className: 'rec-no-profile' }, 'Calorie-based recommendations are off because you chose not to share biological sex. You can still ', React.createElement(Link, { to: '/recipes' }, 'browse recipes'), ' and plan meals manually.')
+        : React.createElement('p', { className: 'rec-no-profile' }, 'Update your ', React.createElement(Link, { to: '/profile' }, 'health profile'), ' before receiving personalized recommendations.')
+      : metadataError || recipeError
+      ? React.createElement('p', { className: 'meal-action-status', role: 'status' }, metadataError || recipeError)
       : loading || !metadataReady
         ? React.createElement(SkeletonLoader, null)
         : !profile?.goal && !profile?.height_cm
@@ -245,9 +272,11 @@ function RecommendWidget({ profile }) {
                   item,
                   rank: i,
                   mealType,
+                  reviewing: pendingReviews.includes(mealReviewKey(item.recipe, profile)),
                   onUse: () => {
                     try {
-                      if (!canSelectRecipe(item.recipe, profile, CB_CONSTRAINTS, metadataReady)) { setActionMessage('This recipe cannot be selected with the available dietary rules.'); return; }
+                      if (pendingReviews.includes(mealReviewKey(item.recipe, profile))) return;
+                      if (!canSelectRecipe(item.recipe, profile, definitions, metadataReady) || aiReviewBlocksMeal(readMealReview(item.recipe, profile))) { setActionMessage('This recipe has a dietary warning and cannot be selected.'); return; }
                       addMealForToday(item.recipe, { type: mealType });
                       setActionMessage(
                         `Added ${item.recipe.name} to today's ${mealType.toLowerCase()}.`,
@@ -262,14 +291,20 @@ function RecommendWidget({ profile }) {
                 React.createElement(
                   'p',
                   null,
-                  'No recipe matches your preferences for this meal. ',
+                  recommendation.status === 'unsupported-restrictions'
+                    ? 'A saved restriction has no matching rule yet, so recommendations are paused. Review your profile or browse recipe details. '
+                    : recommendation.status === 'empty-catalogue'
+                      ? 'No recipes are available in the catalogue yet. '
+                      : recommendation.status === 'rules-unavailable'
+                        ? 'The nutrition ranking rules are unavailable. Please reload to try again. '
+                        : 'No recipes currently pass all your saved dietary checks. Review your profile or browse recipe details. ',
                   React.createElement(Link, { to: '/recipes' }, 'Browse recipes'),
                   '.',
                 ),
             ),
   );
 }
-function RecCard({ item, rank, mealType, onUse }) {
+function RecCard({ item, rank, mealType, onUse, reviewing = false }) {
   const ranks = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
   const colors = ['#2ddc7a', '#60a5fa', '#a78bfa'];
   const color = item.allergyHit ? '#f87171' : item.violations > 0 ? '#fbbf24' : colors[rank];
@@ -292,7 +327,7 @@ function RecCard({ item, rank, mealType, onUse }) {
         { className: 'rec-card-banner' },
         recipe.emoji || '\u{1F372}',
         React.createElement('span', { className: 'rec-card-rank' }, ranks[rank]),
-        React.createElement('span', { className: 'rec-card-type-tag' }, recipe.type),
+        React.createElement('span', { className: 'rec-card-type-tag', title: 'Original recipe category' }, `${recipe.type} recipe`),
       ),
       React.createElement(
         'div',
@@ -373,9 +408,8 @@ function RecCard({ item, rank, mealType, onUse }) {
       { className: 'rec-card-actions' },
       React.createElement(
         'button',
-        { className: 'quick-meal-action', type: 'button', onClick: onUse },
-        "Use for today's ",
-        mealType.toLowerCase(),
+        { className: 'quick-meal-action', type: 'button', onClick: onUse, disabled: reviewing },
+        reviewing ? 'Reviewing meal…' : "Use for today's " + mealType.toLowerCase(),
       ),
     ),
   );
@@ -397,47 +431,5 @@ function SkeletonLoader() {
     ),
   );
   return React.createElement('div', { className: 'rec-loading' }, card, card, card);
-}
-function scoreAndRankRecipes(profile, recipes, goalIdeals) {
-  const goal = profile.goal || 'maintain';
-  const dietary = asList(profile.dietary_restrictions);
-  const medical = asList(profile.medical_conditions);
-  const allergies = asList(profile.allergies);
-  const allConstraints = [...dietary, ...medical, ...allergies];
-  const ideals = goalIdeals[goal] || goalIdeals.maintain;
-  if (!ideals) return [];
-  const dailyTarget = computeDailyTarget(profile);
-  const perMealKcal = Math.round(dailyTarget / 4);
-  const scored = (recipes || []).filter(recipe => canSelectRecipe(recipe, profile, CB_CONSTRAINTS)).map((recipe) => {
-    let score = 0;
-    let goalScore = 0;
-    if (recipe.goal?.includes(goal)) goalScore += 20;
-    if (recipe.protein >= ideals.minProtein) goalScore += 8;
-    if (recipe.kcal <= ideals.maxKcal) goalScore += 6;
-    if (recipe.fats <= ideals.maxFats) goalScore += 3;
-    if (recipe.carbs >= ideals.minCarbs) goalScore += 3;
-    score += Math.min(40, goalScore);
-    const violations = 0, allergyHit = false;
-    if (allergyHit) score -= 30;
-    else if (violations > 0) score -= violations * 20;
-    const calDiff = Math.abs(recipe.kcal - perMealKcal);
-    if (calDiff <= 50) score += 15;
-    else if (calDiff <= 120) score += 10;
-    else if (calDiff <= 200) score += 5;
-    if (violations === 0 && allConstraints.length > 0) score += 10;
-    const reason = generateReason(recipe, goal, violations, perMealKcal, profile);
-    return { recipe, score: Math.max(0, score), reason, violations, allergyHit };
-  });
-  scored.sort(
-    (a, b) => b.score - a.score || String(a.recipe.id).localeCompare(String(b.recipe.id)),
-  );
-  return scored.filter((item) => !item.allergyHit && item.violations === 0).slice(0, 3);
-}
-function generateReason(recipe, goal, violations, perMealKcal) {
-  const distance = Math.abs(Number(recipe.kcal) - perMealKcal);
-  return `${recipe.kcal} kcal; ${recipe.protein} g protein, ${recipe.carbs} g carbs and ${recipe.fats} g fat. ${distance <= 80 ? 'Close to' : 'Compared with'} the estimated ${perMealKcal} kcal per-meal target. Ranked using your selected goal and loaded ingredient rules.`;
-}
-function computeDailyTarget(profile) {
-  return computeDailyTargets(profile).calories;
 }
 export { RecommendWidget as default };

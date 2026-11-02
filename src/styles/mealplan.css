@@ -196,6 +196,10 @@
   color: #2ddc7a;
 }
 
+.week-day-btn.today.active .day-num {
+  color: #060d0a;
+}
+
 .day-dot {
   width: 4px;
   height: 4px;
@@ -1682,3 +1686,7 @@
     display: none;
   }
 }
+.plan-check { margin: 16px 24px; padding: 16px; border: 1px solid #345b43; border-radius: 14px; background: #12271b; color: #d9ece0; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.plan-check summary { cursor: pointer; color: #5ee99b; }
+.plan-check ul, .price-gap-list { padding-left: 20px; }
+.price-gap-list { color: #f3cf8b; font-size: 12px; line-height: 1.6; }

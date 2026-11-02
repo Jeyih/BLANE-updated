@@ -1,7 +1,7 @@
 import React from 'react';
 import { useMemo, useState } from 'react';
 import { useIngredientPrices } from '../context/PriceContext';
-import { formatPrice, priceCoverage, ingredientPriceAudit } from '../lib/pricing';
+import { formatQuotePrice, priceCoverage, ingredientPriceAudit } from '../lib/pricing';
 const PAGE_SIZE = 50;
 function IngredientPriceCatalogue() {
   const { records, foods, recipeIngredients, referenceData, loading } = useIngredientPrices();
@@ -259,9 +259,7 @@ function IngredientPriceCatalogue() {
                         ? React.createElement(
                             React.Fragment,
                             null,
-                            formatPrice(food.quote.price),
-                            ' / ',
-                            food.quote.unit,
+                            formatQuotePrice(food.quote),
                             React.createElement(
                               'div',
                               { className: 'price-estimate-note' },
@@ -275,8 +273,6 @@ function IngredientPriceCatalogue() {
                               React.createElement('br', null),
                               food.quote.records[0].notes,
                               React.createElement('br', null),
-                              food.quote.records[0].packPrice &&
-                                `${formatPrice(food.quote.records[0].packPrice)} / ${food.quote.records[0].packQuantity}`,
                               ' ',
                               food.quote.records[0].availability,
                             ),
@@ -301,7 +297,7 @@ function IngredientPriceCatalogue() {
                             React.createElement(
                               'a',
                               { href: url, target: '_blank', rel: 'noreferrer' },
-                              'DOST-FNRI portion reference',
+                              'Quantity conversion reference',
                             ),
                           ),
                         ),

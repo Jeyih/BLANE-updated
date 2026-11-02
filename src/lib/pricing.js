@@ -1,4 +1,5 @@
 import { documentedPurchaseAmount } from './philippine-portions.js';
+import { densityPurchaseAmount, measuredPurchaseAmount } from './recipe-cost-basis.js';
 function ingredientKey(name, aliases = {}) {
   const key = String(name || '')
     .normalize('NFD')
@@ -9,10 +10,27 @@ function ingredientKey(name, aliases = {}) {
   return aliases[key] || key;
 }
 const formatPrice = (v) =>
-  Number.isFinite(v) && v > 0 ? `\u20B1${v.toFixed(2)}` : 'Price unavailable';
+  Number.isFinite(v) && v > 0 ? `\u20B1${(Math.round((v + Number.EPSILON) * 100) / 100).toFixed(2)}` : 'Price unavailable';
 const formatEstimatedPrice = (v) =>
   Number.isFinite(v) && v > 0 ? `Est. ${formatPrice(v)}` : 'Estimate unavailable';
+function formatSourcePrice(record) {
+  if (!record) return 'Price unavailable';
+  const pack = Number(record.packPrice);
+  if (Number.isFinite(pack) && pack > 0 && String(record.packQuantity || '').trim())
+    return `${formatPrice(pack)} / ${record.packQuantity}`;
+  const unit = record.unit === 'l' ? 'litre' : record.unit === 'pc' ? 'piece' : record.unit;
+  return `${formatPrice(Number(record.price))}${unit ? ` / ${unit}` : ''}`;
+}
+function formatQuotePrice(quote) {
+  if (!quote?.records?.length) return 'Price unavailable';
+  // Different source packs are separate offers, never a fabricated average pack.
+  return [...new Set(quote.records.map(formatSourcePrice))].join('; ');
+}
 const RETAIL_HOSTS = new Set([
+  'beasbibingka.com',
+  'www.albertosfreshmarket.com',
+  'bagsakanbyedds.com',
+  'deligoodph.com',
   'shopmetro.ph',
   'jelexie.ph',
   'pindotlang.com',
@@ -207,7 +225,7 @@ async function loadAllPriceRows(supabase, table, columns = '*', order = 'id') {
 async function loadPriceCatalogue(supabase) {
   const [foods, recipeIngredients] = await Promise.all([
     loadAllPriceRows(supabase, 'fnri_food_composition', 'fct_id,food_name', 'fct_id'),
-    loadAllPriceRows(supabase, 'recipe_ingredients', 'id,fct_id,name,grams,quantity'),
+    loadAllPriceRows(supabase, 'recipe_ingredients', 'id,recipe_id,fct_id,name,grams,quantity'),
   ]);
   return { foods, recipeIngredients };
 }
@@ -227,7 +245,7 @@ function ingredientQuote(name, prices, referenceData = {}) {
 function marketIngredientPriceText(ingredient, records, referenceData = {}) {
   const quote = ingredientQuote(ingredient.name, records, referenceData);
   return quote
-    ? `${quote.records[0].estimateType === 'comparable' ? 'Comparable estimate' : 'Estimated reference'} ${formatPrice(quote.price)} / ${quote.unit}`
+    ? `${quote.records[0].estimateType === 'comparable' ? 'Comparable estimate' : 'Estimated reference'} ${formatQuotePrice(quote)}`
     : 'Sourced price unavailable';
 }
 function priceEvidence(records = []) {
@@ -268,6 +286,13 @@ function priceEvidence(records = []) {
       needsReview: false,
       reason:
         'Uses published Philippine as-purchased / edible-portion weights. Actual preparation and store totals can differ.',
+    };
+  if (records.some((p) => p.estimateType === 'density reference' || p.estimateType === 'recorded purchase'))
+    return {
+      label: records.some((p) => p.estimateType === 'density reference')
+        ? 'Published density estimate' : 'Recorded purchase quantity',
+      needsReview: false,
+      reason: 'Uses documented quantities with sourced unit prices. This remains a cost estimate, not a guaranteed store total.',
     };
   return {
     label: 'Matching source reference',
@@ -355,6 +380,18 @@ function priceIngredient(ingredient, prices, referenceData = {}) {
   const name = ingredient.name || ingredient.ingredient_name || ingredient.food_name;
   const references = matchingReferences(name, prices, referenceData);
   const matches = references.flatMap((p) => {
+    const measured = measuredPurchaseAmount(ingredient, p, referenceData.recipeCostBases);
+    if (p.requiresMeasuredQuantity && !measured) return [];
+    // Prefer an exact declared metric volume over a generic density conversion.
+    const density = !measured && !(quantity && quantity.unit === p.unit && !quantity.estimated)
+      ? densityPurchaseAmount(name, grams, p) : null;
+    const basis = measured || density;
+    if (basis) return [{
+      record: { ...p, notes: '', estimateType: measured ? 'recorded purchase' : 'density reference',
+        conversionSourceUrl: basis.sourceUrl, conversionNote: basis.note },
+      quantityEstimated: false,
+      cost: Number(p.price) * basis.amount,
+    }];
     const documented = documentedPurchaseAmount(
       name,
       grams,
@@ -442,6 +479,8 @@ function applyDynamicRecipePrices(recipes, prices, referenceData = {}) {
       ing.priceRecords.some((p) => p.estimateType === 'FNRI portion reference'),
     );
     const needsVerification = ingredients.some((ing) => ing.evidence.needsReview);
+    const documentedQuantity = ingredients.some((ing) => ing.priceRecords.some((p) =>
+      p.estimateType === 'density reference' || p.estimateType === 'recorded purchase'));
     return {
       ...recipe,
       ingredients,
@@ -464,13 +503,15 @@ function applyDynamicRecipePrices(recipes, prices, referenceData = {}) {
                 ? 'quantity estimate'
                 : fnriPortion
                   ? 'FNRI portion estimate'
-                  : 'reference'
+                  : documentedQuantity ? 'documented quantity estimate' : 'reference'
         : 'unavailable',
     };
   });
 }
 const pricingLabel = (r) =>
-  r.pricingSource === 'partial'
+  r.pricingSource === 'documented quantity estimate'
+    ? 'Documented quantity estimate / serving'
+    : r.pricingSource === 'partial'
     ? 'Base-ingredient subtotal / serving'
     : r.pricingSource === 'FNRI portion estimate'
       ? 'FNRI portion estimate / serving'
@@ -488,6 +529,8 @@ const pricingLabel = (r) =>
 export {
   applyDynamicRecipePrices,
   formatEstimatedPrice,
+  formatSourcePrice,
+  formatQuotePrice,
   formatPrice,
   ingredientKey,
   ingredientPriceAudit,

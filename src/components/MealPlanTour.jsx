@@ -5,11 +5,12 @@ const TOUR_STEPS = [
     target: '[data-mealplan-tour="header"]',
     title: 'Your weekly meal plan',
     description:
-      'Export your week as a text file, or regenerate the meal plan for the week when you want a fresh set of meals.',
+      'After the tour, export your week as a text file, or regenerate the week when you want a fresh set of meals.',
   },
   {
     target: '[data-mealplan-tour="week"]',
     title: 'Choose a week and day',
+    interactionTargets: ['[data-mealplan-tour="week"] button'],
     description:
       'Move between weeks with the arrows, then select a day to view or edit its meals. Dots indicate planned meals; a different dot marks days with completed meals.',
   },
@@ -23,25 +24,25 @@ const TOUR_STEPS = [
     target: '[data-mealplan-tour="meal-slots"]',
     title: 'Manage each meal',
     description:
-      'When meals are planned, review their macros, calories, cost, seasonal availability, and profile constraint warnings. Expand ingredients, swap a recipe, mark it finished, add ingredients to groceries, optimize portions, or ask why a recipe was chosen.',
+      'When meals are planned, review their nutrition, cost, and profile warnings. After the tour, expand ingredients, swap recipes, mark meals finished, add groceries, optimize portions, or ask why a recipe was chosen.',
   },
   {
     target: '[data-mealplan-tour="add-slot"]',
     title: 'Add a meal or snack',
     description:
-      'Add breakfast, brunch, lunch, snack, dinner, or a custom meal slot, then assign a recipe.',
+      'After the tour, add breakfast, brunch, lunch, snack, dinner, or a custom meal slot, then assign a recipe.',
   },
   {
     target: '[data-mealplan-tour="price-optimizer"]',
     title: 'Plan around your food budget',
     description:
-      'Set a daily budget and get affordable meal suggestions. Sort meals by cost or value, filter by budget, and expand a meal to inspect ingredient costs and savings tips.',
+      'After the tour, set a daily budget, sort or filter meal suggestions, and expand a meal to inspect ingredient costs and savings tips.',
   },
   {
     target: '[data-mealplan-tour="grocery-list"]',
     title: 'Build your grocery list',
     description:
-      'Add ingredients from an individual meal or all meals for the selected day. Check items off while shopping, remove items, or clear the list.',
+      'After the tour, add ingredients from one meal or all meals for a day. Check items off while shopping, remove items, or clear the list.',
   },
 ];
 function MealPlanTour({ isOpen, onClose }) {

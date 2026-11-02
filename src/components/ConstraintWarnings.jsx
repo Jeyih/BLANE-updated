@@ -49,7 +49,7 @@ function ConstraintActiveBar({ activeConstraints }) {
     ),
   );
 }
-function ViolationBadge({ violations, aiVerdict }) {
+function ViolationBadge({ violations, aiVerdict, textOnly = false }) {
   if (violations.length === 0) {
     const badge = mealReviewBadge(violations, aiVerdict);
     return React.createElement(
@@ -65,8 +65,7 @@ function ViolationBadge({ violations, aiVerdict }) {
   return React.createElement(
     'span',
     { className: 'cb-violation-badge ' + top.severity },
-    top.icon,
-    ' ',
+    textOnly ? null : top.icon + ' ',
     top.constraintLabel,
     moreCount > 0 ? ' +' + moreCount : '',
   );

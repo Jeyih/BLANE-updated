@@ -8,13 +8,12 @@ const SEASON_ICONS = {
   'out-of-season': '\u{1F327}\uFE0F',
   'year-round': '\u{1F4C5}',
 };
-function SeasonBadge({ scoreResult }) {
+function SeasonBadge({ scoreResult, textOnly = false }) {
   const icon = SEASON_ICONS[scoreResult.cssClass] || '\u{1F4C5}';
   return React.createElement(
     'span',
     { className: 'season-badge ' + scoreResult.cssClass },
-    icon,
-    ' ',
+    textOnly ? null : icon + ' ',
     scoreResult.label,
   );
 }

@@ -64,7 +64,7 @@ function createHandler({ loadReferenceData, saveDa, saveRetail,
           'Cache-Control': 'no-store',
           'Netlify-CDN-Cache-Control': 'no-store',
         },
-        body: JSON.stringify({ ...data, persistence,
+        body: JSON.stringify({ ...data, persistence: data.persistenceFailed ? 'memory' : persistence,
           warning: [data.warning, persistence === 'memory'
             ? 'Source checks are available, but new quotes are not saved to the database. Database persistence needs server configuration.'
             : ''].filter(Boolean).join(' '),
